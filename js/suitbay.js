@@ -138,44 +138,43 @@ function build(scene) {
   box(0.02, 0.03, 0.8, glowC, -W + 0.08, 1.9, railZ, { noCast: true });
 
   // The suit bench: steel frame, a synthetic-wood top, a thin pad; a rug under it.
-  const benchAt = new V3(0.15, 0, 0.0), seatY = 0.46;
+  const benchAt = new V3(0.0, 0, 0.0), seatY = 0.46, benchOff = 0.45;      // (the Captain sits toward one end: benchAt is that seat; the bench runs on to their left)
   {
-    const b = new THREE.Group(); b.position.copy(benchAt); G.add(b);
+    const b = new THREE.Group(); b.position.copy(benchAt); b.position.x += benchOff; G.add(b);
     const add = (m, mm) => { m.castShadow = true; m.receiveShadow = true; b.add(m); return m; };
     const top = add(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 0.44), F.paint(new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.55, metalness: 0 }), { grain: 0.06, scale: 20 })));
     top.position.y = seatY - 0.045;
     const pad = add(new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.03, 0.4), F.paint(new THREE.MeshStandardMaterial({ color: srgb('#4a3a34'), roughness: 0.9 }), { grain: 0.08, scale: 40 }))); pad.position.y = seatY - 0.01;
     for (const x of [-0.62, 0.62]) for (const z of [-0.16, 0.16]) { const l = add(new THREE.Mesh(new THREE.BoxGeometry(0.05, seatY - 0.07, 0.05), steelDark)); l.position.set(x, (seatY - 0.07) / 2, z); }
     for (const x of [-0.62, 0.62]) { const r = add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.36), steelDark)); r.position.set(x, 0.12, 0); }
-    const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 1.4), F.paint(new THREE.MeshStandardMaterial({ map: rugTex, roughness: 0.95 }), { grain: 0.1, scale: 30 })); rug.rotation.x = -Math.PI / 2; rug.position.set(0, 0.006, 0.25); rug.receiveShadow = true; b.add(rug);
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6), F.paint(new THREE.MeshStandardMaterial({ map: rugTex, roughness: 0.95 }), { grain: 0.1, scale: 30 })); rug.rotation.x = -Math.PI / 2; rug.position.set(-0.3, 0.006, 0.25); rug.receiveShadow = true; b.add(rug);
   }
 
   // Light: a cool, low fill; the amber pendant over the bench (the key, casting shadows); a cool rim from the status strips; the warm wash on the drape.
-  const hemi = new THREE.HemisphereLight(srgb('#5a7088'), srgb('#1a1612'), 0.35); G.add(hemi);
-  const amb = new THREE.AmbientLight(srgb('#2a3440'), 0.25); G.add(amb);
-  const pendant = new THREE.Group(); pendant.position.set(benchAt.x, 2.2, 0.25); G.add(pendant);
+  const hemi = new THREE.HemisphereLight(srgb('#8aa0b8'), srgb('#2a2018'), 0.9); G.add(hemi);
+  const amb = new THREE.AmbientLight(srgb('#3a4450'), 0.6); G.add(amb);
+  const pendant = new THREE.Group(); pendant.position.set(benchAt.x + 0.15, 2.2, 0.25); G.add(pendant);
   {
     const shadeM = std({ color: srgb('#a8762e'), roughness: 0.5, metalness: 0.6, side: THREE.DoubleSide });
     const sh = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.16, 24, 1, true), shadeM); pendant.add(sh);
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), glowA); bulb.position.y = -0.06; pendant.add(bulb);
-    cyl(0.008, 0.008, 0.38, pipeM, benchAt.x, 2.46, 0.25);
+    cyl(0.008, 0.008, 0.38, pipeM, benchAt.x + 0.15, 2.46, 0.25);
   }
-  const key = new THREE.SpotLight(srgb('#ffc890'), 38, 7, 1.0, 0.65, 2); key.position.set(benchAt.x, 2.12, 0.25); key.target.position.set(benchAt.x, 0, 0.3);
+  const key = new THREE.SpotLight(srgb('#ffc890'), 7, 7, 1.0, 0.75, 2); key.position.set(benchAt.x + 0.15, 2.12, 0.25); key.target.position.set(benchAt.x, 0, 0.3);
   key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; key.shadow.radius = 4; key.shadow.camera.near = 0.3; key.shadow.camera.far = 6;
   G.add(key); G.add(key.target);
-  const wallKey = new THREE.SpotLight(srgb('#ffbc80'), 12, 5, 0.75, 0.7, 2); wallKey.position.set(-1.2, 2.3, railZ + 0.2); wallKey.target.position.set(-2.1, 0.8, railZ);
+  const wallKey = new THREE.SpotLight(srgb('#ffbc80'), 4, 5, 0.75, 0.7, 2); wallKey.position.set(-1.2, 2.3, railZ + 0.2); wallKey.target.position.set(-2.1, 0.8, railZ);
   wallKey.castShadow = true; wallKey.shadow.mapSize.set(1024, 1024); wallKey.shadow.bias = -0.0005; wallKey.shadow.normalBias = 0.02; G.add(wallKey); G.add(wallKey.target);
-  const rim = new THREE.PointLight(srgb('#4ac8d8'), 3.2, 5, 2); rim.position.set(-1.0, 1.9, -D + 0.6); G.add(rim);
-  const rim2 = new THREE.PointLight(srgb('#3a7aa8'), 2.6, 6, 2); rim2.position.set(1.8, 1.6, 1.8); G.add(rim2);
+  const rim = new THREE.PointLight(srgb('#4ac8d8'), 2.0, 5, 2); rim.position.set(-1.0, 1.9, -D + 0.6); G.add(rim);
+  const rim2 = new THREE.PointLight(srgb('#5a8ab8'), 3.5, 7, 2); rim2.position.set(1.8, 1.6, 1.8); G.add(rim2);
   const alcove = new THREE.PointLight(srgb('#ffa860'), 1.6, 2.5, 2); alcove.position.set(-1.0, 2.0, -D + 0.5); G.add(alcove);
 
   const spots = {
-    bench: { at: new V3(benchAt.x, 0, benchAt.z), yaw: 0, seatY },
+    bench: { at: new V3(benchAt.x, 0, benchAt.z), yaw: 0, seatY, beside: new V3(benchAt.x + 0.62, 0, benchAt.z) },
     wall: { at: new V3(-W + 0.82, 0, railZ), yaw: -Math.PI / 2, rail: { x: -W + 0.12, y: railY, z: railZ, hi: railY + 0.32 } },
     watch: [{ at: new V3(1.55, 0, -1.2), yaw: -2.4 }, { at: new V3(-0.9, 0, -1.35), yaw: 2.6 }, { at: new V3(1.85, 0, 0.9), yaw: -1.9 }, { at: new V3(0.6, 0, -1.55), yaw: 3.0 }],
-    corner: { at: new V3(-W + 0.32, 0, -D + 0.32 + 1.2 + 1.3), yaw: -Math.PI / 2 },
+    corner: { at: new V3(W - 0.34, 0, D - 0.34), yaw: Math.PI / 4 },
   };
-  spots.corner = { at: new V3(W - 0.34, 0, D - 0.34), yaw: Math.PI / 4 };
   let t = 0;
   return { group: G, spots, key, tick(dt) { t += dt; glowR.emissiveIntensity = 3 + 1.5 * Math.sin(t * 2.2); G.userData.hatch.userData.red.intensity = 1.6 + 0.8 * Math.sin(t * 2.2); } };
 }

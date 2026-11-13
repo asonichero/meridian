@@ -20,20 +20,23 @@ const PAIN = {
   // What clothing takes off the sting (the sharp part; the deep ache goes through cloth untouched): by garment, stacking.
   CUSHION: {}, CUSHION_MAX: 0.7,   // PENDING: what's worn in a session isn't in the GDD; garments and how much each cushions are added once decided
   CAP: 70,                               // the capacity at tolerance 0.5 is CAP × (0.7 + 0.6 × tolerance)
-  EDGE: 1, TOO_HARSH: 1.5,   // distress at the edge of resistance, and half again past it, where it's too harsh
-  BANDS: [[0.3, 'composed'], [0.6, 'flinching'], [0.9, 'struggling'], [1, 'close to the edge of resistance'], [1.5, 'past the edge of resistance: most receptive'], [Infinity, 'too harsh']],
+  // Distress at the edge of resistance, and where it's too harsh. Meridian raises redlessons' bar (1.5) and asks that it be held a moment
+  // (HARSH_HOLD seconds) before it counts, or overshot by a quarter, so a correction can run long without tripping it: since the player is the
+  // one who disciplines, this is what the crew member's safe word is called on (js/session.js).
+  EDGE: 1, TOO_HARSH: 1.8, HARSH_HOLD: 1.2, HARSH_SPIKE: 1.25,
+  BANDS: [[0.3, 'composed'], [0.6, 'flinching'], [0.9, 'struggling'], [1, 'close to the edge of resistance'], [1.8, 'past the edge of resistance: most receptive'], [Infinity, 'too harsh']],
 };
 
 function createPain(stats = {}) {
   const st = { tolerance: 0.5, resilience: 0.5, ...stats };
-  const P = { stats: st, sting: 0, ache: 0, hits: 0, last: null, dwell: 0, atEdge: false, atLimit: false, tooHarsh: false, peak: 0 };
+  const P = { stats: st, sting: 0, ache: 0, hits: 0, last: null, dwell: 0, atEdge: false, atLimit: false, tooHarsh: false, peak: 0, over: 0 };
   P.capacity = () => PAIN.CAP * (0.7 + 0.6 * st.tolerance);
   P.level = () => P.sting + P.ache;
   P.distress = () => P.level() / P.capacity();
   // How receptive they are to the lesson: little while composed, building as they struggle, fullest from the edge of resistance to half again past it, and gone once it's too harsh.
   P.receptivity = () => { const d = P.distress(), t = Math.max(0, Math.min(1, (d - 0.5) / 0.5)), r = 0.15 + 0.85 * t * t * (3 - 2 * t); return d < PAIN.TOO_HARSH ? r : 0; };
   P.inEdge = () => { const d = P.distress(); return d >= PAIN.EDGE && d < PAIN.TOO_HARSH; };
-  const mark = () => { const d = P.distress(); if (d >= PAIN.EDGE) P.atEdge = P.atLimit = true; if (d >= PAIN.TOO_HARSH) P.tooHarsh = true; };
+  const mark = (dt) => { const d = P.distress(); if (d >= PAIN.EDGE) P.atEdge = P.atLimit = true; P.over = d >= PAIN.TOO_HARSH ? P.over + (dt || 0) : 0; if (P.over >= PAIN.HARSH_HOLD || d >= PAIN.TOO_HARSH * PAIN.HARSH_SPIKE) P.tooHarsh = true; };
   P.band = () => PAIN.BANDS.find(([max]) => P.distress() < max)[1];
   // A smack lands. info: { implement, strength (0–1), speed (1 = standard), raised (seconds the arm waited raised), tender (0–1), cushion (0–1) }.
   // Returns { pain, reaction }: this smack's pain, and how hard they react (0–1) given it and how they already are.
@@ -62,9 +65,11 @@ function createPain(stats = {}) {
     }
     const k = 0.5 + st.resilience;   // the fade rate: resilient people recover faster
     P.sting *= Math.exp(-dt * k / PAIN.TAU_STING); P.ache *= Math.exp(-dt * k / PAIN.TAU_ACHE);
-    mark();
+    mark(dt);
   };
-  P.reset = () => { P.sting = P.ache = 0; P.hits = 0; P.last = null; P.dwell = 0; P.atEdge = P.atLimit = P.tooHarsh = false; P.peak = 0; };
+  P.reset = () => { P.sting = P.ache = 0; P.hits = 0; P.last = null; P.dwell = 0; P.atEdge = P.atLimit = P.tooHarsh = false; P.peak = 0; P.over = 0; };
+  // Soothing: a palm in slow circles takes the edge off the sting (faster than it fades by itself), and a little of the ache.
+  P.soothe = dt => { P.sting *= Math.exp(-dt * 0.6); P.ache *= Math.exp(-dt * 0.004); };
   return P;
 }
 

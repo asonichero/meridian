@@ -72,7 +72,20 @@ What the GDD says about stakes and progression:
 
 ---
 
-## 3. Open questions
+## 3. Decisions so far (from the designer)
+
+- **Look:** redlessons' toon style (cel shading, outlines, painted faces) with smoother skeletons, limbs and joints, leaning toward sculpted stylised models (the Mixamo examples). Real body proportions; natural joint movement; a moodier palette than Young Suns.
+- **Consent:** each crew member is taken in hand separately, only after the method has been fully explained to them, their safe word agreed, and their full consent given. The player is the disciplinarian, so the stop relies on a "too harsh" trigger with a high bar, so sequences don't trend short. As in fairy-shoe, the crew member calls the word themselves.
+- **Positions:** for now, two: seated over the knee, and hands on the wall or gripping supports with feet spread. More can be added as the narrative offers them.
+- **Clothes:** a standard uniform (original, inspired by utopian-militaristic uniforms, but not close to Star Trek) and off-duty wear (closer to Firefly). Both separate into trousers and top. Each garment is a separate mesh with lowered or raised variants.
+- **Implements:** unlocked through the narrative with the ship's AI as the Captain learns. The test has the hand only.
+- **Control:** the player controls when runs begin and end (a toggle, not numbered runs), pace and strength, plus soothing on chosen areas. Some scripted responses per character. A conversation follows each correction, giving aftercare through dialogue and an instruction to the crew member.
+- **Witnesses and turns:** corrections can have other crew as witnesses, or several crew members disciplined in turn, as redlessons does.
+- **Cast:** the player chooses the crew's gender balance and the AI's gender, plus basic customisation for their own character. Each crew member has a baseline body type, translated to male or female. The rest is drafted (`js/crew.js`) for review.
+- **Assets:** allowed. For now everything is still made in code.
+- **First milestone:** a playable correction scene to test the control scheme, models and style (`session.html`).
+
+## 4. Open questions
 
 ### A. Look
 

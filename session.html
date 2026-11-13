@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Meridian · Correction</title>
+<style>
+:root { --panel: rgba(16, 20, 26, 0.86); --line: #34404c; --ink: #e8e0d0; --dim: #9aa4ae; --amber: #e8a84a; --red: #d8503e; --teal: #4ac0c8; }
+html, body { margin: 0; height: 100%; background: #07090c; color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+#view { position: fixed; inset: 0; }
+button { font: inherit; color: var(--ink); background: #222a33; border: 1px solid var(--line); border-radius: 12px; padding: 6px 11px; cursor: pointer; }
+button:hover { border-color: #56687a; } button.on { background: #4a3a22; border-color: var(--amber); color: #ffe2b0; } button:disabled { opacity: 0.4; cursor: default; }
+.panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; backdrop-filter: blur(6px); }
+#setup { top: 12px; left: 12px; width: 330px; max-height: calc(100% - 210px); overflow: auto; padding: 12px 14px; }
+#setup h1 { font-size: 16px; margin: 0 0 2px; letter-spacing: 0.04em; } #setup p.sub { margin: 0 0 8px; color: var(--dim); font-size: 12px; }
+#setup h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--dim); margin: 12px 0 6px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.crew { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 6px; align-items: center; }
+.crew .nm { font-size: 13px; } .crew .nm small { color: var(--dim); display: block; font-size: 11px; }
+.seg button { border-radius: 0; margin-left: -1px; } .seg button:first-child { border-radius: 12px 0 0 12px; } .seg button:last-child { border-radius: 0 12px 12px 0; }
+.sw { width: 22px; height: 22px; border-radius: 50%; padding: 0; border: 2px solid transparent; } .sw.on { border-color: var(--amber); }
+#hide { position: fixed; top: 12px; left: 352px; } #setup.closed { display: none; }
+#bar { left: 50%; transform: translateX(-50%); bottom: 12px; padding: 10px 12px; width: min(980px, calc(100% - 24px)); box-sizing: border-box; }
+#bar .grp { display: flex; flex-direction: column; gap: 4px; } #bar .lab { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--dim); }
+#bar .top { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; justify-content: center; }
+#run { font-size: 16px; padding: 10px 22px; border-radius: 16px; min-width: 120px; } #run.on { background: #6a2a22; border-color: var(--red); color: #ffd8cc; }
+.val { min-width: 38px; text-align: center; color: var(--amber); }
+#meter { margin-top: 8px; display: flex; align-items: center; gap: 10px; }
+#track { position: relative; flex: 1; height: 10px; background: #1a2028; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+#fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #4a8a7a, #c8a040 45%, #d8603e 70%, #a02a3a); }
+#track .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.35); } #track .harsh { width: 2px; background: var(--red); }
+#info { font-size: 12px; color: var(--dim); min-width: 280px; text-align: right; } #info b { color: var(--ink); }
+#say { position: fixed; left: 50%; transform: translateX(-50%); bottom: 168px; width: min(760px, calc(100% - 24px)); padding: 14px 18px 12px; display: none; }
+#say .who { position: absolute; top: -12px; left: 18px; background: #2a3440; border: 1px solid var(--line); border-radius: 10px; padding: 1px 10px; font-size: 12px; color: var(--amber); }
+#say .who.cap { color: var(--teal); } #say .txt { font-size: 16px; min-height: 22px; } #say .choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+#word { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); padding: 10px 18px; display: none; color: #ffd8cc; border-color: var(--red); font-weight: 600; }
+#who { position: fixed; top: 12px; right: 12px; padding: 10px 14px; min-width: 200px; } #who .nm { font-size: 15px; } #who small { color: var(--dim); display: block; }
+#cams { position: fixed; right: 12px; top: 96px; display: flex; flex-direction: column; gap: 4px; }
+#summary { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 18px 22px; display: none; min-width: 360px; }
+#summary table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; } #summary td { padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
+kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
+@media (max-width: 720px) { #setup { width: calc(100% - 24px); max-height: 40%; } #hide { left: auto; right: 12px; top: auto; bottom: 200px; } #say { bottom: 220px; } #who { display: none; } #cams { top: auto; bottom: 230px; } }
+</style>
+</head>
+<body>
+<div id="view"></div>
+
+<div id="setup" class="panel">
+  <h1>Correction test</h1>
+  <p class="sub">The suit bay. Choose who's corrected (in order), who witnesses, and how; then begin. The player runs it: runs of smacks on a toggle, pace, strength, where, and soothing between. If it goes too far, the crew member calls their agreed word and it stops.</p>
+  <h2>Position</h2>
+  <div class="row seg" id="pos"><button data-v="otk" class="on">Across the knee</button><button data-v="wall">At the wall</button></div>
+  <h2>Crew <span style="text-transform:none;letter-spacing:0">(tap: corrected → witness → absent)</span></h2>
+  <div class="crew" id="crew"></div>
+  <h2>Between turns</h2>
+  <div class="row seg" id="between"><button data-v="corner" class="on">The corner</button><button data-v="aside">Stand aside</button></div>
+  <h2>Outfit</h2>
+  <div class="row seg" id="outfit"><button data-v="uniform" class="on">Uniform</button><button data-v="offduty">Off duty</button></div>
+  <h2>Captain (you)</h2>
+  <div class="row seg" id="csex"><button data-v="m" class="on">Male</button><button data-v="f">Female</button></div>
+  <div class="row" id="cskin" style="margin-top:6px"></div>
+  <div class="row" id="chair" style="margin-top:6px"></div>
+  <div class="row" id="cstyle" style="margin-top:6px"></div>
+  <div class="row seg" id="cbuild" style="margin-top:6px"><button data-v="lean">Lean</button><button data-v="average" class="on">Average</button><button data-v="heavy">Heavy</button></div>
+  <div class="row" style="margin-top:14px"><button id="begin" class="on">Begin</button> <a href="figures.html" style="color:var(--dim);font-size:12px">the crew line-up</a></div>
+</div>
+<button id="hide">☰</button>
+
+<div id="who" class="panel"><div class="nm" id="whoNm">—</div><small id="whoSub"></small><small id="whoWord"></small></div>
+<div id="cams"></div>
+<div id="word" class="panel"></div>
+<div id="say" class="panel"><div class="who" id="sayWho"></div><div class="txt" id="sayTxt"></div><div class="choices" id="choices"></div></div>
+<div id="summary" class="panel"></div>
+
+<div id="bar" class="panel">
+  <div class="top">
+    <div class="grp"><span class="lab">Run <kbd>Space</kbd></span><button id="run">Start run</button></div>
+    <div class="grp"><span class="lab">Pace <kbd>[ ]</kbd></span><div class="row"><button data-k="pace" data-d="-0.1">−</button><span class="val" id="paceV">1.0×</span><button data-k="pace" data-d="0.1">+</button></div></div>
+    <div class="grp"><span class="lab">Strength <kbd>- =</kbd></span><div class="row"><button data-k="strength" data-d="-0.1">−</button><span class="val" id="strengthV">1.0×</span><button data-k="strength" data-d="0.1">+</button></div></div>
+    <div class="grp"><span class="lab">Side <kbd>D</kbd></span><div class="row seg" id="side"><button data-v="alt" class="on">Alt</button><button data-v="L">Left</button><button data-v="R">Right</button></div></div>
+    <div class="grp"><span class="lab">Where <kbd>A</kbd></span><div class="row seg" id="area"><button data-v="upper">Upper</button><button data-v="centre" class="on">Centre</button><button data-v="sitspot">Sit spot</button><button data-v="thighs">Thighs</button></div></div>
+    <div class="grp"><span class="lab">Soothe <kbd>S</kbd> · area <kbd>F</kbd></span><div class="row"><button id="soothe">Soothe</button><div class="seg row" id="sarea"><button data-v="seat" class="on">Both</button><button data-v="L">L</button><button data-v="R">R</button><button data-v="thighs">Thighs</button><button data-v="back">Back</button></div></div></div>
+    <div class="grp"><span class="lab">Clothes <kbd>T B U</kbd></span><div class="row"><button id="cTop">Top: down</button><button id="cBot">Trousers: up</button><button id="cUnd">Briefs: up</button></div></div>
+    <div class="grp"><span class="lab">Turn <kbd>Enter</kbd></span><button id="end">End turn</button></div>
+  </div>
+  <div id="meter"><div id="track"><div id="fill"></div></div><div id="info"></div></div>
+</div>
+
+<script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script>
+<script src="js/pain.js"></script><script src="js/audio.js"></script><script src="js/crew.js"></script><script src="js/lines.js"></script>
+<script src="js/figure.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/session.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
+const KEY = 'meridian:session:v1';
+const cfg = Object.assign({ position: 'otk', between: 'corner', outfit: 'uniform', roles: { pilot: 'subject', engineer: 'witness' }, sex: { scientist: 'f', engineer: 'm', pilot: 'f', lifesupport: 'm', comms: 'f', medic: 'm' },
+  order: ['pilot'], captain: { sex: 'm', skin: '#b88a6a', hair: '#3a2a20', hairStyle: 'crop', build: 'average', beard: true } }, (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } })());
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* no storage */ } };
+const seg = (id, val, fn) => { const el = $(id); el.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === val); b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); }; }); };
+
+// ── Setup ──
+function drawCrew() {
+  const el = $('crew'); el.innerHTML = '';
+  for (const id of Crew.IDS) {
+    const r = Crew.ROSTER[id], role = cfg.roles[id] || 'absent', n = cfg.order.indexOf(id);
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.innerHTML = `${r.title ? r.title + ' ' : ''}${r.name}<small>${r.role}</small>`;
+    const rb = document.createElement('button'); rb.textContent = role === 'subject' ? `Corrected #${n + 1}` : role === 'witness' ? 'Witness' : 'Absent'; rb.className = role === 'absent' ? '' : 'on';
+    rb.onclick = () => { const nx = role === 'subject' ? 'witness' : role === 'witness' ? 'absent' : 'subject'; cfg.roles[id] = nx; cfg.order = cfg.order.filter(x => x !== id); if (nx === 'subject') cfg.order.push(id); save(); drawCrew(); };
+    const sb = document.createElement('button'); sb.textContent = cfg.sex[id] === 'm' ? '♂' : '♀'; sb.title = 'Gender';
+    sb.onclick = () => { cfg.sex[id] = cfg.sex[id] === 'm' ? 'f' : 'm'; save(); drawCrew(); };
+    el.append(nm, rb, sb);
+  }
+}
+function drawCaptain() {
+  const C = cfg.captain, O = Crew.CAPTAIN.options;
+  seg('csex', C.sex, v => { C.sex = v; if (!O.hairStyle[v].includes(C.hairStyle)) C.hairStyle = O.hairStyle[v][0]; save(); drawCaptain(); });
+  const sw = (id, list, k) => { const el = $(id); el.innerHTML = ''; for (const c of list) { const b = document.createElement('button'); b.className = 'sw' + (C[k] === c ? ' on' : ''); b.style.background = c; b.onclick = () => { C[k] = c; save(); drawCaptain(); }; el.append(b); } };
+  sw('cskin', O.skin, 'skin'); sw('chair', O.hair, 'hair');
+  const el = $('cstyle'); el.innerHTML = ''; for (const s of O.hairStyle[C.sex]) { const b = document.createElement('button'); b.textContent = s; b.className = C.hairStyle === s ? 'on' : ''; b.onclick = () => { C.hairStyle = s; save(); drawCaptain(); }; el.append(b); }
+  seg('cbuild', C.build, v => { C.build = v; save(); });
+}
+seg('pos', cfg.position, v => { cfg.position = v; save(); if (ses) ses.position(v); drawCams(); });
+seg('between', cfg.between, v => { cfg.between = v; save(); if (ses) ses.st.between = v; });
+seg('outfit', cfg.outfit, v => { cfg.outfit = v; save(); });
+drawCrew(); drawCaptain();
+$('hide').onclick = () => $('setup').classList.toggle('closed');
+
+// ── The stage ──
+const stage = Stage.create($('view'), { keep: !!q.get('still') }), bay = SuitBay.build(stage.scene);
+let ses = null;
+function begin() {
+  if (!cfg.order.length) { alert('Choose at least one crew member to be corrected.'); return; }
+  if (ses) { for (const P of ses.people) stage.scene.remove(P.f.root); stage.scene.remove(ses.captain.root); }
+  const p = id => ({ id, sex: cfg.sex[id] || 'f', outfit: cfg.outfit });
+  ses = Session.create(stage, bay, { captain: cfg.captain, position: cfg.position, between: cfg.between, queue: cfg.order.map(p), witnesses: Crew.IDS.filter(id => cfg.roles[id] === 'witness').map(p), sound: !q.get('still') });
+  ses.on(onEvent); ses.start(); drawCams(); refresh();
+  $('summary').style.display = 'none'; $('word').style.display = 'none';
+  if (innerWidth < 900) $('setup').classList.add('closed');
+  window.ses = ses;
+}
+$('begin').onclick = () => { audioOn(); begin(); };
+function audioOn() { if (window.GameAudio && GameAudio.init()) { GameAudio.ambience({ air: 0.6, hum: 0.7, chatter: 0.25 }); GameAudio.startMusic({ theme: 'session' }); } }
+
+// ── The dialogue box: lines type out, babbled in the speaker's voice ──
+let sayTimer = null, sayQueue = Promise.resolve();
+function showLine(who, id, text, hold) {
+  return new Promise(res => {
+    const box = $('say'), nm = id === 'captain' ? 'Captain' : Crew.ROSTER[id].short;
+    box.style.display = 'block'; $('sayWho').textContent = nm; $('sayWho').className = 'who' + (id === 'captain' ? ' cap' : ''); $('choices').innerHTML = '';
+    const el = $('sayTxt'); el.textContent = ''; let i = 0; clearInterval(sayTimer);
+    if (window.GameAudio && GameAudio.ctx) GameAudio.speak(id, text, Math.min(3, text.length * 0.035), { pitch: id === 'captain' ? (cfg.captain.sex === 'm' ? 140 : 200) : Crew.pitch(id, cfg.sex[id]) });
+    sayTimer = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) { clearInterval(sayTimer); setTimeout(res, hold == null ? 1400 : hold); } }, 24);
+  });
+}
+function choose(options) {
+  return new Promise(res => { const el = $('choices'); el.innerHTML = ''; options.forEach((o, i) => { const b = document.createElement('button'); b.textContent = `${i + 1}. ${o.label}`; b.onclick = () => { el.innerHTML = ''; res(o); }; el.append(b); }); window.__choose = options.map((o, i) => () => el.children[i] && el.children[i].click()); });
+}
+
+// ── Events ──
+function onEvent(type, d) {
+  if (type === 'say') sayQueue = sayQueue.then(() => showLine(d.who, d.id, d.text, 900));
+  if (type === 'word') { const w = $('word'); w.textContent = `${Crew.ROSTER[d.id].short} called their word: “${d.word}”. It stops.`; w.style.display = 'block'; setTimeout(() => (w.style.display = 'none'), 4200); }
+  if (type === 'done') sayQueue = sayQueue.then(() => aftercareAll(d.results));
+  refresh();
+}
+async function aftercareAll(results) {
+  for (const r of results) {
+    ses.aftercare(r.id); ses.camera(0); refresh();
+    const P = ses.people.find(p => p.id === r.id);
+    const run = async steps => {
+      for (const s of steps) {
+        if (s.choose) { const o = await choose(s.choose); r.choice = r.choice || []; r.choice.push(o.order || o.label); await run(o.then); continue; }
+        const id = s.who === 'captain' ? 'captain' : r.id; if (s.expr && P) P.f.setExpr(s.expr);
+        await showLine(s.who, id, s.text, s.who === 'captain' ? 600 : 1100);
+      }
+    };
+    await run(Lines.after(r.id, r.outcome));
+  }
+  $('say').style.display = 'none';
+  const S = $('summary'); S.style.display = 'block';
+  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${Crew.ROSTER[r.id].short}</td><td>${r.position === 'otk' ? 'across the knee' : 'at the wall'}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${Crew.ROSTER[r.id].word}”` : 'completed'}</td><td>peak: ${r.band}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
+}
+
+// ── Live controls ──
+const P0 = { pace: [0.5, 2], strength: [0.4, 1.6] };
+document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => bump(b.dataset.k, +b.dataset.d));
+function bump(k, d) { if (!ses) return; ses.set({ [k]: Math.round(Math.min(P0[k][1], Math.max(P0[k][0], ses.st[k] + d)) * 10) / 10 }); }
+seg('side', 'alt', v => ses && ses.set({ side: v }));
+seg('area', 'centre', v => ses && ses.set({ area: v }));
+seg('sarea', 'seat', v => ses && ses.set({ sootheArea: v }));
+$('run').onclick = () => { audioOn(); ses && ses.run(); };
+$('soothe').onclick = () => ses && ses.set({ soothe: !ses.st.soothe });
+$('end').onclick = () => ses && ses.endTurn();
+const cyc = (k, list) => { const i = list.indexOf(ses.st[k]); const v = list[(i + 1) % list.length]; ses.set({ [k]: v }); const el = { side: 'side', area: 'area', sootheArea: 'sarea' }[k]; $(el).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); };
+const flip = k => { const c = ses.current; if (!c) return; const s = c.f.state; ses.dress({ [k]: s[k] === 'up' || s[k] === 'down' && k === 'top' ? (k === 'top' ? (s.top === 'up' ? 'down' : 'up') : 'down') : 'up' }); };
+$('cTop').onclick = () => ses && ses.dress({ top: ses.current.f.state.top === 'up' ? 'down' : 'up' });
+$('cBot').onclick = () => ses && ses.dress({ bottoms: ses.current.f.state.bottoms === 'up' ? 'down' : 'up' });
+$('cUnd').onclick = () => ses && ses.dress({ under: ses.current.f.state.under === 'up' ? 'down' : 'up' });
+addEventListener('keydown', e => {
+  if (!ses || e.target.tagName === 'INPUT') return; const k = e.key;
+  if (k === ' ') { e.preventDefault(); audioOn(); ses.run(); }
+  else if (k === '[') bump('pace', -0.1); else if (k === ']') bump('pace', 0.1); else if (k === '-') bump('strength', -0.1); else if (k === '=' || k === '+') bump('strength', 0.1);
+  else if (k === 'd' || k === 'D') cyc('side', ['alt', 'L', 'R']); else if (k === 'a' || k === 'A') cyc('area', ses.AREAS);
+  else if (k === 's' || k === 'S') ses.set({ soothe: !ses.st.soothe }); else if (k === 'f' || k === 'F') cyc('sootheArea', ['seat', 'L', 'R', 'thighs', 'back']);
+  else if (k === 't' || k === 'T') $('cTop').click(); else if (k === 'b' || k === 'B') $('cBot').click(); else if (k === 'u' || k === 'U') $('cUnd').click();
+  else if (k === 'Enter') ses.endTurn(); else if (k === 'c' || k === 'C') { ses.camera(ses.st.cam + 1); drawCams(); }
+  else if (/^[1-4]$/.test(k) && window.__choose && window.__choose[+k - 1]) window.__choose[+k - 1]();
+});
+function drawCams() { const el = $('cams'); el.innerHTML = ''; if (!ses) return; const set = ses.CAMS[ses.st.phase === 'after' ? 'after' : ses.st.position]; set.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = ses.st.cam === i ? 'on' : ''; b.onclick = () => { ses.camera(i); drawCams(); }; el.append(b); }); }
+function refresh() {
+  if (!ses) return; const st = ses.st, c = ses.current;
+  $('run').textContent = st.running ? 'Stop run' : 'Start run'; $('run').classList.toggle('on', st.running); $('run').disabled = !c || st.phase !== 'turn';
+  $('soothe').classList.toggle('on', st.soothe); $('paceV').textContent = st.pace.toFixed(1) + '×'; $('strengthV').textContent = st.strength.toFixed(1) + '×';
+  if (c && c.f) { const s = c.f.state; $('cTop').textContent = 'Top: ' + (s.top === 'up' ? 'raised' : 'down'); $('cBot').textContent = 'Trousers: ' + (s.bottoms === 'up' ? 'up' : 'lowered'); $('cUnd').textContent = 'Briefs: ' + (s.under === 'up' ? 'up' : 'lowered'); }
+  if (c) { const r = c.r; $('whoNm').textContent = (r.title ? r.title + ' ' : '') + r.name; $('whoSub').textContent = r.role + (st.phase === 'after' ? ' · aftercare' : ''); $('whoWord').textContent = 'Agreed word: ' + r.word; }
+}
+// the meter: distress against the bar (the band ticks, and the safe-word bar in red)
+{ const tr = $('track'), max = 2.0; for (const v of [0.3, 0.6, 0.9, 1.0]) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (v / max * 100) + '%'; tr.append(t); } const h = document.createElement('div'); h.className = 'tick harsh'; h.style.left = (Pain.PAIN.TOO_HARSH / max * 100) + '%'; tr.append(h);
+  window.__meter = () => { if (!ses) return; const c = ses.current, d = c ? c.pain.distress() : 0; $('fill').style.width = Math.min(100, d / max * 100) + '%';
+    $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
+
+// ── Run ──
+begin();
+const each = dt => { if (ses) ses.update(dt); bay.tick(dt); window.__meter(); };
+if (q.get('still')) { stage.controls.enableDamping = false; window.step = (n, dt) => { for (let i = 0; i < n; i++) stage.step((dt || 0.05) * 1000, each); }; window.step(4); window.ready = true; }
+else { stage.start(each); window.ready = true; }
+</script>
+</body>
+</html>
