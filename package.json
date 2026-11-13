@@ -1,0 +1,10 @@
+{
+  "name": "meridian",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Project Meridian (working title): deep-space psychological action-adventure and management sim, built on the discipline/pain engine from Little Red's Lessons",
+  "scripts": {
+    "serve": "python3 -m http.server 8123",
+    "test": "node --test tests/*.test.js"
+  }
+}
