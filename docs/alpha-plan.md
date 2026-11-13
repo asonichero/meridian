@@ -44,7 +44,7 @@ What the GDD says about stakes and progression:
 | 11 | Evening check-in and Proctor evaluation | GDD §3.5 | How it scores, and what "holding the player accountable" means while it's voice-only, are **open** |
 | 12 | Public boundary progression | GDD §7.1 | Its rate is **open** |
 | 13 | Loss conditions (2) | GDD §7.2 | Thresholds are **open** |
-| 14 | Realistic characters and environments, in a *Young Suns*-like look | Your brief | See open question A |
+| 14 | Realistic skeletons and proportions in a *Young Suns*-like stylised look | Your brief | See open question A |
 
 ---
 
@@ -75,9 +75,20 @@ What the GDD says about stakes and progression:
 ## 3. Open questions
 
 ### A. Look
-1. youngsuns.com is blocked from this environment's network, so I couldn't view it. What specifically do you want from it? For example: realism level, character proportions and faces, suits or helmets, palette, lighting mood. Reference screenshots dropped into the repo would help, or the site can be added to the environment's network allowlist.
-2. "More realistic skeletons": does this mean realistic human proportions and a fuller bone rig (spine, clavicles, fingers), realistic **animation** (mocap), or both?
-3. Should faces stay expressive like redlessons' ten painted expressions, but rendered realistically? Or should they be more restrained?
+
+**What Young Suns looks like** (KO_OP's press kit, docs.ko-op.com, and youngsuns.com, read 2026-11-13). It's **stylised, painterly 3D, not photoreal**:
+- **Characters:** close to real human proportions (no oversized heads, unlike redlessons). Chunky, simplified forms with hand-painted textures. Faces are expressive but not cartoon. Bulky suits and backpacks, some with helmets.
+- **Ship interiors:** cosy and cluttered. Industrial pipes, panels and crates in saturated paint (yellows, oranges, teals), with crew-made decoration (patterned wall panels, bunting, rugs, plants, mismatched furniture) and warm practical lights.
+- **Exteriors:** pastel skies and planetscapes (purple, pink, peach) against deep blues.
+- **Effects:** soft bloom and glowing emissives, with clean readable silhouettes.
+- **UI:** rounded dialogue boxes with a speaker-name tab, much like redlessons' `talk.js` box.
+
+That suits the GDD's §4 description well: "brushed steel, exposed conduit … balanced by warm, personalized pockets … synthetic wood wrapping, ambient amber lighting, replicated drapes."
+
+1. Is the reading above right: **realistic skeletons and proportions** (adult bodies, normal head size, a fuller rig), rendered in Young Suns' **stylised painterly** way (soft PBR or painted shading, no ink outlines)? Or do you want the rendering itself to be more realistic than Young Suns?
+2. "Realistic skeletons": a fuller bone rig (spine segments, clavicles, fingers), realistic **animation** (mocap, which redlessons already retargets), or both?
+3. Faces: keep redlessons' painted expression system (ten expressions that morph smoothly), restyled for Young Suns-like faces, or move to sculpted 3D faces with blend shapes?
+4. Palette: Young Suns is bright and optimistic. Meridian's premise (isolation, relativistic crisis) suggests something moodier. Should the palette stay saturated, or be muted and colder with warm pockets?
 
 ### B. Cast
 4. Names, ages, genders and pronouns, and appearances for the six crew and the Captain.
