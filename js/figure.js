@@ -481,7 +481,7 @@ function make(spec) {
   if (GLB.sex[spec.sex] && spec.model !== 'built') return makeGLB(spec, GLB.sex[spec.sex]);
   const S = shapeOf(spec), F = { spec, S, root: new THREE.Group(), bone: {}, bones: [] };
   // (the heights posing works from, in the figure's own units: the pelvis, the ankle, the pelvis over what it sits on; the arms' rest angle out)
-  F.H = { hips: 0.95, ankle: 0.08, sit: 0.13, abd: 0, waist: 1.0 };
+  F.H = { hips: 0.95, ankle: 0.08, sit: 0.13, abd: 0, waist: 1.0, blades: 1.3 };
   F.root.scale.setScalar(spec.height / 1.75);
 
   // Skeleton
@@ -599,14 +599,14 @@ function spotsOn(F, bodyGeo, at, reach) {
   syncMarks();
 }
 // Places on the body for a hand to rest (F.surface takes them as it does the spots): the outer side of the waist, just over the hip, on each side
-// (sideL, sideR), and the small of the back (back).
+// (sideL, sideR), the small of the back (back), and between the shoulder blades (blades).
 function anchorsOn(F, geo) {
   const p = geo.attributes.position, n = geo.attributes.normal, reg = geo.attributes.region, yW = F.H.waist;
   const torso = [R.CHEST, R.WAIST, R.WAIST_HI, R.HIPS, R.HIPS_LO, R.SEAT];
-  const pick = score => { let best = -1, bs = -1e9; for (let i = 0; i < p.count; i++) { if (!torso.includes(reg.getX(i)) || Math.abs(p.getY(i) - yW) > 0.012) continue; const v = score(i); if (v > bs) { bs = v; best = i; } } return best; };
+  const pick = (score, y) => { y = y == null ? yW : y; let best = -1, bs = -1e9; for (let i = 0; i < p.count; i++) { if (!torso.includes(reg.getX(i)) || Math.abs(p.getY(i) - y) > 0.012) continue; const v = score(i); if (v > bs) { bs = v; best = i; } } return best; };
   F.anchor = {};
   for (const [k, sx] of [['sideL', 1], ['sideR', -1]]) { const i = pick(j => (sx * n.getX(j) > 0.75 ? sx * p.getX(j) : -1e9)); F.anchor[k] = { i, bind: new V3(p.getX(i), p.getY(i), p.getZ(i)) }; }
-  { const i = pick(j => (Math.abs(p.getX(j)) < 0.015 && n.getZ(j) < -0.7 ? -p.getZ(j) : -1e9)); F.anchor.back = { i, bind: new V3(p.getX(i), p.getY(i), p.getZ(i)) }; }
+  for (const [k, y] of [['back', yW], ['blades', F.H.blades]]) { const i = pick(j => (Math.abs(p.getX(j)) < 0.015 && n.getZ(j) < -0.7 ? -p.getZ(j) : -1e9), y); F.anchor[k] = { i, bind: new V3(p.getX(i), p.getY(i), p.getZ(i)) }; }
 }
 // Expression and life: the face easing between expressions, blinking, breathing, the hands' grip, the rest pose, the flesh's give.
 function finish(F, spec) {
@@ -1098,7 +1098,7 @@ function makeGLB(spec, T) {
   F.root.updateMatrixWorld(true);
   F.skeleton = new THREE.Skeleton(F.bones); F.bindM = F.root.matrixWorld.clone();
   F.rest = {}; for (const b of F.bones) F.rest[b.name] = b.getWorldPosition(new V3());
-  F.H = { hips: T.joints.hips[1], ankle: T.joints.footL[1], sit: T.joints.hips[1] - T.L.crotch + 0.008, abd: T.L.abd, waist: T.L.waist - 0.03 };
+  F.H = { hips: T.joints.hips[1], ankle: T.joints.footL[1], sit: T.joints.hips[1] - T.L.crotch + 0.008, abd: T.L.abd, waist: T.L.waist - 0.03, blades: T.L.armpit + 0.03 };
   F.keys = bodyKeys(spec);
   for (const k in T.mesh) T.mesh[k].geo.userData.keys = T.mesh[k].keys;
   // the body

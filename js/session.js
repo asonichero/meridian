@@ -290,7 +290,7 @@ function create(stage, bay, opts) {
   function poseCaptainHands(dt) {
     const F = captain, sw = st.swing, cs = sc(F);
     // the left hand: across the knee, resting on the small of their back, the fingers on toward their hips and round the far side, the forearm
-    // lying along their back (the elbow down on it, toward their shoulders); at the wall, flat on the small of the back
+    // lying along their back (the elbow down on it, toward their shoulders); at the wall, flat between their shoulder blades
     const back = W_(cur.f, 'spine'), bn = toWorldDir(cur.f, 0, 0, -1).normalize(), cloth = lift() * 0.6;
     if (st.position === 'otk') {
       const bk = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth), far = otkX.clone().negate(), s_ = sc(cur.f);
@@ -301,7 +301,8 @@ function create(stage, bay, opts) {
       reach(F, 'L', LW, elbowAt.sub(sh.clone().lerp(LW, 0.5)).normalize(), bk.n.clone().negate(), fing);
       F.grip('L', 0.22, 0.15, 0.2);
     } else {
-      const bk = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth), across = toWorldDir(cur.f, -1, 0, 0.25), fing = across.clone().addScaledVector(bk.n, -across.dot(bk.n)).normalize();
+      // (between the shoulder blades, the fingers across the back away from him)
+      const bk = cur.f.surface('blades', { p: new V3(), n: new V3() }, cloth), across = toWorldDir(cur.f, -1, 0, 0.25), fing = across.clone().addScaledVector(bk.n, -across.dot(bk.n)).normalize();
       reach(F, 'L', bk.p.clone().addScaledVector(bk.n, 0.014).addScaledVector(fing, -0.07 * cs), toWorldDir(F, 0.8, -0.5, -0.2).normalize(), bk.n.clone().negate(), fing);
       F.grip('L', 0.1, 0.25, 0.15);
     }
