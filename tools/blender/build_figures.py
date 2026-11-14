@@ -944,9 +944,9 @@ def garments(sex, torso, leg, arm, body, label, rig):
     # the garments' own shape keys)
     pouch = None
     if sex == 'm':
-        zp = front_z(Surface(torso), CROTCH_Y + 0.025); PC = np.array([0.0, CROTCH_Y + 0.004, zp - 0.014]); PR = np.array([0.04, 0.05, 0.029])
+        zp = front_z(Surface(torso), CROTCH_Y + 0.025); PC = np.array([0.0, CROTCH_Y + 0.014, zp - 0.022]); PR = np.array([0.042, 0.056, 0.03])
         pouch = lambda P: (1 - np.linalg.norm((P - PC) / PR, axis=1)) * PR.min()
-        briefs_f = (lambda b: lambda P: smax(b(P), pouch(P), 0.018))(briefs_f)
+        briefs_f = (lambda b: lambda P: smax(b(P), pouch(P), 0.03))(briefs_f)
     def pouch_keys(ob, base_f, gap):
         """The pouch's size with his: the garment's sexLarge and sexSmall keys, where the pouch is, moved out from its middle (or in)."""
         if pouch is None or not ob.data.shape_keys: return
@@ -954,7 +954,7 @@ def garments(sex, torso, leg, arm, body, label, rig):
         b = np.zeros(n * 3); kbs['Basis'].data.foreach_get('co', b); Xb = b.reshape(-1, 3); X = np.stack([Xb[:, 0], Xb[:, 2], -Xb[:, 1]], 1)
         wp = ss(-0.003, 0.004, pouch(X) + gap - base_f(X)) * ss(PC[2] - 0.035, PC[2] - 0.01, X[:, 2])
         d = (X - PC) / PR; d /= np.linalg.norm(d, axis=1, keepdims=True) + 1e-9
-        for k, amt in (('sexLarge', 0.01), ('sexSmall', -0.006)):
+        for k, amt in (('sexLarge', 0.007), ('sexSmall', -0.004)):
             if k not in kbs: continue
             c = np.zeros(n * 3); kbs[k].data.foreach_get('co', c); c = c.reshape(-1, 3)
             mv = d * amt * wp[:, None]; c = c * (1 - wp[:, None]) + (Xb + np.stack([mv[:, 0], -mv[:, 2], mv[:, 1]], 1)) * wp[:, None]
