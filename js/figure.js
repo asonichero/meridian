@@ -410,7 +410,7 @@ function legRings(S, side, inflate, from, to) {
 // An arm, hanging, from over the shoulder joint to the wrist: [y, rx (side), rz (front/back), centre x]
 function armRings(S, side, inflate, to) {
   const t = inflate || 0, L = S.limb, sx = (S.f ? 0.175 : 0.195) * side;
-  const rows = [[1.468, 0.03, 0.03, -0.022], [1.455, 0.05, 0.048, -0.008], [1.43, 0.062, 0.056, 0.002], [1.38, 0.058, 0.053, 0.008], [1.30, 0.05, 0.049, 0.01], [1.22, 0.047, 0.046, 0.012],
+  const rows = [[1.466, 0.026, 0.026, -0.03], [1.452, 0.042, 0.042, -0.016], [1.43, 0.051, 0.05, -0.008], [1.38, 0.052, 0.05, 0.0], [1.30, 0.048, 0.048, 0.006], [1.22, 0.046, 0.045, 0.01],
     [1.145, 0.039, 0.041, 0.014], [1.07, 0.044, 0.042, 0.016], [0.98, 0.037, 0.032, 0.018], [0.90, 0.029, 0.023, 0.02], [0.875, 0.027, 0.021, 0.02]];
   const mus = (0.6 + 0.8 * S.m) * (t > 0.003 ? 0.4 : 1), OUT = side > 0 ? 0 : Math.PI, IN = side > 0 ? Math.PI : 0, F_ = Math.PI / 2, B_ = -Math.PI / 2, toward = (a, b, k) => a + angDiff(b, a) * k;
   return rows.filter(r => r[0] >= (to == null ? 0 : to) - 1e-6).map(([y, rx, rz, cx]) => {
