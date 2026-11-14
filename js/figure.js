@@ -1106,7 +1106,11 @@ function makeGLB(spec, T) {
   F.body = skinned(F, T.mesh.Body.geo, skinM); F.body.castShadow = true; F.body.receiveShadow = false; F.skinMat = skinM;
   { const hm = dqs(paint(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; ink(F.body, INK_W, F, hm); }
   const L = T.L;
-  spotsOn(F, T.mesh.Body.geo, area => ({ upper: [L.hipX * 0.84, L.crotch + 0.125], centre: [L.hipX * 0.84, L.crotch + 0.072], sitspot: [L.hipX * 0.86, L.crotch + 0.026], thighs: [L.hipX * 0.95, L.crotch - 0.04] })[area], 0.012);
+  // the seat's spots from its own shape (measured in Blender): upper on its upper curve, centre where it's fullest, the sit spot just above the
+  // fold beneath it, the thighs below the fold (for a flatter seat, within sensible bounds of the fullest point)
+  const pk = clamp(L.seatPeak, L.crotch + 0.02, L.crotch + 0.07), fold = clamp(L.seatFold, pk - 0.07, pk - 0.03), top = clamp(L.seatTop, pk + 0.1, pk + 0.18);
+  const SEAT = { upper: [L.hipX * 0.84, pk + 0.4 * (top - pk)], centre: [L.hipX * 0.84, pk], sitspot: [L.hipX * 0.86, fold + 0.012], thighs: [L.hipX * 0.95, fold - 0.055] };
+  spotsOn(F, T.mesh.Body.geo, area => SEAT[area], 0.006);
   buildHead(F, spec, S);
   // the clothes: each garment made when it's first worn, then shown or hidden
   F.gm = {}; F.clothes = {};

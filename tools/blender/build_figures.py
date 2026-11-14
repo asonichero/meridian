@@ -73,6 +73,15 @@ cz = np.mean([sum(side_ext(py)) / 2 for py in range(crotch_py - 70, crotch_py - 
 zm = lambda px: (cz - px) * S
 xm = lambda px: (px - cx) * S
 print('landmarks py: chin', chin_py, 'neck', neck_py, 'shoulder', shoulder_py, 'armpit', armpit_py, 'crotch', crotch_py, 'knee', knee_py, 'ankle', ankle_py, 'scale', round(S, 6))
+# Real proportions rather than the reference's stylised long legs: the crotch lowered (the legs shortened above the ankle), the trunk lengthened to
+# match, the shoulders and head where they were. (The reference has the crotch at about half the height; people have it nearer 46–47%.)
+CROTCH_DROP = 0.05
+_ym0 = ym; _c0 = _ym0(crotch_py); _n0 = _ym0(neck_py); _f0 = 0.14
+def ym(py):
+    y = _ym0(py)
+    if y <= _f0 or y >= _n0: return y
+    c1 = _c0 - CROTCH_DROP
+    return _f0 + (y - _f0) * (c1 - _f0) / (_c0 - _f0) if y <= _c0 else c1 + (y - _c0) * (_n0 - c1) / (_n0 - _c0)
 
 # ── Profiles ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 # A profile is rows up its axis: { y (or z, along the axis), cx, cz (the centre), rx (half width), zF / zB (front, back), p (squareness),
@@ -672,6 +681,19 @@ class Cloth(Surface):
                 ci = self.cx[i] * c + self.cz[i] * s_; cu = self.cx[i + 1] * c + self.cz[i + 1] * s_
                 self.T[i] = np.maximum(ci + self.T[i], cu + self.T[i + 1] - slope * dy) - ci
 
+def seat_marks(F, x):
+    """Down the back of the seat at x: where it's fullest, the fold below (where it's come in 2.2 cm), its top above (5 cm in)."""
+    def back(y):
+        lo, hi = 0.0, -0.25
+        for _ in range(30):
+            m = (lo + hi) / 2
+            if F(np.array([[x, y, m]]))[0][0] > 0: lo = m
+            else: hi = m
+        return lo
+    ys = np.arange(CROTCH_Y - 0.15, CROTCH_Y + 0.3, 0.004); d = np.array([back(y) for y in ys]); i = int(np.argmin(d))
+    fold = next((ys[j] for j in range(i, -1, -1) if d[j] > d[i] + 0.022), ys[0]); top = next((ys[j] for j in range(i, len(ys)) if d[j] > d[i] + 0.05), ys[-1])
+    return float(ys[i]), float(fold), float(top)
+
 def landmarks(sex, torso):
     L = {'crotch': CROTCH_Y, 'hip': HIP_Y, 'knee': KNEE_Y, 'ankle': ANKLE_Y, 'shoulder': SH_Y, 'armpit': ym(armpit_py), 'neck': ym(neck_py), 'chin': ym(chin_py),
          'wrist': WRIST_Y, 'elbow': ELBOW_Y, 'height': HEIGHT_F}
@@ -767,6 +789,8 @@ def dress_from(ob, body, BD, label, allowed, rig):
 
 def garments(sex, torso, leg, arm, body, label, rig):
     L = landmarks(sex, torso); BD = body_data(body); out = []
+    L['seatPeak'], L['seatFold'], L['seatTop'] = seat_marks(body_field(torso, leg, arm, sex), L['hipX'] * 0.8)
+    print(sex, 'seat: fullest', round(L['seatPeak'], 3), 'fold', round(L['seatFold'], 3), 'top', round(L['seatTop'], 3), 'crotch', round(CROTCH_Y, 3))
     hk = HAND_K[sex]; legs_ = lambda Ls: (lambda P: np.maximum(Ls[0].f(P), Ls[1].f(P)))
     lerp_crotch = lambda T, Lf: (lambda P: (lambda s: s * T.f(P) + (1 - s) * Lf(P))(ss(CROTCH_Y - 0.012, CROTCH_Y + 0.04, P[:, 1])))
     dr = DELT_R[sex] * float(np.interp(0.06, [r['y'] for r in arm], [r['rx'] for r in arm])) / 0.0397

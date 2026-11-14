@@ -132,7 +132,7 @@ function create(stage, bay, opts) {
   // deck: in front of the bench, not over it (the body turned a little out into the room, head end first, so the arms hang clear of it).
   // The Captain sits at the bench's end turned 45° to their right, so their lap points off its corner and nothing of the subject's is over the
   // bench: the head end out to the Captain's left, the legs to their right.
-  const OTK = { pitch: 0.05, yaw: 0, z: 0.3, seat: bench.at.clone().add(new V3(-0.08, 0, 0)), seatYaw: -Math.PI / 4 };
+  const OTK = { pitch: 0.0, yaw: 0, z: 0.3, seat: bench.at.clone().add(new V3(-0.08, 0, 0)), seatYaw: -Math.PI / 4 };
   let otkQ = null, otkH = new V3(), otkU = new V3(1, 0, 0), otkX = new V3(0, 0, -1);
   // the top of the Captain's thighs at a point (world), between hip and knee
   function lapAt(P) {
@@ -149,7 +149,8 @@ function create(stage, bay, opts) {
     otkQ = new Q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z)); otkU.copy(u); otkX.copy(X);
     // the hips over the Captain's right thigh, a little past its middle; a flinch presses them down into the lap and away from the hand
     const at = local(captain, -0.1 * cs, 0, OTK.z * cs).addScaledVector(toWorldDir(captain, 1, 0, 0), 0.012 * flinch);
-    otkH.set(at.x, lapAt(at) + 0.115 * s * (0.9 + 0.2 * (P.r.body.fat + P.r.body.mass) / 2) - 0.012 * flinch, at.z);
+    const lap = Math.max(lapAt(at), lapAt(local(captain, 0.1 * cs, 0, OTK.z * cs)) - 0.01);
+    otkH.set(at.x, lap + 0.115 * s * (0.9 + 0.2 * (P.r.body.fat + P.r.body.mass) / 2) - 0.012 * flinch, at.z);
     F.root.quaternion.copy(otkQ); F.root.position.copy(otkH).sub(new V3(0, H(F).hips * s, 0).applyQuaternion(otkQ)); F.root.updateMatrixWorld(true);
   }
   // How far the hand is raised, 0 … 1, by the swing's phase (for the shoulder and the torso turning into it).
@@ -161,7 +162,7 @@ function create(stage, bay, opts) {
     if (st.position === 'otk') {
       // leaning into it over the lap, turned a little to the right toward the seat, watching; the right shoulder lifts with the arm, the
       // torso turning a touch more into it, and leans in as the hand comes down
-      seat(F, OTK.seat, OTK.seatYaw, { lean: 0.17 - 0.04 * rz, twist: -0.1 - 0.05 * rz, roll: 0.02 * rz, look: 0.45 - 0.08 * rz, headYaw: -0.25, headRoll: 0.05, spread: 0.03 });
+      seat(F, OTK.seat, OTK.seatYaw, { lean: 0.08 - 0.03 * rz, twist: -0.1 - 0.05 * rz, roll: 0.02 * rz, look: 0.45 - 0.08 * rz, headYaw: -0.25, headRoll: 0.05, spread: 0.03 });
     } else {
       // close in at their left, a little behind, knees bent and leaning over them: the left hand on their back, the right at the seat
       const at = local(cur.f, 0.42, 0, -0.36); at.y = 0;
@@ -216,8 +217,8 @@ function create(stage, bay, opts) {
       placeOTK(P, fl);
       // over the left thigh the back rounds down toward the deck, the head up and turned to the room; on a smack the back arches and the head
       // comes up
-      F.bone.hips.rotation.set(0.1 - 0.05 * ar, 0.07 * wrig, 0.04 * wrig + 0.04 * fl * (J.side === 'L' ? 1 : -1));
-      F.bone.spine.rotation.set(0.32 - 0.12 * ar, 0, 0.02 * wrig); F.bone.chest.rotation.set(0.62 - 0.14 * ar, 0, 0);
+      F.bone.hips.rotation.set(0.04 - 0.05 * ar, 0.07 * wrig, 0.04 * wrig + 0.04 * fl * (J.side === 'L' ? 1 : -1));
+      F.bone.spine.rotation.set(0.04 - 0.08 * ar, 0, 0.02 * wrig); F.bone.chest.rotation.set(0.85 - 0.14 * ar, 0, 0);
       F.bone.neck.rotation.set(-0.7 - 0.4 * hd - 0.2 * ar, -0.7 + 0.1 * Math.sin(t * 1.7) * dd, -0.1);
       F.root.updateMatrixWorld(true);
       // legs: the toes on the deck beyond the bench's end, knees soft; a kick bends the knee on the side struck, the foot leaving the deck
@@ -284,16 +285,17 @@ function create(stage, bay, opts) {
   const handPose = { n: new V3(0, 1, 0), f: new V3(0, 0, 1), cock: 0 };
   function poseCaptainHands(dt) {
     const F = captain, sw = st.swing, cs = sc(F);
-    // the left hand: across the knee, over their back and resting on the far side of their waist, the fingers round it and the forearm lying
-    // across the small of the back; at the wall, flat on the small of the back
+    // the left hand: across the knee, resting on the small of their back, the fingers on toward their hips and round the far side, the forearm
+    // lying along their back (the elbow down on it, toward their shoulders); at the wall, flat on the small of the back
     const back = W_(cur.f, 'spine'), bn = toWorldDir(cur.f, 0, 0, -1).normalize(), cloth = lift() * 0.6;
     if (st.position === 'otk') {
-      const sd = cur.f.surface('sideR', { p: new V3(), n: new V3() }, cloth), down = toWorldDir(cur.f, 0, 0, 1), fing = down.clone().addScaledVector(sd.n, -down.dot(sd.n)).normalize();
-      const LW = sd.p.clone().addScaledVector(sd.n, 0.012).addScaledVector(fing, -0.07 * cs).addScaledVector(bn, 0.02);
-      const nearBack = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth).p.addScaledVector(otkX, 0.1 * sc(cur.f)).addScaledVector(bn, 0.04);
-      const sh = W_(F, 'upperArmL'), pole = nearBack.sub(sh.clone().lerp(LW, 0.5)).normalize();
-      reach(F, 'L', LW, pole, sd.n.clone().negate(), fing);
-      F.grip('L', 0.3, 0.1, 0.2);
+      const bk = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth), far = otkX.clone().negate(), s_ = sc(cur.f);
+      const fing = otkU.clone().negate().addScaledVector(far, 0.6); fing.addScaledVector(bk.n, -fing.dot(bk.n)).normalize();
+      const palmAt = bk.p.clone().addScaledVector(otkU, -0.05 * s_).addScaledVector(far, 0.04 * s_).addScaledVector(bk.n, 0.016);
+      const LW = palmAt.clone().addScaledVector(fing, -0.06 * cs);
+      const elbowAt = bk.p.clone().addScaledVector(otkU, 0.22 * s_).addScaledVector(otkX, 0.03 * s_).addScaledVector(bk.n, 0.05), sh = W_(F, 'upperArmL');
+      reach(F, 'L', LW, elbowAt.sub(sh.clone().lerp(LW, 0.5)).normalize(), bk.n.clone().negate(), fing);
+      F.grip('L', 0.22, 0.15, 0.2);
     } else {
       const bk = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth), across = toWorldDir(cur.f, 1, 0, 0), fing = across.clone().addScaledVector(bk.n, -across.dot(bk.n)).normalize();
       reach(F, 'L', bk.p.clone().addScaledVector(bk.n, 0.014).addScaledVector(fing, -0.08 * cs), toWorldDir(F, 1, -0.2, -0.5).normalize(), bk.n.clone().negate(), fing);
