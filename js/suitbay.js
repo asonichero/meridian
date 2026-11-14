@@ -171,7 +171,7 @@ function build(scene) {
 
   const spots = {
     bench: { at: new V3(benchAt.x, 0, benchAt.z), yaw: 0, seatY, beside: new V3(benchAt.x + 0.62, 0, benchAt.z) },
-    wall: { at: new V3(-W + 0.82, 0, railZ), yaw: -Math.PI / 2, rail: { x: -W + 0.12, y: railY, z: railZ, hi: railY + 0.32 } },
+    wall: { at: new V3(-W + 0.95, 0, railZ), yaw: -Math.PI / 2, rail: { x: -W + 0.12, y: railY, z: railZ, hi: railY + 0.32 } },
     watch: [{ at: new V3(1.55, 0, -1.2), yaw: -2.4 }, { at: new V3(-0.9, 0, -1.35), yaw: 2.6 }, { at: new V3(1.85, 0, 0.9), yaw: -1.9 }, { at: new V3(0.6, 0, -1.55), yaw: 3.0 }],
     corner: { at: new V3(W - 0.34, 0, D - 0.34), yaw: Math.PI / 4 },
   };

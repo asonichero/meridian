@@ -36,6 +36,7 @@ button:hover { border-color: #56687a; } button.on { background: #4a3a22; border-
 #word { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); padding: 10px 18px; display: none; color: #ffd8cc; border-color: var(--red); font-weight: 600; }
 #who { position: fixed; top: 12px; right: 12px; padding: 10px 14px; min-width: 200px; } #who .nm { font-size: 15px; } #who small { color: var(--dim); display: block; }
 #cams { position: fixed; right: 12px; top: 96px; display: flex; flex-direction: column; gap: 4px; }
+#fade { position: fixed; inset: 0; background: #05070a; opacity: 0; pointer-events: none; transition: opacity 0.35s ease; z-index: 5; } #fade.on { opacity: 1; transition: none; }
 #summary { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 18px 22px; display: none; min-width: 360px; }
 #summary table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; } #summary td { padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
 kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
@@ -71,6 +72,7 @@ kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
 <div id="word" class="panel"></div>
 <div id="say" class="panel"><div class="who" id="sayWho"></div><div class="txt" id="sayTxt"></div><div class="choices" id="choices"></div></div>
 <div id="summary" class="panel"></div>
+<div id="fade"></div>
 
 <div id="bar" class="panel">
   <div class="top">
@@ -119,7 +121,7 @@ function drawCaptain() {
   const el = $('cstyle'); el.innerHTML = ''; for (const s of O.hairStyle[C.sex]) { const b = document.createElement('button'); b.textContent = s; b.className = C.hairStyle === s ? 'on' : ''; b.onclick = () => { C.hairStyle = s; save(); drawCaptain(); }; el.append(b); }
   seg('cbuild', C.build, v => { C.build = v; save(); });
 }
-seg('pos', cfg.position, v => { cfg.position = v; save(); if (ses) ses.position(v); drawCams(); });
+seg('pos', cfg.position, v => { cfg.position = v; save(); if (ses) { fade(); ses.position(v); } drawCams(); });
 seg('between', cfg.between, v => { cfg.between = v; save(); if (ses) ses.st.between = v; });
 seg('outfit', cfg.outfit, v => { cfg.outfit = v; save(); });
 drawCrew(); drawCaptain();
@@ -157,7 +159,10 @@ function choose(options) {
 }
 
 // ── Events ──
+// A short fade to dark and back whenever the scene is re-set (a new turn, a change of position, the aftercare), so nobody snaps into place.
+function fade() { const f = $('fade'); f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on'))); }
 function onEvent(type, d) {
+  if (type === 'turn') fade();
   if (type === 'say') sayQueue = sayQueue.then(() => showLine(d.who, d.id, d.text, 900));
   if (type === 'word') { const w = $('word'); w.textContent = `${Crew.ROSTER[d.id].short} called their word: “${d.word}”. It stops.`; w.style.display = 'block'; setTimeout(() => (w.style.display = 'none'), 4200); }
   if (type === 'done') sayQueue = sayQueue.then(() => aftercareAll(d.results));
@@ -165,7 +170,7 @@ function onEvent(type, d) {
 }
 async function aftercareAll(results) {
   for (const r of results) {
-    ses.aftercare(r.id); ses.camera(0); refresh();
+    fade(); ses.aftercare(r.id); ses.camera(0, 0); refresh();
     const P = ses.people.find(p => p.id === r.id);
     const run = async steps => {
       for (const s of steps) {

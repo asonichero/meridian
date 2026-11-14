@@ -24,6 +24,48 @@ function shade(hex, k) {
 // ── Painted materials ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // A soft grain of value noise in object space (so it rides with the figure), a gentle wrap to the light so shadows stay warm and soft rather than
 // black, and optionally: skin regions hidden under clothes (so nothing pokes through), and the marks on the seat.
+// Garment details drawn per pixel from each point's rest-pose position (vBind), so seams, edges, bands and buttons stay crisp at any size.
+// uPat0..2: their colours; uParam: per garment (tunic: hem, raised, shoulder x, uniform?; trousers: –, lowered, leg centre x, uniform?).
+// vPart: which piece a point is on (the tunic's body 0, its sleeves 1).
+const PATTERNS = {
+  tunic: `{
+  vec3 b = vBind; float ax = abs(b.x), hem = uParam.x, up = uParam.y, shX = uParam.z;
+  if (uParam.w > 0.5) {
+    if (vPart < 0.5) {
+      float lx = mix(-0.07, 0.13, clamp((1.47 - b.y) / 0.57, 0.0, 1.0)), d = b.x - lx;
+      float front = smoothstep(0.005, 0.03, b.z), inY = step(hem + 0.008, b.y) * (1.0 - smoothstep(1.478, 1.482, b.y));
+      diffuseColor.rgb *= 1.0 - 0.2 * front * inY * smoothstep(-0.032, -0.004, d) * (1.0 - smoothstep(-0.0035, -0.0015, d));
+      diffuseColor.rgb = mix(diffuseColor.rgb, uPat1, front * inY * (1.0 - smoothstep(0.0012, 0.0028, abs(d + 0.0005))));
+      float belt = smoothstep(0.994, 0.997, b.y) * (1.0 - smoothstep(1.031, 1.034, b.y));
+      diffuseColor.rgb = mix(diffuseColor.rgb, uPat2, belt);
+      float bk = belt * front * (1.0 - smoothstep(0.016, 0.019, abs(b.x - 0.02)));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.28, 0.24), bk * 0.9);
+      diffuseColor.rgb *= 1.0 - 0.28 * smoothstep(1.511, 1.515, b.y);
+      diffuseColor.rgb *= 1.0 - 0.25 * (1.0 - up) * (1.0 - smoothstep(hem + 0.009, hem + 0.012, b.y));
+    } else {
+      float flash = step(0.0, b.x) * smoothstep(1.278, 1.281, b.y) * (1.0 - smoothstep(1.366, 1.369, b.y)) * smoothstep(shX + 0.008, shX + 0.014, b.x);
+      float cuff = smoothstep(0.894, 0.897, b.y) * (1.0 - smoothstep(0.912, 0.915, b.y));
+      diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, max(flash, cuff));
+    }
+  } else if (vPart < 0.5) {
+    float fr = smoothstep(0.03, 0.05, b.z);
+    diffuseColor.rgb *= 1.0 - 0.3 * fr * (1.0 - smoothstep(0.009, 0.011, ax)) * smoothstep(1.31, 1.313, b.y);
+    for (int i = 0; i < 3; i++) { float bd = length(vec2(b.x, b.y - (1.36 + 0.035 * float(i)))); diffuseColor.rgb = mix(diffuseColor.rgb, uPat1, fr * (1.0 - smoothstep(0.0035, 0.0048, bd))); }
+    diffuseColor.rgb *= 1.0 - 0.22 * (1.0 - up) * (1.0 - smoothstep(hem + 0.009, hem + 0.012, b.y));
+  }
+}`,
+  trousers: `{
+  vec3 b = vBind; float ax = abs(b.x);
+  if (uParam.w > 0.5 && uParam.y < 0.5) {
+    float front = smoothstep(0.01, 0.03, b.z), kn = front * smoothstep(0.398, 0.402, b.y) * (1.0 - smoothstep(0.598, 0.602, b.y));
+    diffuseColor.rgb *= 1.0 - 0.16 * kn;
+    float seam = front * (1.0 - smoothstep(0.0008, 0.0022, min(abs(b.y - 0.4), abs(b.y - 0.6))));
+    diffuseColor.rgb *= 1.0 + 0.4 * seam;
+  }
+  if (uParam.w < 0.5 && b.y < 0.9) diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, (1.0 - smoothstep(0.0025, 0.0045, abs(b.z))) * step(uParam.z + 0.03, ax));
+  diffuseColor.rgb *= 1.0 - 0.18 * smoothstep(1.004, 1.007, b.y) * (1.0 - uParam.y);
+}`,
+};
 const NOISE = `
 float fh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float fn3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
@@ -32,28 +74,32 @@ float fn3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
 function paint(m, o) {
   o = o || {};
   const U = { uRim: { value: srgb(o.rim || '#2a3440').multiplyScalar(o.rimK == null ? 1 : o.rimK) }, uGrain: { value: o.grain == null ? 0.03 : o.grain }, uGrainScale: { value: o.scale || 60 }, uHide: { value: 0 },
-    uMarks: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9, 0, 0)) }, uMarkCol: { value: srgb(o.markCol || '#b8323a') } };
+    uMarks: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9, 0, 0)) }, uMarkCol: { value: srgb(o.markCol || '#b8323a') },
+    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() } };
   m.userData.u = U;
+  const key = 'paint|' + [o.regions, o.marks, o.bindAttr].map(x => (x ? 1 : 0)).join('') + (o.pattern || '');
+  m.customProgramCacheKey = () => key;
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
-attribute vec3 bind; ${o.regions ? 'attribute float region;' : ''} varying vec3 vBind; varying float vHide; uniform float uHide;`)
+attribute vec3 bind; ${o.regions || o.pattern ? 'attribute float region;' : ''} varying vec3 vBind; varying float vHide; varying float vPart; uniform float uHide;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vBind = ${o.bindAttr ? 'bind' : 'position'};
-${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'}`);
+${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'} ${o.pattern ? 'vPart = region;' : 'vPart = 0.0;'}`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vBind; varying float vHide; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
+varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
 diffuseColor.rgb *= 1.0 + uGrain * (g - 0.5) * 2.0;
+${o.pattern ? PATTERNS[o.pattern] : ''}
 ${o.marks ? `float mk = 0.0;
 for (int i = 0; i < 8; i++) { vec3 d = vBind - uMarks[i].xyz; d.z *= 0.6; mk += uMarks[i].w * exp(-dot(d, d) / 0.0026); }
 float mott = fn3(vBind * 140.0);
-mk = clamp(mk * (0.75 + 0.5 * mott), 0.0, 1.0);
+mk = 1.0 - exp(-2.2 * mk * (0.75 + 0.5 * mott));
 diffuseColor.rgb = mix(diffuseColor.rgb, uMarkCol, mk * 0.78);` : ''}`)
       // (a soft rim of light round the silhouette, as stylised shading has)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -61,6 +107,56 @@ diffuseColor.rgb = mix(diffuseColor.rgb, uMarkCol, mk * 0.78);` : ''}`)
   };
   return m;
 }
+// ── Dual-quaternion skinning ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// Each bone's matrix turned into a rotation and a translation (a dual quaternion), blended, and applied: unlike blending matrices, a joint keeps
+// its volume as it bends (no collapsing elbow or knee, no pinched shoulder, no twisting wrist). Patched into a material's own skinning chunks, so
+// it works for any material (the toon shading, the outlines, the shadows' depth).
+const DQS_PARS = `
+vec4 dqQuat(mat4 m) {
+  mat3 r = mat3(normalize(m[0].xyz), normalize(m[1].xyz), normalize(m[2].xyz));
+  float tr = r[0][0] + r[1][1] + r[2][2]; vec4 q;
+  if (tr > 0.0) { float s = sqrt(tr + 1.0) * 2.0; q = vec4((r[1][2] - r[2][1]) / s, (r[2][0] - r[0][2]) / s, (r[0][1] - r[1][0]) / s, 0.25 * s); }
+  else if (r[0][0] > r[1][1] && r[0][0] > r[2][2]) { float s = sqrt(1.0 + r[0][0] - r[1][1] - r[2][2]) * 2.0; q = vec4(0.25 * s, (r[1][0] + r[0][1]) / s, (r[2][0] + r[0][2]) / s, (r[1][2] - r[2][1]) / s); }
+  else if (r[1][1] > r[2][2]) { float s = sqrt(1.0 + r[1][1] - r[0][0] - r[2][2]) * 2.0; q = vec4((r[1][0] + r[0][1]) / s, 0.25 * s, (r[2][1] + r[1][2]) / s, (r[2][0] - r[0][2]) / s); }
+  else { float s = sqrt(1.0 + r[2][2] - r[0][0] - r[1][1]) * 2.0; q = vec4((r[2][0] + r[0][2]) / s, (r[2][1] + r[1][2]) / s, 0.25 * s, (r[0][1] - r[1][0]) / s); }
+  return normalize(q);
+}
+vec4 dqDual(vec4 q, vec3 t) { return 0.5 * vec4(q.w * t + cross(t, q.xyz), -dot(t, q.xyz)); }
+vec3 dqRot(vec4 q, vec3 v) { return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
+`;
+const DQS_BASE = `#ifdef USE_SKINNING
+  mat4 boneMatX = getBoneMatrix( skinIndex.x ); mat4 boneMatY = getBoneMatrix( skinIndex.y ); mat4 boneMatZ = getBoneMatrix( skinIndex.z ); mat4 boneMatW = getBoneMatrix( skinIndex.w );
+  vec4 dqA = dqQuat(boneMatX), dqB = dqQuat(boneMatY), dqC = dqQuat(boneMatZ), dqD = dqQuat(boneMatW);
+  float wB = dot(dqA, dqB) < 0.0 ? -skinWeight.y : skinWeight.y, wC = dot(dqA, dqC) < 0.0 ? -skinWeight.z : skinWeight.z, wD = dot(dqA, dqD) < 0.0 ? -skinWeight.w : skinWeight.w;
+  vec4 dqR = skinWeight.x * dqA + wB * dqB + wC * dqC + wD * dqD;
+  vec4 dqT = skinWeight.x * dqDual(dqA, boneMatX[3].xyz) + wB * dqDual(dqB, boneMatY[3].xyz) + wC * dqDual(dqC, boneMatZ[3].xyz) + wD * dqDual(dqD, boneMatW[3].xyz);
+  float dqL = length(dqR); dqR /= dqL; dqT /= dqL;
+#endif`;
+const DQS_NORMAL = `#ifdef USE_SKINNING
+  objectNormal = dqRot(dqR, objectNormal);
+#endif`;
+const DQS_SKIN = `#ifdef USE_SKINNING
+  vec3 skP = (bindMatrix * vec4(transformed, 1.0)).xyz;
+  skP = dqRot(dqR, skP) + 2.0 * (dqR.w * dqT.xyz - dqT.w * dqR.xyz + cross(dqR.xyz, dqT.xyz));
+  transformed = (bindMatrixInverse * vec4(skP, 1.0)).xyz;
+#endif`;
+function dqs(m) {
+  const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => '';
+  m.onBeforeCompile = (sh, r) => {
+    if (prev) prev(sh, r);
+    sh.vertexShader = sh.vertexShader.replace('#include <skinning_pars_vertex>', '#include <skinning_pars_vertex>\n' + DQS_PARS)
+      .replace('#include <skinbase_vertex>', DQS_BASE).replace('#include <skinnormal_vertex>', DQS_NORMAL).replace('#include <skinning_vertex>', DQS_SKIN);
+  };
+  m.customProgramCacheKey = () => 'dqs|' + prevKey();
+  return m;
+}
+const DEPTHM = dqs(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, skinning: true }));
+// A skinned part of a figure: bound with the rest pose's matrix, dual-quaternion skinned, casting its shadow with the same skinning.
+function skinned(F, geo, m) {
+  const sm = new THREE.SkinnedMesh(geo, m); F.root.add(sm); sm.bind(F.skeleton, F.bindM); sm.frustumCulled = false; sm.customDepthMaterial = DEPTHM;
+  return sm;
+}
+
 const MATS = new Map();
 function mat(hex, o) {
   o = o || {};
@@ -86,12 +182,13 @@ function tmat(hex, o) {
   o = Object.assign({ grain: 0 }, o || {});
   const key = JSON.stringify([hex, o]);
   if (!o.unique && TMATS.has(key)) return TMATS.get(key);
-  const m = paint(new THREE.MeshToonMaterial({ color: srgb(hex), gradientMap: ramp(), skinning: !!o.skin, vertexColors: !!o.vc, side: o.side || THREE.FrontSide }), o);
+  let m = paint(new THREE.MeshToonMaterial({ color: srgb(hex), gradientMap: ramp(), skinning: !!o.skin, vertexColors: !!o.vc, side: o.side || THREE.FrontSide }), o);
+  if (o.skin) m = dqs(m);
   if (!o.unique) TMATS.set(key, m);
   return m;
 }
 const INK = '#2a1a16';
-const INKM = { plain: new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide }), skinned: new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true }) };
+const INKM = { plain: new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide }), skinned: dqs(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true })) };
 function hullGeo(geo, w) {
   const g = geo.clone(), p = g.attributes.position, n = g.attributes.normal;
   for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * w, p.getY(i) + n.getY(i) * w, p.getZ(i) + n.getZ(i) * w);
@@ -99,41 +196,59 @@ function hullGeo(geo, w) {
 }
 // An outline round a mesh: for a plain one, a child; for a skinned one, a second skinned mesh on the same skeleton (mat: its own, e.g. sharing hidden regions).
 function ink(mesh, w, F, m) {
-  if (mesh.isSkinnedMesh) { const h = new THREE.SkinnedMesh(hullGeo(mesh.geometry, w), m || INKM.skinned); F.root.add(h); h.bind(F.skeleton, F.bindM); h.frustumCulled = false; mesh.userData.hull = h; return h; }
+  if (mesh.isSkinnedMesh) { const h = skinned(F, hullGeo(mesh.geometry, w), m || INKM.skinned); h.castShadow = false; mesh.userData.hull = h; return h; }
   const h = new THREE.Mesh(hullGeo(mesh.geometry, w), INKM.plain); mesh.add(h); return h;
 }
 const INK_W = 0.0045;
 
 // ── Bones ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Built for a figure 1.75 m tall; a figure of another height is scaled whole (f.root.scale). Women's shoulders narrower and hip joints a touch wider.
+// Each hand has four fingers of two joints and a thumb of two; each buttock a bone of its own (for the flesh's give when it's struck).
+const HAND_K = 1.06;      // (hands a touch large, as the toon lean wants)
+function fingerSpec(f, s, sx) {
+  const k = (f ? 0.92 : 1) * HAND_K, h = 'hand' + s;
+  return [
+    ['index1' + s, h, 0, -0.093 * k, 0.026 * k], ['index2' + s, 'index1' + s, 0, -0.042 * k, 0],
+    ['middle1' + s, h, 0, -0.095 * k, 0.009 * k], ['middle2' + s, 'middle1' + s, 0, -0.046 * k, 0],
+    ['ring1' + s, h, 0, -0.092 * k, -0.008 * k], ['ring2' + s, 'ring1' + s, 0, -0.043 * k, 0],
+    ['pinky1' + s, h, 0, -0.086 * k, -0.024 * k], ['pinky2' + s, 'pinky1' + s, 0, -0.033 * k, 0],
+    ['thumb1' + s, h, -0.009 * k * sx, -0.026 * k, 0.026 * k], ['thumb2' + s, 'thumb1' + s, -0.004 * k * sx, -0.03 * k, 0.014 * k],
+  ];
+}
 function skeletonSpec(sx) {
   const f = sx === 'f', shX = f ? 0.175 : 0.195, hipX = f ? 0.095 : 0.09;
   return [
     ['hips', null, 0, 0.95, 0],
     ['spine', 'hips', 0, 0.10, 0], ['chest', 'spine', 0, 0.17, 0], ['neck', 'chest', 0, 0.27, -0.012], ['head', 'neck', 0, 0.085, 0.012],
     ['clavL', 'chest', 0.03, 0.21, 0], ['upperArmL', 'clavL', shX - 0.03, 0, -0.01], ['foreArmL', 'upperArmL', 0.012, -0.29, 0], ['handL', 'foreArmL', 0.005, -0.255, 0.008],
-    ['fingersL', 'handL', 0, -0.095, 0.004], ['thumbL', 'handL', -0.006, -0.028, 0.024],
+    ...fingerSpec(f, 'L', 1),
     ['clavR', 'chest', -0.03, 0.21, 0], ['upperArmR', 'clavR', -(shX - 0.03), 0, -0.01], ['foreArmR', 'upperArmR', -0.012, -0.29, 0], ['handR', 'foreArmR', -0.005, -0.255, 0.008],
-    ['fingersR', 'handR', 0, -0.095, 0.004], ['thumbR', 'handR', 0.006, -0.028, 0.024],
+    ...fingerSpec(f, 'R', -1),
     ['thighL', 'hips', hipX, -0.05, 0], ['shinL', 'thighL', -0.005, -0.42, 0.006], ['footL', 'shinL', 0, -0.40, -0.012], ['toeL', 'footL', 0, -0.06, 0.13],
     ['thighR', 'hips', -hipX, -0.05, 0], ['shinR', 'thighR', 0.005, -0.42, 0.006], ['footR', 'shinR', 0, -0.40, -0.012], ['toeR', 'footR', 0, -0.06, 0.13],
+    ['gluteL', 'hips', 0.078, -0.078, -0.1], ['gluteR', 'hips', -0.078, -0.078, -0.1],
   ];
 }
+const FINGERS = ['index', 'middle', 'ring', 'pinky'];
 
 // ── Mesh builder: rings swept along the body in its rest pose, each vertex weighted to the bones near it. ────────────────────────────────────────
 function Builder() {
   const B = { pos: [], nrm: [], uv: [], idx: [], si: [], sw: [], col: [], reg: [] };
-  // ring: { c: [x, y, z], rx, zF, zB, p (superellipse exponent), lobes(θ) → extra radius }; rings run in order; seg around.
-  B.sweep = (rings, seg, o) => {
+  // ring: { c: [x, y, z], rx, zF, zB, p (superellipse exponent), lobes(θ) → extra radius, ax/az: its side and front axes (default x and z) };
+  // rings run in order; seg around. o.smooth: rings added between each pair, on a smooth (Catmull-Rom) curve through every value, so the
+  // profile flows between the rows rather than turning at each.
+  B.sweep = (rings0, seg, o) => {
+    const rings = smoothRings(rings0, o.smooth == null ? 2 : o.smooth);
     const base = B.pos.length / 3, n = seg + 1;
     rings.forEach((r, i) => {
+      const ax = r.ax || X_, az = r.az || Z_;
       for (let j = 0; j <= seg; j++) {
         const th = (j / seg) * Math.PI * 2, c = Math.cos(th), s = Math.sin(th), p = r.p || 2;
         const ex = Math.sign(c) * Math.pow(Math.abs(c), 2 / p), ez = Math.sign(s) * Math.pow(Math.abs(s), 2 / p);
         let x = ex * r.rx, z = ez * (s > 0 ? r.zF : r.zB);
         const add = r.lobes ? r.lobes(th) : 0;
         if (add) { const L = Math.hypot(x, z) || 1; x += add * x / L; z += add * z / L; }
-        const P = [r.c[0] + x * (o.mirror || 1), r.c[1], r.c[2] + z];
+        const P = [r.c[0] + x * ax[0] + z * az[0], r.c[1] + x * ax[1] + z * az[1], r.c[2] + x * ax[2] + z * az[2]];
         B.vert(P, [0, 0, 0], [j / seg, i / (rings.length - 1)], o);
       }
     });
@@ -170,6 +285,28 @@ function Builder() {
   };
   return B;
 }
+const X_ = [1, 0, 0], Z_ = [0, 0, 1];
+// Rings added between each pair of rows: every number (centre, radii, exponent, axes) and the lobes on a Catmull-Rom curve through the rows.
+function smoothRings(rows, sub) {
+  if (!sub || rows.length < 2) return rows;
+  const cr = (a, b, c, d, t) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
+  const out = [], n = rows.length, at = i => rows[clamp(i, 0, n - 1)];
+  const num = (r, k, i) => (k === 'c' || k === 'ax' || k === 'az' ? (r[k] || (k === 'ax' ? X_ : k === 'az' ? Z_ : [0, 0, 0]))[i] : r[k] == null ? (k === 'p' ? 2 : 0) : r[k]);
+  for (let i = 0; i < n - 1; i++) {
+    const A = at(i - 1), Bq = at(i), C = at(i + 1), D = at(i + 2);
+    for (let k = 0; k <= sub; k++) {
+      if (k === 0) { out.push(Bq); continue; }
+      const t = k / (sub + 1), r = {};
+      for (const key of ['c', 'ax', 'az']) r[key] = [0, 1, 2].map(j => cr(num(A, key, j), num(Bq, key, j), num(C, key, j), num(D, key, j), t));
+      for (const key of ['rx', 'zF', 'zB', 'p']) r[key] = Math.max(key === 'p' ? 1.5 : 0.0005, cr(num(A, key), num(Bq, key), num(C, key), num(D, key), t));
+      if (A.lobes || Bq.lobes || C.lobes || D.lobes) { const L = q => (q.lobes ? q.lobes : () => 0); r.lobes = th => cr(L(A)(th), L(Bq)(th), L(C)(th), L(D)(th), t); }
+      if (Bq.ax || C.ax) { const v = new V3(...r.ax).normalize(); r.ax = [v.x, v.y, v.z]; const u = new V3(...r.az).normalize(); r.az = [u.x, u.y, u.z]; }
+      out.push(r);
+    }
+  }
+  out.push(rows[n - 1]);
+  return out;
+}
 // The swept rings repeat their first column at the end (for the texture's seam): give both the same normal so no seam shows.
 function weldSeams(g) {
   const p = g.attributes.position, n = g.attributes.normal, map = new Map();
@@ -184,7 +321,7 @@ function weldSeams(g) {
 }
 
 // ── Regions of skin, so what's under clothes can be hidden ────────────────────────────────────────────────────────────────────────────────────
-const R = { HEAD: 0, CHEST: 1, WAIST: 2, HIPS: 3, SEAT: 4, THIGH: 5, KNEE: 6, SHIN: 7, UPARM: 8, FOREARM: 9, HAND: 10 };
+const R = { HEAD: 0, CHEST: 1, WAIST: 2, HIPS: 3, SEAT: 4, THIGH: 5, KNEE: 6, SHIN: 7, UPARM: 8, FOREARM: 9, HAND: 10, WAIST_HI: 11, HIPS_LO: 12 };
 
 // ── The body's shape, from sex, mass (muscle and frame, 0–1) and fat (softness, 0–1). ──────────────────────────────────────────────────────────
 function shapeOf(o) {
@@ -214,16 +351,20 @@ function torsoRings(S, inflate, bridge) {
     [1.24, 0.158 * ch, 0.11, 0.095, 0, 0.85, 0],
     [1.30, 0.162 * lerp(ch, sh, 0.4), 0.112, 0.098, 0, 1, 0],
     [1.36, 0.17 * sh, 0.104, 0.098, 0, 0.45, 0],
-    [1.41, 0.17 * sh, 0.085, 0.092, 0, 0, 0],
-    [1.438, 0.152 * sh, 0.072, 0.082, 0, 0, 0],
-    [1.462, 0.112 * sh, 0.06, 0.068, 0, 0, 0],
+    [1.41, 0.162 * sh, 0.085, 0.092, 0, 0, 0],
+    [1.438, 0.14 * sh, 0.072, 0.08, 0, 0, 0],
+    [1.462, 0.104 * sh, 0.06, 0.066, 0, 0, 0],
     [1.482, 0.07, 0.054, 0.057, 0, 0, 0],
     [1.52, 0.056 * (S.f ? 1 : 1.12), 0.05 * (S.f ? 1 : 1.1), 0.054 * (S.f ? 1 : 1.1), 0, 0, 0],
     [1.585, 0.052 * (S.f ? 1 : 1.1), 0.048 * (S.f ? 1 : 1.1), 0.05 * (S.f ? 1 : 1.1), 0, 0, 0],
   ];
+  const mus = 0.6 + 0.8 * S.m, soft = bridge ? 0.5 : 1;
+  const pec = S.f ? 0 : 0.011 * mus;
   return rows.map(([y, rx, zF, zB, gl, bu, be]) => {
     const R0 = { c: [0, y, 0.0], rx: rx * (y > 1.5 ? 1 : S.W) + t, zF: (zF + be * S.belly) * S.W + t, zB: zB * S.W + t, p: y > 1.44 ? 2 : 2.25 };
-    if (gl || bu) R0.lobes = th => {
+    const pc = pec * gauss(y - 1.31, 0.045), sca = 0.006 * mus * gauss(y - 1.35, 0.05) * soft, grv = y > 0.99 && y < 1.43 ? 0.0045 * ss(0.99, 1.06, y) * ss(1.43, 1.36, y) * (bridge ? 0 : 1) : 0;
+    const obl = 0.004 * mus * gauss(y - 1.0, 0.04) * soft;      // (the obliques, over the hips)
+    R0.lobes = th => {
       let a = 0;
       if (gl) {
         const l = gauss(angDiff(th, -Math.PI / 2 + 0.62), 0.5), r = gauss(angDiff(th, -Math.PI / 2 - 0.62), 0.5);
@@ -234,6 +375,10 @@ function torsoRings(S, inflate, bridge) {
         const l = gauss(angDiff(th, Math.PI / 2 - 0.62), 0.38), r = gauss(angDiff(th, Math.PI / 2 + 0.62), 0.38);
         a += bu * S.bust * (bridge ? Math.max(l, r) + 0.6 * gauss(angDiff(th, Math.PI / 2), 0.45) : l + r);
       }
+      if (pc) a += pc * (gauss(angDiff(th, Math.PI / 2 - 0.55), 0.42) + gauss(angDiff(th, Math.PI / 2 + 0.55), 0.42)) * (bridge ? 0.6 : 1);
+      if (sca) a += sca * (gauss(angDiff(th, -Math.PI / 2 + 0.75), 0.35) + gauss(angDiff(th, -Math.PI / 2 - 0.75), 0.35));
+      if (grv) a -= grv * gauss(angDiff(th, -Math.PI / 2), 0.09);
+      if (obl) a += obl * (gauss(angDiff(th, 0.25), 0.4) + gauss(angDiff(th, Math.PI - 0.25), 0.4));
       return a;
     };
     return R0;
@@ -250,14 +395,33 @@ function legRings(S, side, inflate, from, to) {
     [-0.76, 0.033 * L, 0.03 * L, 0.033 * L, -0.005, -0.006], [-0.82, 0.03, 0.03, 0.03, -0.005, -0.008], [-0.86, 0.026, 0.028, 0.026, -0.005, -0.008],
   ];
   return rows.filter(r => r[0] <= (from == null ? 9 : from) + 1e-6 && r[0] >= (to == null ? -9 : to) - 1e-6)
-    .map(([dy, rx, zF, zB, cx, cz]) => ({ c: [hx + cx * side, 0.90 + dy, cz], rx: rx + t, zF: zF + t, zB: zB + t, p: 2.1 }));
+    .map(([dy, rx, zF, zB, cx, cz]) => {
+      const y = 0.90 + dy, R0 = { c: [hx + cx * side, y, cz], rx: rx + t, zF: zF + t, zB: zB + t, p: 2.1 };
+      // the muscles: quads down the front, the inner one bulging above the knee, the kneecap, the calf (the inner head higher and fuller)
+      const mus = (0.6 + 0.8 * S.m) * (t > 0.003 ? 0.45 : 1), IN = side > 0 ? Math.PI : 0, OUT = side > 0 ? 0 : Math.PI, toward = (a, b, k) => a + angDiff(b, a) * k;
+      const F_ = Math.PI / 2, B_ = -Math.PI / 2;
+      const quad = 0.006 * mus * gauss(y - 0.68, 0.08), vmo = 0.007 * mus * gauss(y - 0.55, 0.035), vl = 0.004 * mus * gauss(y - 0.7, 0.08), pat = 0.006 * gauss(y - 0.475, 0.022) * (t > 0.003 ? 0.3 : 1);
+      const ham = 0.003 * mus * gauss(y - 0.66, 0.08), gm = 0.012 * mus * gauss(y - 0.37, 0.05), gl = 0.008 * mus * gauss(y - 0.39, 0.04), mal = 0.004 * gauss(y - 0.1, 0.016);
+      R0.lobes = th => quad * gauss(angDiff(th, F_), 0.7) + vmo * gauss(angDiff(th, toward(F_, IN, 0.5)), 0.45) + vl * gauss(angDiff(th, OUT), 0.6) + pat * gauss(angDiff(th, F_), 0.35)
+        + ham * gauss(angDiff(th, B_), 0.7) + gm * gauss(angDiff(th, toward(B_, IN, 0.45)), 0.5) + gl * gauss(angDiff(th, toward(B_, OUT, 0.45)), 0.45) + mal * (gauss(angDiff(th, IN), 0.35) + gauss(angDiff(th, OUT), 0.35));
+      return R0;
+    });
 }
 // An arm, hanging, from over the shoulder joint to the wrist: [y, rx (side), rz (front/back), centre x]
 function armRings(S, side, inflate, to) {
   const t = inflate || 0, L = S.limb, sx = (S.f ? 0.175 : 0.195) * side;
   const rows = [[1.468, 0.03, 0.03, -0.022], [1.455, 0.05, 0.048, -0.008], [1.43, 0.062, 0.056, 0.002], [1.38, 0.058, 0.053, 0.008], [1.30, 0.05, 0.049, 0.01], [1.22, 0.047, 0.046, 0.012],
     [1.145, 0.039, 0.041, 0.014], [1.07, 0.044, 0.042, 0.016], [0.98, 0.037, 0.032, 0.018], [0.90, 0.029, 0.023, 0.02], [0.875, 0.027, 0.021, 0.02]];
-  return rows.filter(r => r[0] >= (to == null ? 0 : to) - 1e-6).map(([y, rx, rz, cx]) => ({ c: [sx + cx * side, y, -0.01 + (y < 1.14 ? 0.008 : 0)], rx: rx * L + t, zF: rz * L + t, zB: rz * L + t, p: 2 }));
+  const mus = (0.6 + 0.8 * S.m) * (t > 0.003 ? 0.4 : 1), OUT = side > 0 ? 0 : Math.PI, IN = side > 0 ? Math.PI : 0, F_ = Math.PI / 2, B_ = -Math.PI / 2, toward = (a, b, k) => a + angDiff(b, a) * k;
+  return rows.filter(r => r[0] >= (to == null ? 0 : to) - 1e-6).map(([y, rx, rz, cx]) => {
+    const R0 = { c: [sx + cx * side, y, -0.01 + (y < 1.14 ? 0.008 : 0)], rx: rx * L + t, zF: rz * L + t, zB: rz * L + t, p: 2 };
+    // the deltoid capping the shoulder, the biceps and triceps, the point of the elbow, the forearm's swell below it
+    const del = 0.009 * mus * gauss(y - 1.4, 0.04), bic = 0.008 * mus * gauss(y - 1.25, 0.045), tri = 0.007 * mus * gauss(y - 1.32, 0.05);
+    const elb = 0.004 * gauss(y - 1.145, 0.016) * (t > 0.003 ? 0.3 : 1), brr = 0.006 * mus * gauss(y - 1.06, 0.04), flx = 0.004 * mus * gauss(y - 1.04, 0.05);
+    R0.lobes = th => del * (gauss(angDiff(th, OUT), 0.9) + 0.5 * gauss(angDiff(th, F_), 0.5)) + bic * gauss(angDiff(th, F_), 0.55) + tri * gauss(angDiff(th, B_), 0.6)
+      + elb * gauss(angDiff(th, B_), 0.4) + brr * gauss(angDiff(th, toward(F_, OUT, 0.5)), 0.5) + flx * gauss(angDiff(th, toward(F_, IN, 0.5)), 0.5);
+    return R0;
+  });
 }
 
 // ── Making a figure ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -287,11 +451,14 @@ function make(spec) {
   // Weights: smooth blends across each joint.
   function torsoW(P) {
     const [x, y] = P, ax = Math.abs(x), s = side(x), out = [];
-    const toThigh = ss(0.96, 0.80, y) * ss(0.01, 0.08, ax) * 0.8;
+    const toThigh = ss(0.93, 0.79, y) * ss(0.01, 0.08, ax) * 0.55;      // (the cheek's lower part rides partly with its thigh: enough to round as the leg moves, not so much that it turns with it)
     const sp = ss(0.98, 1.13, y), chs = ss(1.15, 1.30, y), nk = ss(1.47, 1.535, y), hd = ss(1.55, 1.6, y);
     const cl = ss(0.09, 0.15, ax) * ss(1.34, 1.43, y) * (1 - nk);
     let hips = (1 - sp) * (1 - toThigh), spine = sp * (1 - chs), chest = chs * (1 - nk) * (1 - cl);
     out.push(w('hips', hips), w('thigh' + s, toThigh * (1 - sp)), w('spine', spine), w('chest', chest), w('clav' + s, cl * 0.6), w('upperArm' + s, cl * 0.4), w('neck', nk * (1 - hd)), w('head', hd));
+    // the cheek's flesh rides a little on its own bone, for its give when it's struck
+    const gC = rest['glute' + s], gd = (x - gC.x) ** 2 + (y - gC.y) ** 2 * 0.8, gw = 0.7 * Math.exp(-gd / (2 * 0.05 * 0.05)) * ss(-0.02, -0.07, P[2]);
+    if (gw > 0.01) { for (const e of out) e[1] *= 1 - gw; out.push(w('glute' + s, gw)); }
     return out;
   }
   function legW(P) {
@@ -304,24 +471,23 @@ function make(spec) {
     const ua = ss(1.47, 1.39, y), fa = ss(1.18, 1.10, y), hd = ss(0.915, 0.865, y);
     return [w('chest', (1 - ua) * 0.35), w('clav' + s, (1 - ua) * 0.65), w('upperArm' + s, ua * (1 - fa)), w('foreArm' + s, fa * (1 - hd)), w('hand' + s, hd)];
   }
-  const torsoRegion = P => P[1] >= 1.47 ? R.HEAD : P[1] >= 1.15 ? R.CHEST : P[1] >= 1.03 ? R.WAIST : P[1] >= 0.935 ? R.HIPS : R.SEAT;
-  const legRegion = P => P[1] >= 0.93 ? R.HIPS : P[1] >= 0.61 ? R.THIGH : P[1] >= 0.38 ? R.KNEE : R.SHIN;
+  const torsoRegion = P => P[1] >= 1.47 ? R.HEAD : P[1] >= 1.15 ? R.CHEST : P[1] >= 1.085 ? R.WAIST_HI : P[1] >= 1.03 ? R.WAIST : P[1] >= 0.958 ? R.HIPS : P[1] >= 0.935 ? R.HIPS_LO : R.SEAT;
+  const legRegion = P => P[1] >= 0.958 ? R.HIPS : P[1] >= 0.93 ? R.HIPS_LO : P[1] >= 0.61 ? R.THIGH : P[1] >= 0.38 ? R.KNEE : R.SHIN;
   const armRegion = P => P[1] >= 1.14 ? R.UPARM : P[1] >= 0.88 ? R.FOREARM : R.HAND;
 
   // ── The body ──
   const BB = Builder(), skinC = () => [1, 1, 1];
-  BB.sweep(torsoRings(S), 36, { weights: torsoW, region: torsoRegion, capBottom: true, color: skinC });
+  BB.sweep(torsoRings(S), 48, { weights: torsoW, region: torsoRegion, capBottom: true, color: skinC });
   for (const sd of [1, -1]) {
     BB.sweep(legRings(S, sd), 22, { weights: legW, region: legRegion, color: skinC, flip: true });
     BB.sweep(armRings(S, sd), 18, { weights: armW, region: armRegion, color: skinC, capBottom: true, flip: true });
-    handGeo(BB, S, sd, BI, w);
+    handGeo(BB, S, sd, BI, w, rest);
   }
   const bodyGeo = BB.geometry();
   const skinM = tmat(spec.skin, { skin: true, regions: true, marks: true, bindAttr: true, unique: true, rim: '#6a5048', rimK: 0.5 });
-  F.body = new THREE.SkinnedMesh(bodyGeo, skinM);
-  F.root.add(F.body); F.body.bind(F.skeleton, F.bindM); F.body.castShadow = true; F.body.receiveShadow = false; F.body.frustumCulled = false;
+  F.body = skinned(F, bodyGeo, skinM); F.body.castShadow = true; F.body.receiveShadow = false;
   F.skinMat = skinM;
-  { const hm = paint(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true }), { regions: true, grain: 0 }); hm.userData.u.uHide = skinM.userData.u.uHide; ink(F.body, INK_W, F, hm); }
+  { const hm = dqs(paint(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true }), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; ink(F.body, INK_W, F, hm); }
 
   // The seat's spots: the vertex on the back of the seat nearest each, for aiming at and marking.
   F.spot = {};
@@ -329,11 +495,12 @@ function make(spec) {
     const p = bodyGeo.attributes.position, n = bodyGeo.attributes.normal, reg = bodyGeo.attributes.region;
     for (const k of SPOTS) {
       const area = k.slice(0, -1), sd = k.slice(-1) === 'L' ? 1 : -1, tx = (area === 'thighs' ? 0.088 : 0.078) * sd, ty = SPOT_AT[area];
-      let best = -1, bd = 1e9;
-      for (let i = 0; i < p.count; i++) {
-        if (n.getZ(i) > -0.55) continue; const r = reg.getX(i); if (r !== R.SEAT && r !== R.HIPS && r !== R.THIGH) continue;
-        const d = (p.getX(i) - tx) ** 2 + (p.getY(i) - ty) ** 2; if (d < bd) { bd = d; best = i; }
-      }
+      // (the outermost point there: the cheek's own surface, not the top of a leg tube buried inside it: of the points within 3 cm, the one
+      // furthest back)
+      let best = -1, bd = 1e9, bz = 1e9;
+      const ok = i => n.getZ(i) <= -0.55 && [R.SEAT, R.HIPS, R.HIPS_LO, R.THIGH].includes(reg.getX(i));
+      for (let i = 0; i < p.count; i++) { if (!ok(i)) continue; const d = Math.hypot(p.getX(i) - tx, p.getY(i) - ty); if (d < 0.03 && p.getZ(i) < bz) { bz = p.getZ(i); best = i; } }
+      if (best < 0) for (let i = 0; i < p.count; i++) { if (!ok(i)) continue; const d = Math.hypot(p.getX(i) - tx, p.getY(i) - ty); if (d < bd) { bd = d; best = i; } }
       F.spot[k] = { i: best, bind: new V3(p.getX(best), p.getY(best), p.getZ(best)), mark: 0 };
     }
   }
@@ -377,20 +544,53 @@ function make(spec) {
   F.t = Math.random() * 10; F.blink = 2 + Math.random() * 3; F.breath = 0.3; F.gaze = new V3(0, 0, 1);
   F.tick = dt => tickFace(F, dt);
   F.rest0 = {}; for (const b of F.bones) F.rest0[b.name] = b.position.clone();
-  F.resetPose = () => { for (const b of F.bones) { b.rotation.set(0, 0, 0); b.position.copy(F.rest0[b.name]); } };
+  F.grip = (s, curl, spread, thumb) => grip(F, s, curl, spread, thumb);
+  F.resetPose = () => { for (const b of F.bones) { b.rotation.set(0, 0, 0); b.position.copy(F.rest0[b.name]); } F.grip('L'); F.grip('R'); };
+  // The flesh's give: a struck cheek pushed in and springing back, and the other answering a little (a damped spring each).
+  F.jig = { L: { x: 0, v: 0 }, R: { x: 0, v: 0 } };
+  F.impact = (s, power) => { F.jig[s].v += 0.32 * power; F.jig[s === 'L' ? 'R' : 'L'].v += 0.08 * power; };
+  F.resetPose();
   return F;
 }
 
-// A hand: the palm, the four fingers together as one shaped block (they curl as one), and the thumb.
-function handGeo(BB, S, sd, BI, w) {
-  const s = sd > 0 ? 'L' : 'R', L = S.limb * (S.f ? 0.94 : 1), sx = ((S.f ? 0.175 : 0.195) + 0.02) * sd, z0 = -0.002;
-  const hw = P => { const y = P[1]; const fg = ss(0.80, 0.78, y); return [w('hand' + s, 1 - fg), w('fingers' + s, fg)]; };
-  const palm = [[0.885, 0.02, 0.028], [0.86, 0.023, 0.04], [0.83, 0.022, 0.046], [0.80, 0.02, 0.046], [0.78, 0.017, 0.044], [0.74, 0.015, 0.04], [0.71, 0.012, 0.033], [0.695, 0.008, 0.02]];
-  BB.sweep(palm.map(([y, rx, rz]) => ({ c: [sx, 0.88 - (0.88 - y) * L, z0], rx: rx * L, zF: rz * L, zB: rz * L, p: 3 })), 14, { weights: hw, region: () => R.HAND, capTop: true, capBottom: false, flip: true });
-  // thumb: from the heel of the palm, forward and down
-  const tw = P => [w('thumb' + s, ss(0.86, 0.83, P[1])), w('hand' + s, 1 - ss(0.86, 0.83, P[1]))];
-  const th = [[0.87, 0.012, 0.01], [0.845, 0.011, 0.034], [0.815, 0.009, 0.05], [0.795, 0.006, 0.056]];
-  BB.sweep(th.map(([y, r, zz]) => ({ c: [sx - 0.008 * sd, y, z0 + zz * L], rx: r * L, zF: r * L, zB: r * L })), 10, { weights: tw, region: () => R.HAND, capTop: true, capBottom: true, flip: true });
+// A hand: the palm (the thumb's pad bulging on its inner side), four fingers of two joints each with rounded tips, and the thumb. Every part
+// built along its own bone's line in the rest pose (the hand hanging, palm in, thumb forward), weighted down its length so each joint bends.
+function handGeo(BB, S, sd, BI, w, rest) {
+  const s = sd > 0 ? 'L' : 'R', k = (S.f ? 0.92 : 1) * HAND_K, H = rest['hand' + s], PALM = sd > 0 ? Math.PI : 0, OUTS = sd > 0 ? 0 : Math.PI;
+  const v = a => new V3(a[0], a[1], a[2]);
+  // the palm: from inside the wrist to the knuckles; thick at the heel, wide across the knuckles
+  const yk = rest['middle1' + s].y, zc = H.z + 0.001 * k;
+  const prow = [[H.y + 0.012, 0.016, 0.024], [H.y - 0.006, 0.017, 0.031], [H.y - 0.03, 0.0175, 0.039], [H.y - 0.06, 0.016, 0.043], [yk + 0.01, 0.0135, 0.044], [yk - 0.004, 0.011, 0.04]];
+  const hw = P => { const kn = ss(yk + 0.006, yk - 0.008, P[1]); const near = f => Math.exp(-((P[2] - rest[f + '1' + s].z) ** 2) / 0.00012); let tot = 0; const out = [];
+    for (const f of FINGERS) { const ww = kn * near(f); tot += ww; out.push(w(f + '1' + s, ww)); } out.push(w('hand' + s, Math.max(0.001, 1 - tot))); return out; };
+  BB.sweep(prow.map(([y, rx, rz]) => ({ c: [H.x + 0.002 * sd, y, zc], rx: rx * k, zF: rz * k, zB: rz * k, p: 2.6,
+    lobes: th => 0.007 * k * gauss(angDiff(th, PALM + (sd > 0 ? -0.6 : 0.6)), 0.5) * gauss(y - (H.y - 0.035), 0.022) + 0.003 * k * gauss(angDiff(th, OUTS), 0.8) * gauss(y - (H.y - 0.05), 0.03) })),
+    16, { weights: hw, region: () => R.HAND, capTop: true, capBottom: false, flip: true, smooth: 1 });
+  // a finger (or the thumb): rings round its line from base through its joint to the tip, weighted hand → first joint → second
+  const digit = (b1, b2, len2, r0, r1, base) => {
+    const A = v([rest[b1].x, rest[b1].y, rest[b1].z]), J = v([rest[b2].x, rest[b2].y, rest[b2].z]), d1 = J.clone().sub(A).normalize();
+    const T = J.clone().addScaledVector(d1, len2), Bp = A.clone().addScaledVector(d1, -base), len = T.distanceTo(Bp), dir = T.clone().sub(Bp).normalize();
+    // its cross-section's axes: across the back of the hand (x) and across the finger (z), perpendicular to its line
+    const ax = new V3(1, 0, 0).addScaledVector(dir, -dir.x).normalize(), az = new V3().crossVectors(ax, dir).negate().normalize();
+    const st = [0, 0.18, 0.4, 0.55, 0.72, 0.88, 0.96, 1], rr = [1.05, 1.0, 0.96, 0.9, 0.86, 0.8, 0.62, 0.25];
+    const rings = st.map((u, i) => { const P = Bp.clone().addScaledVector(dir, u * len), r = lerp(r0, r1, u) * rr[i] / lerp(1, 0.85, u);
+      return { c: [P.x, P.y, P.z], rx: r * 0.86, zF: r, zB: r, p: 2.2, ax: [ax.x, ax.y, ax.z], az: [az.x, az.y, az.z] }; });
+    const jt = A.distanceTo(J), wf = P => { const u = new V3(P[0], P[1], P[2]).sub(A).dot(d1); const a1 = ss(base * 0.3, base + 0.004, u + base), a2 = ss(jt - 0.006, jt + 0.006, u);
+      return [w('hand' + s, 1 - a1), w(b1, a1 * (1 - a2)), w(b2, a1 * a2)]; };
+    BB.sweep(rings, 12, { weights: wf, region: () => R.HAND, capTop: true, flip: true, smooth: 1 });
+  };
+  const fr = { index: [0.0098, 0.0082, 0.036], middle: [0.0102, 0.0085, 0.04], ring: [0.0096, 0.008, 0.037], pinky: [0.0084, 0.007, 0.03] };
+  for (const f of FINGERS) digit(f + '1' + s, f + '2' + s, fr[f][2] * k, fr[f][0] * k, fr[f][1] * k, 0.016 * k);
+  digit('thumb1' + s, 'thumb2' + s, 0.03 * k, 0.012 * k, 0.0095 * k, 0.012 * k);
+}
+// How a hand is held: curl (0 flat … 1 a fist), spread (fingers fanned), thumb (in across the palm).
+function grip(F, s, curl, spread, thumb) {
+  const sg = s === 'L' ? -1 : 1, c = curl == null ? 0.25 : curl, sp = spread || 0, th = thumb == null ? 0.25 : thumb;
+  FINGERS.forEach((f, i) => {
+    const b1 = F.bone[f + '1' + s], b2 = F.bone[f + '2' + s];
+    b1.rotation.set((i - 1.4) * -0.1 * sp, 0, sg * c * (1.25 + 0.08 * i)); b2.rotation.set(0, 0, sg * c * 1.45);
+  });
+  F.bone['thumb1' + s].rotation.set(-0.35 * th, sg * 0.25 * th, sg * 0.55 * th); F.bone['thumb2' + s].rotation.set(0, 0, sg * 0.6 * th);
 }
 
 function buildBoot(F, spec, sd, BI, w) {
@@ -416,8 +616,7 @@ function buildBoot(F, spec, sd, BI, w) {
     const a = base + i * n + j, b = a + 1, c = a + n, d = c + 1; BB.idx.push(a, b, c, b, d, c);
   }
   const g = BB.geometry(), col = spec.outfit === 'offduty' ? '#4a3424' : '#1e2024';
-  const m = new THREE.SkinnedMesh(g, tmat(col, { skin: true, rim: '#3a4048', rimK: 0.4 }));
-  F.root.add(m); m.bind(F.skeleton, F.bindM); m.castShadow = true; m.frustumCulled = false; F['boot' + s] = m; ink(m, INK_W, F);
+  const m = skinned(F, g, tmat(col, { skin: true, rim: '#3a4048', rimK: 0.4 })); m.castShadow = true; F['boot' + s] = m; ink(m, INK_W, F);
 }
 
 // ── Clothes, from the same rings, out a little from the skin ─────────────────────────────────────────────────────────────────────────────────
@@ -426,74 +625,57 @@ const OUTFITS = {
   // along the edge), a low stand collar in the same cloth, a webbing belt; the department's colour only as a flash on the left shoulder and a
   // band at each cuff. Charcoal trousers with stitched knee panels, black boots.
   uniform: { tunic: '#3e5262', trousers: '#2a2e34', pipe: null, under: '#4a4e56', sleeves: 'long', hem: 0.86, collar: true, edge: '#c8c0ae', belt: '#1e2226' },
-  // Off duty: a worn henley with the sleeves pushed up, canvas trousers with braces, brown boots (frontier-practical).
-  offduty: { tunic: '#8a5a3c', trousers: '#5a4a38', pipe: '#3a2a1e', under: '#cfc6b4', sleeves: 'rolled', hem: 0.86, collar: false },
+  // Off duty: a worn henley with the sleeves pushed up (bone buttons down its placket), canvas trousers with a contrast outer seam, brown boots (frontier-practical).
+  offduty: { tunic: '#8a5a3c', trousers: '#5a4a38', pipe: '#3a2a1e', under: '#cfc6b4', sleeves: 'rolled', hem: 0.86, collar: false, edge: '#d8ccb0' },
 };
 function dress(F, spec, S, BI, w, torsoW, legW, armW) {
   for (const k in F.clothes) { const m = F.clothes[k]; for (const x of [m, m.userData.hull]) if (x) { x.parent.remove(x); x.geometry.dispose(); } }
   F.clothes = {};
   const O = OUTFITS[spec.outfit] || OUTFITS.uniform, st = F.state;
-  const add = (key, BB, m) => { const sm = new THREE.SkinnedMesh(BB.geometry(), m); F.root.add(sm); sm.bind(F.skeleton, F.bindM); sm.castShadow = true; sm.receiveShadow = false; sm.frustumCulled = false; F.clothes[key] = sm; ink(sm, INK_W, F); return sm; };
+  const add = (key, BB, m) => { const sm = skinned(F, BB.geometry(), m); sm.castShadow = true; sm.receiveShadow = false; F.clothes[key] = sm; ink(sm, INK_W, F); return sm; };
   let hide = 0; const H = r => { hide |= 1 << r; };
 
   // The top: the tunic (or shirt), hem down over the hips, or raised and rolled above the waist.
   {
     const BB = Builder(), dept = srgb(spec.dept), main = srgb(O.tunic), dark = srgb(shade(O.tunic, -0.25));
-    const hem = st.top === 'up' ? 1.05 : O.hem, inf = 0.012;
+    const hem = st.top === 'up' ? 1.075 : O.hem, inf = 0.012;
     const rings = torsoRings(S, inf, true).filter(r => r.c[1] >= hem - 0.03);
-    rings[0].c[1] = hem; if (st.top !== 'up') { rings[0].rx += 0.008; rings[0].zB += 0.012; rings[0].zF += 0.006; }
+    rings[0].c[1] = hem;
+    // the hem hangs from the widest of the hips: never narrower than the cloth just above it, and flaring a little
+    if (st.top !== 'up') { const r1 = rings.find(r => r.c[1] > hem + 0.005) || rings[1]; rings[0].rx = Math.max(rings[0].rx, r1.rx) + 0.006; rings[0].zB = Math.max(rings[0].zB, r1.zB) + 0.01; rings[0].zF = Math.max(rings[0].zF, r1.zF) + 0.005; rings[0].lobes = r1.lobes; }
     // a rolled band where it's raised
     if (st.top === 'up') { const r0 = rings[0]; rings.unshift({ c: [0, hem - 0.012, r0.c[2]], rx: r0.rx + 0.012, zF: r0.zF + 0.012, zB: r0.zB + 0.012, p: 2.2 }); }
     const top = rings[rings.length - 1]; top.c[1] = O.collar ? 1.545 : 1.50; top.rx = O.collar ? 0.062 : 0.075; top.zF = O.collar ? 0.058 : 0.07; top.zB = O.collar ? 0.062 : 0.068;
-    const tcol = P => {
-      const [x, y, z] = P;
-      if (spec.outfit === 'uniform') {
-        const edge = srgb(O.edge), belt = srgb(O.belt);
-        // the closure: a line from the right collarbone (−x, high) down to the left hip (+x, low), on the front
-        const lx = lerp(-0.07, 0.13, clamp((1.47 - y) / (1.47 - 0.9), 0, 1));
-        if (z > 0.02 && y < 1.48 && y > hem + 0.01 && Math.abs(x - lx) < 0.006) return [edge.r, edge.g, edge.b];
-        if (z > 0.02 && y < 1.48 && x < lx && x > lx - 0.03) return [dark.r, dark.g, dark.b];            // the overlap's shadow
-        if (y > 0.995 && y < 1.035) return [belt.r, belt.g, belt.b];                                     // the belt
-        if (O.collar && y > 1.515) return [dark.r, dark.g, dark.b];                                        // the collar's edge
-        if (st.top !== 'up' && y < hem + 0.012) return [dark.r, dark.g, dark.b];
-      } else {
-        if (z > 0.05 && Math.abs(x) < 0.012 && y > 1.32) return [dark.r, dark.g, dark.b];                  // the henley placket
-      }
-      return [main.r, main.g, main.b];
-    };
-    BB.sweep(rings, 36, { weights: torsoW, color: tcol });
+    BB.sweep(rings, 36, { weights: torsoW, bindAttr: true, region: () => 0 });
     const sleeveTo = O.sleeves === 'long' ? 0.885 : 1.03;
     for (const sd of [1, -1]) {
       const ar = armRings(S, sd, 0.01, sleeveTo); ar[ar.length - 1].c[1] = sleeveTo;
       if (O.sleeves === 'rolled') { const r = ar[ar.length - 1]; ar.push({ c: [r.c[0], sleeveTo - 0.02, r.c[2]], rx: r.rx + 0.008, zF: r.zF + 0.008, zB: r.zB + 0.008 }); ar[ar.length - 2].rx += 0.01; ar[ar.length - 2].zF += 0.01; ar[ar.length - 2].zB += 0.01; }
-      const flash = P => sd > 0 && P[1] > 1.28 && P[1] < 1.37 && P[0] * sd > (S.f ? 0.175 : 0.195) + 0.02;
-      BB.sweep(ar, 18, { weights: armW, capBottom: true, flip: true, color: P => spec.outfit === 'uniform' && (flash(P) || (P[1] < 0.915 && P[1] > 0.895)) ? [dept.r, dept.g, dept.b] : spec.outfit === 'uniform' ? [main.r, main.g, main.b] : tcol([P[0] * 0.5, P[1], P[2]]) });
+      BB.sweep(ar, 18, { weights: armW, capBottom: true, flip: true, region: () => 1 });
     }
-    add('top', BB, tmat('#ffffff', { skin: true, vc: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6 }));
-    H(R.CHEST); H(R.UPARM); if (O.sleeves === 'long') H(R.FOREARM); if (st.top !== 'up') { H(R.WAIST); }
+    const tm = tmat(O.tunic, { skin: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6, pattern: 'tunic', bindAttr: true, unique: true }), U = tm.userData.u;
+    U.uPat0.value.copy(srgb(spec.dept)); U.uPat1.value.copy(srgb(O.edge || shade(O.tunic, -0.4))); U.uPat2.value.copy(srgb(O.belt || '#222'));
+    U.uParam.value.set(hem, st.top === 'up' ? 1 : 0, S.f ? 0.175 : 0.195, spec.outfit === 'uniform' ? 1 : 0);
+    add('top', BB, tm);
+    H(R.CHEST); H(R.UPARM); H(R.WAIST_HI); if (O.sleeves === 'long') H(R.FOREARM); if (st.top !== 'up') { H(R.WAIST); }
   }
   // The trousers: up to the waist, or lowered and bunched at the knees.
   {
-    const BB = Builder(), main = srgb(O.trousers), pipe = srgb(O.pipe || spec.dept), inf = 0.009;
-    const pipeOn = (P, sd) => { const lx = (S.f ? 0.095 : 0.09) * sd; const a = Math.atan2(P[2], P[0] - lx); return Math.abs(angDiff(a, sd > 0 ? 0 : Math.PI)) < 0.09; };
-    const knee = srgb(shade(O.trousers, -0.18)), seam = srgb(shade(O.trousers, 0.25));
-    const tc = sd => P => {
-      if (O.pipe && P[1] < 0.9 && pipeOn(P, sd)) return [pipe.r, pipe.g, pipe.b];
-      if (spec.outfit === 'uniform' && P[2] > 0.02 && P[1] > 0.4 && P[1] < 0.6) return (Math.abs(P[1] - 0.4) < 0.006 || Math.abs(P[1] - 0.6) < 0.006) ? [seam.r, seam.g, seam.b] : [knee.r, knee.g, knee.b];
-      return [main.r, main.g, main.b];
-    };
+    const BB = Builder(), main = srgb(O.trousers), inf = 0.009, tc = () => null;
+    const trm = () => { const m = tmat(O.trousers, { skin: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6, pattern: 'trousers', bindAttr: true, unique: true }), U = m.userData.u;
+      U.uPat0.value.copy(srgb(O.pipe || spec.dept)); U.uParam.value.set(0, st.bottoms === 'down' ? 1 : 0, S.f ? 0.095 : 0.09, spec.outfit === 'uniform' ? 1 : 0); return m; };
     if (st.bottoms !== 'down') {
       const waist = 1.035, rings = torsoRings(S, inf, true).filter(r => r.c[1] <= waist + 0.06 && r.c[1] >= 0.79);
       rings[rings.length - 1].c[1] = waist;
-      BB.sweep(rings, 36, { weights: torsoW, color: tc(1), capBottom: true });
+      BB.sweep(rings, 36, { weights: torsoW, capBottom: true });
       for (const sd of [1, -1]) {
         const lr = legRings(S, sd, inf + 0.004, 0.0, -0.82).map(r => (r.c[1] < 0.2 ? Object.assign(r, { rx: r.rx + 0.012, zF: r.zF + 0.014, zB: r.zB + 0.012 }) : r));
         lr[lr.length - 1].c[1] = 0.12;
-        BB.sweep(lr, 22, { weights: legW, color: tc(sd), flip: true });
+        BB.sweep(lr, 22, { weights: legW, flip: true });
       }
       // the waistband (and the braces, off duty)
-      add('bottoms', BB, tmat('#ffffff', { skin: true, vc: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6 }));
-      H(R.HIPS); H(R.SEAT); H(R.THIGH); H(R.KNEE); H(R.SHIN);
+      add('bottoms', BB, trm());
+      H(R.HIPS); H(R.HIPS_LO); H(R.SEAT); H(R.THIGH); H(R.KNEE); H(R.SHIN);
     } else {
       // lowered: the waistband round the knees, the cloth gathered in rolls above the boots, a sag of cloth between the legs
       for (const sd of [1, -1]) {
@@ -503,23 +685,23 @@ function dress(F, spec, S, BI, w, torsoW, legW, armW) {
         });
         lr[0].c[1] = 0.555; lr[lr.length - 1].c[1] = 0.12;
         lr.unshift({ c: [lr[0].c[0], 0.565, lr[0].c[2]], rx: lr[0].rx - 0.006, zF: lr[0].zF - 0.006, zB: lr[0].zB - 0.006 });
-        BB.sweep(lr, 22, { weights: legW, color: tc(sd), flip: true });
+        BB.sweep(lr, 22, { weights: legW, flip: true });
       }
-      sag(BB, S, 0.545, 0.47, 0.06, legW, main, inf + 0.03);
-      add('bottoms', BB, tmat('#ffffff', { skin: true, vc: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6 }));
+      sag(BB, S, 0.545, 0.47, 0.06, legW, null, inf + 0.03);
+      add('bottoms', BB, trm());
       H(R.SHIN);
     }
   }
   // Underwear: briefs (fuller-cut trunks for the men), up, or lowered round the thighs.
   {
-    const BB = Builder(), inf = 0.004, col = O.under;
+    const BB = Builder(), inf = 0.006, col = O.under;
     if (st.under !== 'down') {
       const top = S.f ? 0.965 : 0.985, rings = torsoRings(S, inf, true).filter(r => r.c[1] <= top + 0.06 && r.c[1] >= 0.79);
       rings[rings.length - 1].c[1] = top;
       BB.sweep(rings, 36, { weights: torsoW, capBottom: true });
       const legTo = S.f ? -0.05 : -0.11;
       for (const sd of [1, -1]) { const lr = legRings(S, sd, inf + 0.002, 0.0, legTo - 0.01); lr[lr.length - 1].c[1] = 0.9 + legTo; BB.sweep(lr, 22, { weights: legW, flip: true }); }
-      H(R.SEAT);
+      H(R.SEAT); H(R.HIPS_LO);
     } else {
       for (const sd of [1, -1]) {
         const lr = legRings(S, sd, inf + 0.004, -0.18, -0.30);
@@ -735,9 +917,16 @@ function tickFace(F, dt) {
   let moved = Math.abs((d.open == null ? -9 : d.open) - open) > 0.004;
   for (const key in x) if (!moved && Math.abs((d[key] == null ? -9 : d[key]) - x[key]) > 0.003) moved = true;
   if (moved) { F.paintFace(x, open); Object.assign(d, x); d.open = open; }
+  // breathing: the chest rising and the shoulders with it, faster and deeper when worked up (turns only: the skinning keeps volume)
   F.breathT = (F.breathT || 0) + dt * (1.6 + 2.4 * F.breath);
-  const b = Math.sin(F.breathT) * (0.012 + 0.02 * F.breath);
-  F.bone.chest.scale.set(1 + b * 0.4, 1, 1 + b);
+  const b = Math.sin(F.breathT) * (0.012 + 0.022 * F.breath);
+  F.bone.chest.rotation.x -= b * 0.6; F.bone.clavL.rotation.z += b * 0.5; F.bone.clavR.rotation.z -= b * 0.5;
+  // the flesh's spring: in along the cheek, a little up
+  for (const sd of ['L', 'R']) {
+    const J = F.jig[sd], wv = 26, z = 0.22;
+    J.v += (-wv * wv * J.x - 2 * z * wv * J.v) * dt; J.x += J.v * dt; J.x = clamp(J.x, -0.02, 0.02);
+    const g = F.bone['glute' + sd]; g.position.set(F.rest0['glute' + sd].x, F.rest0['glute' + sd].y + 0.35 * J.x, F.rest0['glute' + sd].z + J.x);
+  }
   if (F.tail) {
     const pv = F.tail.piv, q = new THREE.Quaternion(); pv.parent.getWorldQuaternion(q);
     const down = new V3(0, -1, 0).applyQuaternion(q.invert());
@@ -772,6 +961,6 @@ function aim(obj, X, Y) {
   setWorldQuat(obj, new THREE.Quaternion().setFromRotationMatrix(_m.makeBasis(x, y, z)));
 }
 
-const api = { tmat, ink, make, EXPRS, MOUTHS, HEAD_SCALE, OUTFITS, SPOTS, ik2, aim, setWorldQuat, mat, paint, srgb, shade, R };
+const api = { tmat, ink, dqs, grip, FINGERS, make, EXPRS, MOUTHS, HEAD_SCALE, OUTFITS, SPOTS, ik2, aim, setWorldQuat, mat, paint, srgb, shade, R };
 root.Figure = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -41,148 +41,209 @@ function create(stage, bay, opts) {
   const witnesses = (opts.witnesses || []).map(p => addPerson(p, 'witness'));
   let cur = null;      // the one across the lap / at the rail now
 
-  // ── Springs for the reactions ──
+  // ── Springs for the reactions: each driven toward a target and kicked by impulses as smacks land, so they snap and settle ──
   const J = { kick: 0, side: 'R', flick: 0, stamp: 0 };
-  const sp = {}; for (const k of ['kick', 'lift', 'wrig', 'toe', 'fwd', 'stamp', 'hx', 'grip']) sp[k] = spring(14, 0.55);
+  const sp = {}; for (const k of ['kick', 'kickO', 'lift', 'wrig', 'toe', 'fwd', 'stamp', 'flinch', 'arch', 'head', 'grip', 'raise', 'rebound']) sp[k] = spring(15, 0.5);
+  sp.raise.w = 9; sp.raise.z = 0.9; sp.rebound.w = 30; sp.rebound.z = 0.35;
+  const kickSp = (k, v) => { sp[k].v += v; };
 
   // ── Positions ──
   const bench = bay.spots.bench, wall = bay.spots.wall;
   const sc = F => F.root.scale.x;
-  const setRoot = (F, pos, yaw) => { F.root.position.copy(pos); F.root.quaternion.copy(yawQ(yaw)); };
+  const setRoot = (F, pos, yaw) => { F.root.position.copy(pos); F.root.quaternion.copy(yawQ(yaw)); F.root.updateMatrixWorld(true); };
   const local = (F, x, y, z) => new V3(x, y, z).applyQuaternion(F.root.quaternion).add(F.root.position);
   const toWorldDir = (F, x, y, z) => new V3(x, y, z).applyQuaternion(F.root.quaternion);
-  // A standing idle: weight easing from foot to foot, a little sway, the arms at rest.
-  function stand(F, t, o) {
-    o = o || {};
-    F.resetPose();
-    const w = Math.sin(t * 0.5 + (F.phase || (F.phase = Math.random() * 6))) * 0.5;
-    F.bone.hips.position.x = 0.012 * w; F.bone.hips.rotation.z = 0.025 * w; F.bone.spine.rotation.z = -0.02 * w;
-    F.bone.upperArmL.rotation.z = 0.1; F.bone.upperArmR.rotation.z = -0.1; F.bone.foreArmL.rotation.x = -0.12; F.bone.foreArmR.rotation.x = -0.12;
-    F.bone.thighL.rotation.z = -0.025 * w; F.bone.thighR.rotation.z = -0.025 * w;
-    F.bone.neck.rotation.x = o.look == null ? 0.06 : o.look;
-    if (o.headYaw) F.bone.neck.rotation.y = o.headYaw;
-  }
-  // Seated on the bench: hips on the seat, thighs forward, feet on the deck.
-  function seat(F, at, yaw, o) {
-    o = o || {}; F.resetPose(); setRoot(F, at, yaw); F.root.updateMatrixWorld(true);
-    const s = sc(F);
-    F.bone.hips.position.y = (bench.seatY + 0.13) / s; F.bone.hips.position.z = -0.03 / s; F.bone.hips.rotation.x = -0.05;
-    F.bone.spine.rotation.x = 0.04 + (o.lean || 0); F.bone.chest.rotation.x = 0.03; F.bone.neck.rotation.x = o.look == null ? 0.12 : o.look;
-    F.root.updateMatrixWorld(true);
-    for (const [side, sx] of [['L', 1], ['R', -1]]) {
-      const ank = local(F, sx * (0.13 + (o.spread || 0)), 0.085, 0.44 + (o.feetZ || 0));
-      Fg.ik2(F, F.bone['thigh' + side], F.bone['shin' + side], F.bone['foot' + side], ank, toWorldDir(F, 0, 0.6, 1), 1);
-      Fg.aim(F.bone['foot' + side], toWorldDir(F, 1, 0, 0), UP);
-    }
-  }
+  const W_ = (F, b) => F.bone[b].getWorldPosition(new V3());
   // An arm's hand to a point, the elbow bending toward `pole`, the hand turned so its palm faces `palm` and the fingers run along `fingers`.
   function reach(F, side, W, pole, palm, fingers) {
     Fg.ik2(F, F.bone['upperArm' + side], F.bone['foreArm' + side], F.bone['hand' + side], W, pole, -1);
     if (palm) Fg.aim(F.bone['hand' + side], side === 'R' ? palm.clone() : palm.clone().negate(), fingers.clone().negate());
     F.root.updateMatrixWorld(true);
   }
-  function legTo(F, side, W, pole) { Fg.ik2(F, F.bone['thigh' + side], F.bone['shin' + side], F.bone['foot' + side], W, pole, 1); }
+  function legTo(F, side, W, pole) { Fg.ik2(F, F.bone['thigh' + side], F.bone['shin' + side], F.bone['foot' + side], W, pole, 1); F.root.updateMatrixWorld(true); }
+  // A foot flat on the deck, its toes along `fwd` (world), heel lifted by `heel` (0 flat … 1 up on the toes).
+  function footFlat(F, side, fwd, heel) {
+    const x = new V3().crossVectors(UP, fwd).normalize().negate();
+    Fg.aim(F.bone['foot' + side], x, UP.clone().applyAxisAngle(x, -0.9 * (heel || 0)));
+    F.bone['toe' + side].rotation.x = -0.9 * (heel || 0);
+    F.root.updateMatrixWorld(true);
+  }
+  // Standing, planted: the weight on one leg (contrapposto: that hip up and out, the other knee easy, the shoulders tilted back against it), feet set
+  // where they stand, the arms relaxed. o: { weight (−1 … 1), wide (stance), crouch (knees), lean (forward, at the waist), look (head down), arms: null to leave them }
+  function stand(F, at, yaw, o) {
+    o = o || {}; F.resetPose(); setRoot(F, at, yaw);
+    const w = o.weight == null ? 0.6 : o.weight, wide = o.wide == null ? 0.11 : o.wide, cr = o.crouch || 0, s = sc(F);
+    F.bone.hips.position.x = 0.022 * w; F.bone.hips.position.y = 0.95 - 0.006 * Math.abs(w) - 0.14 * cr; F.bone.hips.position.z = -0.06 * cr;
+    F.bone.hips.rotation.set(0.3 * cr, 0.04 * w, -0.05 * w);
+    F.bone.spine.rotation.set(0.02 + (o.lean || 0) * 0.6, -0.03 * w, 0.035 * w); F.bone.chest.rotation.set((o.lean || 0) * 0.4, -0.02 * w, 0.025 * w);
+    F.bone.neck.rotation.set(o.look == null ? 0.08 : o.look, o.headYaw || 0, -0.02 * w);
+    F.root.updateMatrixWorld(true);
+    const fwd = toWorldDir(F, 0, 0, 1);
+    for (const [side, sx] of [['L', 1], ['R', -1]]) {
+      const free = (sx > 0) !== (w > 0), out = free ? 0.025 : 0;
+      const A = local(F, sx * (wide + out), 0.085, (free ? 0.05 : 0) + (o.stagger ? o.stagger * sx : 0));
+      legTo(F, side, A, toWorldDir(F, sx * 0.15, 0, 1).normalize());
+      footFlat(F, side, toWorldDir(F, sx * (free ? 0.25 : 0.1), 0, 1).normalize(), 0);
+    }
+    if (o.arms !== null) { for (const [side, sx] of [['L', 1], ['R', -1]]) { F.bone['upperArm' + side].rotation.set(0.04, 0, sx * 0.09); F.bone['foreArm' + side].rotation.x = -0.22; F.bone['hand' + side].rotation.set(0, sx * 0.25, 0); F.grip(side, 0.32, 0.1, 0.3); } }
+    F.root.updateMatrixWorld(true);
+  }
+  // How someone waiting holds their arms: folded across the chest, at parade rest (clasped behind), or clasped in front.
+  function arms(F, how) {
+    const chest = W_(F, 'chest'), fwd = toWorldDir(F, 0, 0, 1), side = toWorldDir(F, 1, 0, 0), s = sc(F);
+    if (how === 'fold') {
+      // the forearms crossed in front of the chest, each hand tucked toward the other arm, the elbows a little out
+      for (const [sd, sx] of [['L', 1], ['R', -1]]) {
+        const T = chest.clone().addScaledVector(fwd, 0.19 * s).addScaledVector(UP, (sx > 0 ? -0.05 : -0.025) * s).addScaledVector(side, -sx * 0.12 * s);
+        reach(F, sd, T, side.clone().multiplyScalar(sx).addScaledVector(UP, -0.5).normalize(), side.clone().multiplyScalar(sx).addScaledVector(fwd, 0.5).normalize(), side.clone().multiplyScalar(-sx));
+        F.grip(sd, 0.5, 0, 0.5);
+      }
+    } else if (how === 'rest') {
+      const hip = W_(F, 'hips');
+      for (const [sd, sx] of [['L', 1], ['R', -1]]) reach(F, sd, hip.clone().addScaledVector(fwd, -0.17 * s).addScaledVector(side, sx * 0.02 * s).addScaledVector(UP, 0.02), side.clone().multiplyScalar(sx).addScaledVector(fwd, -0.4).normalize(), fwd.clone().negate().addScaledVector(side, -sx * 0.6).normalize().negate(), UP.clone().negate().addScaledVector(side, -sx * 0.5).normalize());
+      F.grip('L', 0.55, 0, 0.4); F.grip('R', 0.4, 0, 0.6);
+    } else if (how === 'clasp') {
+      const hip = W_(F, 'hips');
+      for (const [sd, sx] of [['L', 1], ['R', -1]]) reach(F, sd, hip.clone().addScaledVector(fwd, 0.15 * s).addScaledVector(side, sx * 0.025 * s).addScaledVector(UP, -0.06 * s), side.clone().multiplyScalar(sx).addScaledVector(fwd, -0.3).normalize(), side.clone().multiplyScalar(-sx), UP.clone().negate().addScaledVector(fwd, 0.4).normalize());
+      F.grip('L', 0.45, 0, 0.5); F.grip('R', 0.5, 0, 0.5);
+    }
+  }
+  // Seated on the bench: hips on the seat, thighs forward, feet planted on the deck.
+  function seat(F, at, yaw, o) {
+    o = o || {}; F.resetPose(); setRoot(F, at, yaw);
+    const s = sc(F);
+    F.bone.hips.position.y = (bench.seatY + 0.13) / s; F.bone.hips.position.z = -0.03 / s; F.bone.hips.rotation.x = -0.08 + (o.tilt || 0);
+    F.bone.spine.rotation.set(0.06 + (o.lean || 0), o.twist || 0, o.roll || 0); F.bone.chest.rotation.set(0.04 + (o.lean || 0) * 0.5, (o.twist || 0) * 0.6, (o.roll || 0) * 0.5);
+    F.bone.neck.rotation.set(o.look == null ? 0.12 : o.look, o.headYaw || 0, o.headRoll || 0);
+    F.root.updateMatrixWorld(true);
+    for (const [side, sx] of [['L', 1], ['R', -1]]) {
+      const ank = local(F, sx * (0.14 + (o.spread || 0)), 0.085, 0.43 + (o.feetZ || 0) + (sx > 0 ? 0.03 : -0.02));
+      legTo(F, side, ank, toWorldDir(F, sx * 0.1, 0.5, 1).normalize());
+      footFlat(F, side, toWorldDir(F, sx * 0.15, 0, 1).normalize(), 0);
+    }
+    for (const [side, sx] of [['L', 1], ['R', -1]]) { F.bone['upperArm' + side].rotation.set(-0.25, 0, sx * 0.1); F.bone['foreArm' + side].rotation.x = -0.9; F.grip(side, 0.35, 0.1, 0.3); }
+    F.root.updateMatrixWorld(true);
+  }
 
   // ── Placing the subject ──
-  const OTK = { pitch: 0.14 };
+  const OTK = { pitch: 0.2 };
   let otkQ = null, otkH = new V3();
-  function placeOTK(P, snap) {
+  function placeOTK(P, flinch) {
     const F = P.f, s = sc(F), cs = sc(captain);
-    // her (his) spine along world +x, tipped head-down; front to the deck; left side toward the Captain
+    // the spine along world +x, tipped head-down; front to the deck; left side toward the Captain
     const p = OTK.pitch, X = new V3(0, 0, -1), Y = new V3(Math.cos(p), -Math.sin(p), 0), Z = new V3().crossVectors(X, Y);
     otkQ = new Q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z));
     const lapTop = bench.seatY + 0.155 * cs;
-    otkH.set(bench.at.x - 0.11 * cs, lapTop + 0.125 * s * (0.9 + 0.2 * (P.r.body.fat + P.r.body.mass) / 2), bench.at.z + 0.24);
-    F.root.quaternion.copy(otkQ); F.root.position.copy(otkH).sub(new V3(0, 0.95 * s, 0).applyQuaternion(otkQ));
+    // the hips over the Captain's right thigh, a little past its middle; a flinch presses them down into the lap and away from the hand
+    otkH.set(bench.at.x - 0.11 * cs + 0.012 * flinch, lapTop + 0.125 * s * (0.9 + 0.2 * (P.r.body.fat + P.r.body.mass) / 2) - 0.012 * flinch, bench.at.z + 0.25);
+    F.root.quaternion.copy(otkQ); F.root.position.copy(otkH).sub(new V3(0, 0.95 * s, 0).applyQuaternion(otkQ)); F.root.updateMatrixWorld(true);
   }
-  function placeWall(P) { setRoot(P.f, wall.at, wall.yaw); }
-  // The captain, for the position.
+  // How far the hand is raised, 0 … 1, by the swing's phase (for the shoulder and the torso turning into it).
+  function raiseOf(sw) { if (!sw) return 0; const ph = swingPhase(sw); const at = x => (x === 'raised' ? 1 : 0); return lerp(at(ph.from), at(ph.to), ph.e); }
+  // The Captain, for the position: seated on the bench (across the knee), or standing at the subject's left, a little behind (at the wall).
   function poseCaptain(dt) {
-    const F = captain;
-    if (st.position === 'otk' || st.phase === 'after') seat(F, bench.at, 0, { lean: st.phase === 'after' ? 0 : 0.1, look: st.phase === 'after' ? 0.05 : 0.38 });
-    else {
-      // standing to the subject's left, a little behind, turned to them
-      const at = local(cur.f, 0.52, 0, -0.38); at.y = 0;
-      const look = local(cur.f, 0, 0.9, -0.1); const yaw = Math.atan2(look.x - at.x, look.z - at.z) - 0.35;
-      stand(F, st.t, { look: 0.3 }); setRoot(F, at, yaw); F.bone.spine.rotation.x = 0.08; F.bone.spine.rotation.y = 0.2;
+    const F = captain, rz = sp.raise.to(raiseOf(st.swing), dt);
+    if (st.phase === 'after') { seat(F, bench.at, 0, { look: 0.05, lean: -0.02 }); return; }
+    if (st.position === 'otk') {
+      // leaning into it over the lap, turned a little to the right toward the seat, watching; the right shoulder lifts with the arm, the
+      // torso turning a touch more into it, and leans in as the hand comes down
+      seat(F, bench.at, 0, { lean: 0.1 - 0.06 * rz, twist: -0.12 - 0.1 * rz, roll: 0.03 * rz, look: 0.5 - 0.12 * rz, headYaw: -0.3, headRoll: 0.05, spread: 0.03 });
+    } else {
+      // close in at their left, a little behind, knees bent and leaning over them: the left hand on their back, the right at the seat
+      const at = local(cur.f, 0.42, 0, -0.36); at.y = 0;
+      const look = local(cur.f, 0, 0.8, -0.2); const yaw = Math.atan2(look.x - at.x, look.z - at.z) - 0.2;
+      stand(F, at, yaw, { weight: -0.5, wide: 0.19, crouch: 0.45, lean: 0.48 - 0.1 * rz, look: 0.4, headYaw: 0.15, stagger: 0.08, arms: null });
+      F.bone.spine.rotation.y += 0.12 - 0.14 * rz; F.bone.chest.rotation.y += 0.08 - 0.1 * rz;
     }
+    F.bone.clavR.rotation.z = -0.22 * rz; F.bone.clavR.rotation.y = 0.12 * rz;
     F.root.updateMatrixWorld(true);
   }
 
   // ── Whoever's not in the middle: witnesses and those waiting stand at the watch spots, turned to the scene; those done wait in the corner,
-  // hands on their head, or stand aside. ──
+  // hands on their head, or stand aside. Each holds their arms their own way. ──
   const focus = () => (st.position === 'otk' ? bench.at.clone().setY(0.8) : wall.at.clone().setY(0.9));
+  const HOLDS = ['fold', 'rest', 'clasp', 'rest', 'fold', 'clasp'];
   function poseOthers(t) {
     let w = 0;
     for (const P of people) {
       if (P === cur && st.phase === 'turn') continue;
       if (st.phase === 'after' && P === afterWith) continue;
-      const F = P.f;
+      const F = P.f, i = people.indexOf(P);
       if (P.done && st.between === 'corner' && st.phase === 'turn') {
-        // the first in the corner; any after, along the east bulkhead, facing it
+        // the first in the corner; any after, along the east bulkhead, facing it; feet together, hands on the head, the head bowed
         const c = bay.spots.corner, off = people.filter(x => x.done).indexOf(P);
-        stand(F, t, { look: 0.25 });
-        if (off === 0) setRoot(F, c.at, c.yaw); else setRoot(F, new V3(c.at.x + 0.04, 0, c.at.z - 0.85 * off), Math.PI / 2);
-        F.root.updateMatrixWorld(true);
-        const head = F.bone.head.getWorldPosition(new V3()), side = toWorldDir(F, 1, 0, 0);
-        for (const [sd, sx] of [['L', 1], ['R', -1]]) reach(F, sd, head.clone().addScaledVector(UP, 0.14 * sc(F)).addScaledVector(side, sx * 0.05), side.clone().multiplyScalar(sx).add(new V3(0, -0.2, 0)).normalize(), null, null);
+        if (off === 0) stand(F, c.at, c.yaw, { weight: 0.3, wide: 0.08, look: 0.32 }); else stand(F, new V3(c.at.x + 0.04, 0, c.at.z - 0.85 * off), Math.PI / 2, { weight: 0.3, wide: 0.08, look: 0.32 });
+        const head = W_(F, 'head'), side = toWorldDir(F, 1, 0, 0), fwd = toWorldDir(F, 0, 0, 1);
+        for (const [sd, sx] of [['L', 1], ['R', -1]]) {
+          reach(F, sd, head.clone().addScaledVector(UP, 0.15 * sc(F)).addScaledVector(side, sx * 0.045).addScaledVector(fwd, -0.01), side.clone().multiplyScalar(sx).addScaledVector(UP, -0.15).normalize(), UP.clone(), side.clone().multiplyScalar(-sx).addScaledVector(fwd, 0.3).normalize());
+          F.grip(sd, 0.3, 0, 0.2);
+        }
         F.setExpr(P.outcome === 'word' ? 'sad' : 'teary');
         continue;
       }
       const spot = bay.spots.watch[w++ % bay.spots.watch.length], f = focus();
-      stand(F, t, { look: 0.12 });
-      setRoot(F, spot.at, Math.atan2(f.x - spot.at.x, f.z - spot.at.z));
+      const waiting = !P.done && P.role === 'subject';
+      stand(F, spot.at, Math.atan2(f.x - spot.at.x, f.z - spot.at.z), { weight: i % 2 ? 0.6 : -0.6, look: waiting ? 0.3 : 0.15, headYaw: 0.05 * Math.sin(i * 1.7) });
+      arms(F, waiting ? 'clasp' : HOLDS[i % HOLDS.length]);
       if (P.done) F.setExpr(P.outcome === 'word' ? 'sad' : 'teary'); else F.setExpr(P.role === 'witness' ? 'concerned' : 'shy');
-      F.root.updateMatrixWorld(true);
     }
   }
 
   // ── The subject's pose and reactions ──
   function poseSubject(dt) {
     const P = cur, F = P.f, d = clamp(P.pain.distress(), 0, 1.8), dd = Math.min(1, d), t = st.t, s = sc(F);
-    const k = sp.kick.to(J.kick, dt), wr = Math.sin(t * 6.3) * 0.5 + Math.sin(t * 3.7) * 0.5, wrig = sp.wrig.to(wr * dd * (st.running ? 1 : 0.5), dt);
-    const mine = J.side === 'L' ? 1 : -1;
+    const wr = Math.sin(t * 6.3) * 0.5 + Math.sin(t * 3.7) * 0.5, wrig = sp.wrig.to(wr * dd * (st.running ? 1 : 0.4), dt);
+    const k = sp.kick.to(0, dt), ko = sp.kickO.to(0, dt), fl = sp.flinch.to(0, dt), ar = sp.arch.to(0, dt), hd = sp.head.to(0.15 * dd, dt);
+    const g = sp.grip.to(0.25 + 0.75 * dd, dt);
+    // past the edge, while it goes on, the legs keep going: a slow alternating kick
+    const pedal = st.running && d > 0.95 ? Math.sin(t * 5.2) * 0.5 * clamp((d - 0.95) * 2, 0, 1) : 0;
     F.resetPose();
     if (st.position === 'otk') {
-      placeOTK(P);
-      F.bone.hips.rotation.y = 0.07 * wrig; F.bone.hips.rotation.z = 0.04 * wrig;
-      F.bone.spine.rotation.x = 0.06 - 0.06 * k; F.bone.chest.rotation.x = 0.04 - 0.05 * k;
-      F.bone.neck.rotation.x = -0.25 - 0.45 * k + 0.08 * dd * Math.sin(t * 2.9); F.bone.neck.rotation.y = 0.5 + 0.1 * Math.sin(t * 1.7) * dd;
+      placeOTK(P, fl);
+      // the back arched a little, the head turned on the bench side; on a smack the back arches and the head comes up
+      F.bone.hips.rotation.set(-0.06 - 0.05 * ar, 0.07 * wrig, 0.04 * wrig + 0.04 * fl * (J.side === 'L' ? 1 : -1));
+      F.bone.spine.rotation.set(0.1 - 0.12 * ar, 0, 0.02 * wrig); F.bone.chest.rotation.set(0.08 - 0.1 * ar, 0, 0);
+      F.bone.neck.rotation.set(-0.42 - 0.45 * hd - 0.2 * ar, -0.85 + 0.1 * Math.sin(t * 1.7) * dd, -0.1);
       F.root.updateMatrixWorld(true);
-      // legs: the feet toward the deck beyond the bench's end; a kick lifts the foot on the side struck
+      // legs: the toes on the deck beyond the bench's end, knees soft; a kick bends the knee on the side struck, the foot leaving the deck
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
-        const m = side === J.side ? 1 : 0.35, kk = k * m + 0.25 * dd * Math.max(0, sx * wrig);
-        const W = new V3(otkH.x - 0.66 * s + 0.12 * kk, 0.085 + 0.42 * kk, otkH.z - sx * 0.1 * s);
-        legTo(F, side, W, new V3(-0.2, -1, 0).normalize());
-        F.bone['foot' + side].rotation.x = 0.95 - 0.4 * kk;
+        const kk = Math.max(0, (side === J.side ? k : ko) + 0.3 * dd * Math.max(0, sx * wrig) + (side === 'L' ? pedal : -pedal));
+        const Wt = new V3(otkH.x - 0.62 * s + 0.2 * kk, 0.06 + 0.5 * kk, otkH.z - sx * 0.085 * s - 0.04 * kk * sx);
+        legTo(F, side, Wt, new V3(-0.15, -1, 0).normalize());
+        F.bone['foot' + side].rotation.x = 1.0 - 0.35 * kk; F.bone['toe' + side].rotation.x = -0.6 + 0.3 * kk;
       }
-      // hands braced on the bench, beyond the Captain's left knee; lifted a little as they react
-      const sh = F.bone.chest.getWorldPosition(new V3());
+      // hands braced on the bench beyond the Captain's left knee; on a smack they push and grip
+      const sh = W_(F, 'chest');
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
-        const lift = sp.lift.to(k, dt);
-        const W = new V3(sh.x + 0.36 * s, bench.seatY + 0.075 + 0.05 * lift, otkH.z - sx * 0.15 * s);
-        reach(F, side, W, new V3(0.2, 0.6, -sx * 0.8).normalize(), new V3(0, -1, 0), new V3(1, 0, 0));
-        F.bone['fingers' + side].rotation.x = 0;
+        const lift = sp.lift.to(0, dt);
+        const Wt = new V3(sh.x + 0.34 * s + 0.03 * lift, bench.seatY + 0.074 + 0.03 * Math.max(0, lift), otkH.z - sx * 0.16 * s);
+        reach(F, side, Wt, new V3(0.15, 0.7, -sx * 0.7).normalize(), new V3(0, -1, 0), new V3(1, 0, sx * -0.25).normalize());
+        F.grip(side, 0.12 + 0.35 * g, 0.4 - 0.3 * g, 0.3);
       }
     } else {
-      placeWall(P);
-      const fwd = sp.fwd.to(k, dt), toe = sp.toe.to(k * 0.9 + 0.2 * dd * Math.max(0, wrig), dt);
-      F.bone.hips.position.y = (0.95 - 0.05 + 0.035 * toe) ; F.bone.hips.position.z = -0.09 + 0.06 * fwd;
-      F.bone.hips.rotation.x = 0.42 - 0.25 * fwd; F.bone.hips.rotation.y = 0.05 * wrig; F.bone.hips.rotation.z = 0.04 * wrig;
-      F.bone.spine.rotation.x = 0.2 - 0.05 * fwd; F.bone.chest.rotation.x = 0.1 - 0.08 * fwd;
-      F.bone.neck.rotation.x = -0.15 - 0.4 * k + 0.06 * dd * Math.sin(t * 2.6); F.bone.neck.rotation.y = 0.12 * Math.sin(t * 1.3) * dd;
+      // bent well forward from the hips, back long, head down between the arms; a smack brings them up onto their toes, the hips driving toward
+      // the bulkhead and the back straightening, the head coming up; now and then a foot comes off the deck
+      setRoot(F, wall.at, wall.yaw);
+      const toe = sp.toe.to(0, dt), fwd = Math.max(0, fl);
+      F.bone.hips.position.set(0.012 * wrig, 0.93 - 0.03 + 0.04 * toe, -0.1 + 0.07 * fwd);
+      F.bone.hips.rotation.set(0.72 - 0.35 * fwd - 0.15 * ar, 0.05 * wrig, 0.05 * wrig);
+      F.bone.spine.rotation.set(0.12 - 0.06 * ar, 0, 0.03 * wrig); F.bone.chest.rotation.set(0.06 - 0.08 * ar, 0, 0);
+      F.bone.neck.rotation.set(0.25 - 0.7 * hd - 0.15 * ar, 0.1 * Math.sin(t * 1.3) * dd, 0);
       F.root.updateMatrixWorld(true);
-      const stamp = sp.stamp.to(J.stamp, dt);
+      const stamp = sp.stamp.to(0, dt);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
-        const st_ = side === J.side ? stamp : 0;
-        legTo(F, side, local(F, sx * 0.25, 0.085 + 0.045 * toe + 0.13 * st_, 0.02 + 0.05 * st_), toWorldDir(F, sx * 0.2, 0.2, 1).normalize());
-        Fg.aim(F.bone['foot' + side], toWorldDir(F, 1, 0, 0), toWorldDir(F, 0, 1, -0.4 * toe).normalize());
+        const st_ = side === J.side ? Math.max(0, stamp) : 0, pd = side === 'L' ? Math.max(0, pedal) : Math.max(0, -pedal);
+        const up = 0.03 * Math.max(0, toe) + 0.16 * st_ + 0.1 * pd;
+        legTo(F, side, local(F, sx * 0.25, 0.085 + up, 0.0 - 0.1 * st_), toWorldDir(F, sx * 0.15, 0.1, 1).normalize());
+        footFlat(F, side, toWorldDir(F, sx * 0.12, 0, 1).normalize(), clamp(toe * 1.2 + st_ + pd, 0, 1));
       }
-      const R = wall.rail, g = sp.grip.to(dd, dt);
+      // the hands over the rail: palms down on it, the fingers wrapped over its far side, the wrists a hand's length back toward them
+      const R = wall.rail, toWall = toWorldDir(F, 0, 0, 1), hk = sc(F);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
-        const W = new V3(R.x + 0.07, R.y + 0.03, R.z - sx * 0.3 * s);
-        reach(F, side, W, toWorldDir(F, sx * 1, -0.6, -0.3).normalize(), toWorldDir(F, 0, -0.5, 1).normalize(), toWorldDir(F, 0, -1, 0.6).normalize());
-        F.bone['fingers' + side].rotation.z = sx * -(1.1 + 0.3 * g); F.bone['thumb' + side].rotation.z = sx * -0.8;
+        const fdir = toWall.clone().addScaledVector(UP, -0.25).normalize();
+        const G = new V3(R.x, R.y, R.z - sx * 0.25 * s), Wt = G.clone().addScaledVector(fdir, -0.072 * hk).addScaledVector(UP, 0.03);
+        reach(F, side, Wt, toWorldDir(F, sx * 1, -0.6, -0.2).normalize(), UP.clone().negate().addScaledVector(toWall, 0.25).normalize(), fdir);
+        F.grip(side, 0.72 + 0.2 * g, 0.05, 0.7);
       }
     }
     F.breath = 0.3 + 0.7 * dd;
@@ -196,26 +257,34 @@ function create(stage, bay, opts) {
   // the contact: palm flat on the spot, fingers running across the seat away from the Captain
   function contactFor(spotKey) {
     cur.f.surface(spotKey, sv, lift());
-    const n = sv.n.clone(), away = st.position === 'otk' ? new V3(0, 0, 1) : toWorldDir(cur.f, -1, 0.4, 0.2).normalize();
+    const n = sv.n.clone(), away = st.position === 'otk' ? new V3(0.15, 0, 1) : toWorldDir(cur.f, -1, 0.4, 0.2).normalize();
     const f = away.addScaledVector(n, -away.dot(n)).normalize();
-    const W = sv.p.clone().addScaledVector(n, 0.018).addScaledVector(f, -0.085 * sc(captain));
+    const W = sv.p.clone().addScaledVector(n, 0.016).addScaledVector(f, -0.085 * sc(captain));
     return { W, n, f, P: sv.p.clone() };
   }
-  const handPose = { W: new V3(), n: new V3(0, 1, 0), f: new V3(0, 0, 1) };
+  const handPose = { n: new V3(0, 1, 0), f: new V3(0, 0, 1), cock: 0 };
   function poseCaptainHands(dt) {
     const F = captain, sw = st.swing, cs = sc(F);
-    // the left hand: on the small of their back
-    const back = cur.f.bone.spine.getWorldPosition(new V3()), bn = toWorldDir(cur.f, 0, 0, -1).normalize();
-    const LW = back.clone().addScaledVector(bn, 0.13 * sc(cur.f)).add(st.position === 'otk' ? new V3(0.05, 0, -0.06) : new V3(0, 0, 0));
-    reach(F, 'L', LW, st.position === 'otk' ? new V3(0.6, 0.3, -0.7).normalize() : toWorldDir(F, 1, -0.3, -0.4).normalize(), bn.clone().negate(), st.position === 'otk' ? new V3(0, 0, 1) : toWorldDir(cur.f, 1, 0, 0));
-    // the right: by the swing, or soothing, or at rest above the seat
+    // the left hand: flat on the small of their back, fingers across it
+    const back = W_(cur.f, 'spine'), bn = toWorldDir(cur.f, 0, 0, -1).normalize(), across = st.position === 'otk' ? new V3(0.25, 0, 1).normalize() : toWorldDir(cur.f, 1, 0, 0);
+    const LW = back.clone().addScaledVector(bn, 0.125 * sc(cur.f)).addScaledVector(across, -0.07);
+    reach(F, 'L', LW, st.position === 'otk' ? new V3(0.7, 0.4, -0.6).normalize() : toWorldDir(F, 1, -0.2, -0.5).normalize(), bn.clone().negate(), across.clone().addScaledVector(bn, -across.dot(bn)).normalize());
+    F.grip('L', 0.1, 0.25, 0.15);
+    // the right: by the swing, or soothing, or resting just above the seat
     const key = spotOf(sw ? sw.side : (st.side === 'alt' ? st.nextSide : st.side), st.area), c = contactFor(key);
-    const raised = c.W.clone().addScaledVector(c.n, 0.3 * cs).add(new V3(0, 0.08, 0)).addScaledVector(c.f, -0.08);
-    const rest = c.W.clone().addScaledVector(c.n, 0.1 * cs);
-    let W = rest, phase = sw ? swingPhase(sw) : null;
+    const sh = W_(F, 'upperArmR'), toSh = sh.clone().sub(c.W); toSh.addScaledVector(c.n, -toSh.dot(c.n)).normalize();
+    // raised: up, and out to the Captain's right side (not straight up in front of them), a touch back toward the shoulder
+    const outR = st.position === 'otk' ? new V3(-1, 0, -0.15).normalize() : toWorldDir(F, -1, 0, 0);
+    const upish = c.n.clone().multiplyScalar(0.45).add(UP).normalize(), raised = c.W.clone().addScaledVector(upish, 0.26 * cs).addScaledVector(outR, 0.1 * cs).addScaledVector(toSh, 0.04);
+    const rest = c.W.clone().addScaledVector(c.n, 0.07 * cs).addScaledVector(toSh, 0.02);
+    let W = rest, cock = 0.15, curl = 0.2, phase = sw ? swingPhase(sw) : null;
     if (phase) {
-      const A_ = phase.from === 'rest' ? rest : phase.from === 'raised' ? raised : c.W, B = phase.to === 'rest' ? rest : phase.to === 'raised' ? raised : c.W;
-      W = A_.clone().lerp(B, phase.e); if (phase.arc) W.addScaledVector(c.n, 0.06 * Math.sin(Math.PI * phase.e));
+      const at = x => (x === 'rest' ? rest : x === 'raised' ? raised : c.W), A_ = at(phase.from), B_ = at(phase.to);
+      W = A_.clone().lerp(B_, phase.e); if (phase.arc) W.addScaledVector(c.n, 0.05 * Math.sin(Math.PI * phase.e)).addScaledVector(toSh, 0.04 * Math.sin(Math.PI * phase.e));
+      // the wrist: cocked back raised, flat on the skin at contact; on the way down it stays cocked till the last moment, then snaps flat
+      const ck = x => (x === 'raised' ? 0.85 : x === 'rest' ? 0.15 : 0), e2 = phase.from === 'raised' && phase.to === 'contact' ? Math.pow(phase.e, 2.5) : phase.e;
+      cock = lerp(ck(phase.from), ck(phase.to), e2); curl = phase.to === 'contact' || phase.from === 'contact' ? 0.03 : 0.12;
+      if (sw.phase === 'contact') W.addScaledVector(c.n, 0.012 * sp.rebound.x);      // (a little give, coming off the skin)
     } else if (st.soothe) {
       // slow circles on the area chosen
       const ak = st.sootheArea === 'thighs' ? 'thighs' : st.sootheArea === 'back' ? 'upper' : 'centre';
@@ -224,13 +293,18 @@ function create(stage, bay, opts) {
       const a = st.t * 2.1, tang = new V3().crossVectors(c2.n, c2.f).normalize();
       W = c2.W.clone().addScaledVector(c2.f, 0.03 * Math.cos(a)).addScaledVector(tang, 0.03 * Math.sin(a)).addScaledVector(c2.n, -0.004);
       if (st.sootheArea === 'back') W = back.clone().addScaledVector(bn, 0.12 * sc(cur.f)).addScaledVector(tang, 0.04 * Math.sin(a)).addScaledVector(c2.f, -0.06);
-      handPose.n.lerp(c2.n, 0.3); handPose.f.lerp(c2.f, 0.3);
+      handPose.n.lerp(c2.n, 0.25); handPose.f.lerp(c2.f, 0.25); cock = 0; curl = 0.06;
     }
-    if (!st.soothe || sw) { handPose.n.lerp(c.n, 0.4); handPose.f.lerp(c.f, 0.4); }
-    handPose.W.copy(W);
-    const pole = st.position === 'otk' ? new V3(-0.8, 0.3, -0.6).normalize() : toWorldDir(F, -1, -0.3, -0.5).normalize();
-    reach(F, 'R', W, pole, handPose.n.clone().negate().normalize(), handPose.f.clone().normalize());
-    F.bone.fingersR.rotation.z = 0.05;
+    if (!st.soothe || sw) { handPose.n.lerp(c.n, 0.5); handPose.f.lerp(c.f, 0.5); }
+    handPose.cock = lerp(handPose.cock, cock, sw ? 1 : 0.15);
+    // the hand's frame: fingers along the skin, cocked back toward the normal by the wrist
+    const n = handPose.n.clone().normalize(), f = handPose.f.clone().addScaledVector(n, -handPose.f.dot(n)).normalize(), a = handPose.cock;
+    const fC = f.clone().multiplyScalar(Math.cos(a)).addScaledVector(n, Math.sin(a)), nC = n.clone().multiplyScalar(Math.cos(a)).addScaledVector(f, -Math.sin(a));
+    // the elbow: out and back at rest and contact, lifted high with the hand raised
+    const rz = sp.raise.x, out = st.position === 'otk' ? new V3(-0.8, 0.25, -0.55) : toWorldDir(F, -1, -0.2, -0.5);
+    const pole = out.normalize().lerp(new V3(-0.3, 1, -0.3).normalize(), clamp(rz, 0, 1) * 0.6).normalize();
+    reach(F, 'R', W, pole, nC.negate(), fC);
+    F.grip('R', curl, 0.12, 0.1);
   }
 
   // ── Smacks ──
@@ -241,10 +315,14 @@ function create(stage, bay, opts) {
   function impact(sw) {
     const P = cur, key = spotOf(sw.side, st.area), tender = P.f.spot[key].mark;
     const hit = P.pain.hit({ implement: 'hand', strength: st.strength, speed: st.pace, raised: sw.waited, tender, cushion: cushion() });
-    P.f.mark(key, 0.022 * st.strength * (1 - 0.6 * cushion())); for (const a of AREAS) if (a !== st.area) P.f.mark(a + sw.side, 0.005 * st.strength);
+    P.f.mark(key, 0.032 * st.strength * (1 - 0.6 * cushion())); for (const a of AREAS) if (a !== st.area) P.f.mark(a + sw.side, 0.005 * st.strength);
     P.hits++; P.peak = Math.max(P.peak, P.pain.distress());
-    J.kick = Math.max(J.kick, hit.reaction); J.side = sw.side; J.flick = 0.45;
-    if (hit.reaction > 0.55 && bandIndex() >= 2 && Math.random() < 0.45) J.stamp = 1;
+    J.side = sw.side; J.flick = 0.45;
+    const r = hit.reaction;
+    P.f.impact(sw.side, r * (0.6 + 0.4 * st.strength) * (cushion() > 0.3 ? 0.4 : 1));
+    kickSp('kick', 9 * r); kickSp('kickO', 3 * r * Math.random()); kickSp('flinch', 6 * r); kickSp('arch', 5 * r); kickSp('head', 6 * r); kickSp('lift', 4 * r);
+    kickSp('toe', 5 * r); kickSp('rebound', 6); kickSp('grip', 3 * r);
+    if (r > 0.55 && bandIndex() >= 2 && Math.random() < 0.45) kickSp('stamp', 9 * r);
     if (st.sound && A && A.ctx) { A.thwack(hit.reaction, cushion() > 0.3); A.voice(hit.reaction, bandIndex(), false, 0.9, P.pitch); }
     emit('hit', { hit, side: sw.side, area: st.area, distress: P.pain.distress(), band: BANDS[bandIndex()], hits: P.hits });
     scripted();
@@ -325,7 +403,7 @@ function create(stage, bay, opts) {
   // ── Cameras ──
   const CAMS = {
     otk: [['Side', [-0.45, 1.35, 1.95], [-0.05, 0.7, 0.2]], ['Behind', [-1.5, 1.2, 0.45], [-0.1, 0.75, 0.22]], ['Seat', [-0.75, 1.5, 0.8], [-0.2, 0.82, 0.24]],
-      ['Their face', [1.05, 0.5, 0.55], [0.5, 0.55, 0.24]], ['Captain', [0.1, 1.3, 1.05], [0.0, 1.22, 0.0]], ['Room', [1.9, 1.9, 2.0], [0.0, 0.7, 0.0]]],
+      ['Their face', [0.85, 0.42, 0.85], [0.52, 0.52, 0.26]], ['Captain', [0.1, 1.3, 1.05], [0.0, 1.22, 0.0]], ['Room', [1.9, 1.9, 2.0], [0.0, 0.7, 0.0]]],
     wall: [['Side', [-1.3, 1.3, -0.55], [-1.95, 0.9, 1.0]], ['Behind', [-0.5, 1.2, 0.6], [-1.9, 0.85, 0.95]], ['Seat', [-1.0, 1.25, 0.4], [-1.75, 0.88, 0.95]],
       ['Their face', [-2.45, 1.05, 0.25], [-2.25, 1.2, 0.95]], ['Captain', [-2.1, 1.6, 0.85], [-1.5, 1.6, 1.45]], ['Room', [1.2, 1.9, 2.0], [-1.6, 0.8, 0.8]]],
     after: [['Two-shot', [0.3, 1.0, 1.75], [0.3, 0.85, 0.0]], ['Close', [0.55, 1.05, 1.1], [0.3, 0.95, 0.0]]],
@@ -339,7 +417,6 @@ function create(stage, bay, opts) {
   // ── Each frame ──
   function update(dt) {
     st.t += dt; sayCool -= dt;
-    J.kick *= Math.exp(-dt * 5); J.stamp *= Math.exp(-dt * 4);
     if (cur && st.phase === 'turn') {
       advance(dt);
       const onSkin = st.swing && st.swing.phase === 'contact';
@@ -357,12 +434,17 @@ function create(stage, bay, opts) {
     }
     if (cur && st.phase !== 'after' && st.phase !== 'over') { poseSubject(dt); poseCaptain(dt); poseCaptainHands(dt); captain.setExpr(st.position === 'otk' || st.phase === 'turn' ? 'stern' : 'calm'); }
     else if (st.phase === 'after' && afterWith) {
-      poseCaptain(dt); seat(afterWith.f, bench.beside, -0.35, { look: 0.15 });
-      // the Captain's arm round their shoulders
-      const sh = afterWith.f.bone.clavR.getWorldPosition(new V3()).add(new V3(0, 0.03, -0.04));
-      reach(captain, 'L', sh, new V3(0.3, 0.2, -1).normalize(), new V3(0, -1, 0), new V3(1, 0, 0));
+      // sat side by side: they lean in, the head toward the Captain's shoulder, hands in their lap; the Captain's arm round them, the hand on
+      // their far shoulder, the other hand on their own knee
+      const G = afterWith.f;
+      seat(captain, bench.at, 0, { look: 0.18, headYaw: 0.3, roll: -0.03, lean: 0.02 });
+      seat(G, bench.beside.clone().add(new V3(-0.06, 0, 0.02)), -0.3, { look: 0.3, lean: 0.1, roll: 0.14, headRoll: 0.18, headYaw: -0.2, spread: -0.03 });
+      for (const [sd, sx] of [['L', 1], ['R', -1]]) { const T = local(G, sx * 0.05, bench.seatY + 0.16, 0.24); reach(G, sd, T, toWorldDir(G, sx, -0.3, -0.4).normalize(), UP.clone().negate(), toWorldDir(G, -sx * 0.6, 0, 1).normalize()); G.grip(sd, 0.4, 0, 0.4); }
+      const far = W_(G, 'clavL').add(toWorldDir(G, 0.06, 0.05, -0.02));
+      reach(captain, 'L', far, new V3(0.1, 0.3, -1).normalize(), toWorldDir(G, 0.3, -1, 0).normalize(), toWorldDir(G, 0, 0, 1)); captain.grip('L', 0.35, 0.1, 0.3);
+      reach(captain, 'R', local(captain, -0.13, bench.seatY + 0.17, 0.33), new V3(-1, 0, -0.3).normalize(), UP.clone().negate(), new V3(0, 0, 1)); captain.grip('R', 0.3, 0.1, 0.3);
       captain.setExpr('soft');
-    } else { stand(captain, st.t, {}); setRoot(captain, bench.at.clone().add(new V3(0.3, 0, 0.6)), 0); }
+    } else { stand(captain, bench.at.clone().add(new V3(0.3, 0, 0.6)), 0, {}); }
     poseOthers(st.t);
     captain.tick(dt); for (const P of people) P.f.tick(dt);
   }
