@@ -296,6 +296,8 @@ VARIANTS = {
     'firm': {'torso': lambda r: (1.0 - 0.07 * gauss(r['y'] - ym(crotch_py - 150), 0.1), 0.95, 0.97, 0.95), 'leg': lambda r: (0.97, 0.97, 0.97, 1), 'arm': lambda r: (0.96, 0.96, 0.96, 1)},
     'bust': {'torsoP': lambda P: bust_variant(P, 3.4, spread=0.036, drop=0.032, widen=1.65, apart=0.62, round_=2.0), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
     'bustSmall': {'torsoP': lambda P: bust_variant(P, 0.4), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
+    'sexLarge': {'sex': (1.35, 1.45, 1.15), 'torso': lambda r: (1, 1, 1, 1), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
+    'sexSmall': {'sex': (0.86, 0.82, 0.94), 'torso': lambda r: (1, 1, 1, 1), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
 }
 
 
@@ -599,30 +601,37 @@ def front_z(Sf, y, x=0.0):
         if Sf.f(np.array([[x, y, m]]))[0] > 0: lo = m
         else: hi = m
     return lo
-def sex_parts(sex, T):
-    """Hers: a groove (to be cut from the field) down the front of the mons into the crotch. His: the scrotum and penis, hanging (a field to be
-    joined to the body). Simple, soft forms, as the rest of the body is."""
+def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
+    """Hers: a cleft down the front of the mons into the crotch, a soft raised form either side of it (as a field to cut from the body: the
+    groove positive, the forms negative). His: the scrotum and penis, hanging, their roots well up in the body so they join it without a crease
+    (a field to be joined to it); k: (girth, length, scrotum) for the shape keys toward smaller or larger. Simple, soft forms, as the rest is."""
     if sex == 'f':
-        def groove(P):
+        def cut(P):
             x, y, z = P[:, 0], P[:, 1], P[:, 2]
-            win = ss(CROTCH_Y - 0.03, CROTCH_Y - 0.008, y) * ss(CROTCH_Y + 0.048, CROTCH_Y + 0.026, y)
-            return 0.0055 * np.exp(-0.5 * (x / 0.0042) ** 2) * win * ss(-0.03, 0.0, z)
-        return None, groove
+            front = ss(-0.03, 0.0, z)
+            gw = ss(CROTCH_Y - 0.03, CROTCH_Y - 0.008, y) * ss(CROTCH_Y + 0.048, CROTCH_Y + 0.026, y)
+            bw = ss(CROTCH_Y - 0.034, CROTCH_Y - 0.01, y) * ss(CROTCH_Y + 0.05, CROTCH_Y + 0.022, y)
+            groove = 0.005 * np.exp(-0.5 * (x / 0.0038) ** 2) * gw
+            forms = 0.0032 * np.exp(-0.5 * ((np.abs(x) - 0.0105) / 0.0058) ** 2) * bw
+            return (groove - forms) * front
+        return None, cut
+    kg, kl, ks = k
     zp = front_z(T, CROTCH_Y + 0.025)
-    S0, R0 = np.array([0.0, CROTCH_Y - 0.034, zp - 0.026]), np.array([0.026, 0.031, 0.023])
-    A, B = np.array([0.0, CROTCH_Y + 0.022, zp - 0.014]), np.array([0.0, CROTCH_Y - 0.068, zp + 0.01])
+    S0, R0 = np.array([0.0, CROTCH_Y - 0.02, zp - 0.03]), np.array([0.026, 0.031, 0.023]) * ks
+    A = np.array([0.0, CROTCH_Y + 0.05, zp - 0.026]); tip = np.array([0.0, CROTCH_Y - 0.052, zp + 0.01])
+    B = A + (tip - A) * kl
     def parts(P):
         q = np.linalg.norm((P - S0) / R0, axis=1); scrotum = (1 - q) * R0.min()
-        return smax(scrotum, capsule(P, A, B, 0.016, 0.0148), 0.012)
+        return smax(scrotum, capsule(P, A, B, 0.016 * kg, 0.0148 * kg), 0.012)
     return parts, None
 
-def body_field(torso, leg, arm, sex):
+def body_field(torso, leg, arm, sex, sexk=(1.0, 1.0, 1.0)):
     """The body's parts as fields, and how they're joined: the trunk, the legs and arms (the measured surfaces), the hands and feet, the sex."""
     hk = HAND_K[sex]
     S_ = {'torso': Surface(torso), 'legL': Surface(leg, 1), 'legR': Surface(leg, -1), 'armL': Surface(arm, 1, arm_axis(1)), 'armR': Surface(arm, -1, arm_axis(1))}
     H = {'handL': hand_parts(1, hk), 'handR': hand_parts(-1, hk)}; Ft = {'footL': foot_part(1, leg), 'footR': foot_part(-1, leg)}
     comps = {k: v.f for k, v in S_.items()}; comps.update({k: v[0] for k, v in H.items()}); comps.update({k: v[0] for k, v in Ft.items()})
-    add, cut = sex_parts(sex, S_['torso'])
+    add, cut = sex_parts(sex, S_['torso'], sexk)
     if add: comps['sex'] = add
     dr = DELT_R[sex] * float(np.interp(0.06, [r['y'] for r in arm], [r['rx'] for r in arm])) / 0.0397
     for sx, s_ in ((1, 'L'), (-1, 'R')):
@@ -640,7 +649,7 @@ def body_field(torso, leg, arm, sex):
             a = smax(smax(c['arm' + s_], c['hand' + s_], 0.008), c['delt' + s_], 0.02)
             f = smax(f, a, 0.022)
         f = smax(f, c['footL'], 0.014); f = smax(f, c['footR'], 0.014)
-        if add: f = smax(f, c['sex'], 0.02)      # (a soft join, no crease where it meets the body)
+        if add: f = smax(f, c['sex'], 0.026)      # (a soft join, no crease where it meets the body)
         if cut: f = f - cut(P)
         return f, c
     return F
@@ -708,8 +717,8 @@ def build(sex):
     for pgn in body.data.polygons: pgn.use_smooth = True
     body.shape_key_add(name='Basis')
     for v, fns in VARIANTS.items():
-        if v.startswith('bust') and sex == 'm': continue
-        Fv = body_field(fns['torsoP'](torso) if 'torsoP' in fns else scaled(torso, fns['torso']), scaled(leg, fns['leg']), scaled(arm, fns['arm']), sex)
+        if (v.startswith('bust') and sex == 'm') or (v.startswith('sex') and sex == 'f'): continue
+        Fv = body_field(fns['torsoP'](torso) if 'torsoP' in fns else scaled(torso, fns['torso']), scaled(leg, fns['leg']), scaled(arm, fns['arm']), sex, fns.get('sex', (1.0, 1.0, 1.0)))
         t_v = along(Fv, X, Nrm)
         dt = np.where(limb & ~np.isnan(t_v) & ~np.isnan(t_base), t_v - t_base, 0.0)
         acc = np.zeros(len(X)); cnt = np.zeros(len(X))
@@ -884,7 +893,7 @@ def garments(sex, torso, leg, arm, body, label, rig):
     Tb = Cloth(torso, lambda y: 0.0045, slope=1.2, below=CROTCH_Y + 0.12)
     Lb = [Cloth(leg, lambda y: 0.0045, sx) for sx in (1, -1)]
     briefs_f = lerp_crotch(Tb, legs_(Lb))
-    his = sex_parts(sex, Surface(torso))[0]
+    his = sex_parts(sex, Surface(torso), (1.35, 1.45, 1.15))[0]
     if his: briefs_f = (lambda b: lambda P: np.maximum(b(P), his(P) + 0.006))(briefs_f)
     Tt = Cloth(torso, lambda y: 0.01, slope=0.7, below=CROTCH_Y + 0.13)
     leg_ease = lambda y: 0.009 + 0.011 * ss(0.33, 0.2, y)

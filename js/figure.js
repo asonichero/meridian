@@ -133,8 +133,8 @@ varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
-if (uCleft.z > 0.5) { float cl = (1.0 - smoothstep(0.0006, 0.0017, abs(vBind.x))) * smoothstep(uCleft.y, uCleft.y + 0.008, vBind.y) * (1.0 - smoothstep(uCleft.x - 0.01, uCleft.x, vBind.y)) * step(uCleft.w, vBind.z);
-  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.42, 0.3, 0.28), cl); }
+if (uCleft.z > 0.5) { float cl = (1.0 - smoothstep(0.0005, 0.0014, abs(vBind.x))) * smoothstep(uCleft.y, uCleft.y + 0.008, vBind.y) * (1.0 - smoothstep(uCleft.x - 0.01, uCleft.x, vBind.y)) * step(uCleft.w, vBind.z);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62, 0.48, 0.45), cl * 0.85); }
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
 diffuseColor.rgb *= 1.0 + uGrain * (g - 0.5) * 2.0;
 ${o.pattern ? PATTERNS[o.pattern] : ''}
@@ -1086,12 +1086,15 @@ function bodyRegion(P, dom, L, sex) {
   if (y >= L.downTop - 0.04) return R.KNEE;
   return R.SHIN;
 }
-// The body's build, as the shape keys' amounts: mass (muscle and frame) toward muscle or slight, fat toward soft or firm; the bust's size (0 small
-// – 1 large; the model as built is about 0.4) toward the smaller or the larger.
+// The body's build, as the shape keys' amounts: mass (muscle and frame) toward muscle or slight, fat toward soft or firm; her bust's size (0 small
+// – 1 large; the model as built is about 0.4) toward the smaller or the larger; his sex likewise, by the same number (spec.size if given, else
+// the bust's, held a little short of the largest: the Captain's is given as 1).
 function bodyKeys(spec) {
   const m = spec.mass == null ? 0.5 : spec.mass, fat = spec.fat == null ? 0.4 : spec.fat, b = spec.bust == null ? 0.4 : spec.bust, her = spec.sex === 'f';
+  const z = spec.size != null ? spec.size : 0.25 + 0.6 * b;
   return { muscle: clamp((m - 0.5) / 0.4, 0, 1), slight: clamp((0.5 - m) / 0.25, 0, 1) * 0.8, soft: clamp((fat - 0.4) / 0.35, 0, 1), firm: clamp((0.4 - fat) / 0.3, 0, 1) * 0.8,
-    bust: her ? clamp((b - 0.4) / 0.6, 0, 1) : 0, bustSmall: her ? clamp((0.4 - b) / 0.4, 0, 1) : 0 };
+    bust: her ? clamp((b - 0.4) / 0.6, 0, 1) : 0, bustSmall: her ? clamp((0.4 - b) / 0.4, 0, 1) : 0,
+    sexLarge: her ? 0 : clamp((z - 0.4) / 0.6, 0, 1), sexSmall: her ? 0 : clamp((0.4 - z) / 0.4, 0, 1) };
 }
 function setKeys(mesh, keys) {
   const dict = mesh.geometry.userData.keys || {}, inf = mesh.morphTargetInfluences;

@@ -12,7 +12,8 @@ const METERS = ['stress', 'wilfulness', 'resentment', 'compliance'];
 
 // pain: how much they can take (tolerance) and how fast it fades (resilience), for js/pain.js.
 // body: the baseline type (height in metres for each sex; mass = muscle and frame, fat = softness, 0–1; bust: its size in the female translation,
-// 0 (small) – 1 (large)). dept: their department colour on the uniform.
+// 0 (small) – 1 (large); in the male translation the same number sizes his sex, the Captain's the largest). dept: their department colour on the
+// uniform.
 const ROSTER = {
   scientist: { id: 'scientist', pain: { tolerance: 0.55, resilience: 0.5 }, name: 'Rowan Varga', short: 'Varga', title: 'Dr.', role: 'Mission Specialist (Chief Scientist)', age: 41,
     domain: ['anomaly mapping', 'research logs', 'mission objectives'],
@@ -75,7 +76,7 @@ function captainSpec(c) {
   c = Object.assign({ sex: 'm', skin: '#b88a6a', hair: '#3a2a20', hairStyle: 'crop', build: 'average', beard: true }, c || {});
   const [mass, fat] = CAPTAIN.options.build[c.build] || CAPTAIN.options.build.average;
   return { sex: c.sex, height: c.sex === 'f' ? 1.72 : 1.83, mass, fat, skin: c.skin, hair: c.hair, hairStyle: c.hairStyle, eyes: '#4a5a6a',
-    beard: c.sex === 'm' && c.beard, outfit: 'uniform', dept: CAPTAIN.dept, bust: 0.45 };
+    beard: c.sex === 'm' && c.beard, outfit: 'uniform', dept: CAPTAIN.dept, bust: 0.45, size: 1 };
 }
 // Voice pitch for the babble and cries, by sex (Hz).
 const pitch = (id, sex) => (sex === 'm' ? 128 : 208) + ({ scientist: 4, engineer: -14, pilot: 10, lifesupport: 8, comms: 0, medic: -6 }[id] || 0);
