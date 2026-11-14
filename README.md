@@ -5,7 +5,7 @@ A deep-space sci-fi psychological action-adventure and management sim, built on 
 ## Run it
 
 ```
-npm run serve        # http://localhost:8123/ opens the correction test (session.html); /figures.html is the crew line-up; /model.html the bodies and clothes
+npm run serve        # http://localhost:8123/ opens the correction test (session.html); /figures.html shows one figure at a time (any crew member or the Captain, posed); /model.html the bodies and clothes
 npm test             # the pain model, the scripted correction, the crew and their lines, the figures' rig (built in code and from the models)
 ```
 
@@ -44,7 +44,7 @@ This is the first playable piece. It tests the control scheme, the models and th
 
 The style is redlessons' toon look on bodies sculpted after a stylised reference turnaround:
 - **The bodies** (`tools/blender/build_figures.py`): the female body is measured from the reference's front and side silhouettes, row by row: the trunk, legs and arms each a surface of measured rows (the bust and seat as forms on the chest and the lower back, the thighs taking over from the hips across the crotch), the hands and feet modelled, all smoothly united and drawn by marching cubes. Its proportions are made realistic where the reference is stylised: the crotch is lowered 5 cm (the reference's long legs shortened, the trunk lengthened to match, head and shoulders kept), putting it at about 47% of the height. The male is derived from it: broader shoulders and chest, narrower hips, a flat chest, a fuller neck.
-- **The rig:** the game's own skeleton (below), placed on each body and weighted automatically. Shape keys move each body toward the extremes of build (muscle, slight, soft, firm, and the bust for her); each crew member's baseline build sets them.
+- **The rig:** the game's own skeleton (below), placed on each body and weighted automatically. Shape keys move each body toward the extremes of build (muscle, slight, soft, firm) and, for her, the bust toward smaller or much larger (the larger also fuller, lower and wider, not only further out); each crew member's baseline build and bust size set them. The seats are fuller than the reference's, the men's too.
 - **The clothes** are layers drawn as shells over the body: each row's outline made convex (cloth bridges the hollows) and hanging from the bust, shoulder blades and seat rather than following the body in, cut clean at the hem, collar, cuffs, waist and leg openings, and weighted from the skin under it with the body's shape keys. Each layer is kept clear of the one under it. The uniform's jacket (stand collar, long sleeves) and the off-duty shirt (open neck, sleeves rolled), each down or raised and rolled above the waist; trousers, up or lowered and bunched round the knees with the seat's cloth hanging between; briefs (trunks for the men), up or lowered round the thighs; boots.
 - The head, face and hair are still built in code (below), on the head bone. Figures fall back to the bodies built in code if the models don't load.
 
@@ -81,11 +81,13 @@ For every figure:
 | `models/` | The Blender-built bodies and clothes (`meridian_f.glb`, `meridian_m.glb`), and their joints and landmarks (`meridian_meta.json`) |
 | `tools/measure-reference.py`, `tools/blender/build_figures.py` | Measuring the reference turnaround; building the bodies, rig, shape keys and clothes in Blender |
 | `model.html` | The models as a turnaround sheet, with the reference overlaid |
+| `js/poses.js` | Posing a figure: standing planted (contrapposto), how the arms are held (folded, parade rest, clasped, hands on head), seated, bent at a rail; hands and feet placed by IK |
 | `js/session.js` | The correction: positions, the Captain's strike (arm IK onto the skin), runs, soothing, reactions, the safe word, turns, witnesses, corner, cameras, aftercare posing |
 | `js/lines.js` | Each crew member's scripted responses and the aftercare conversation |
 | `js/crew.js` | The roster (GDD roles, plus drafted names, body types, looks, safe words and pain stats) |
 | `js/pain.js`, `js/discipline.js`, `js/audio.js` | Ported from redlessons: the pain model (with Meridian's higher, held too-harsh bar and soothing), the tiered script, synthesised sound |
 | `js/stage.js` | Renderer: HDR buffer, bloom, grading (filmic curve, split tone, vignette, grain) |
 | `js/suitbay.js` | The Airlock Anteroom and Suit Bay |
-| `session.html`, `figures.html` | The correction test; the crew line-up |
+| `session.html` | The correction test |
+| `figures.html` | One figure at a time in a plain, well-lit space: any crew member or the Captain, either translation, either outfit, the clothes raised or lowered, a choice of poses and expressions, four views and a turntable (`?who=&sex=&outfit=&clothes=&pose=&expr=&view=&spin=1`) |
 | `vendor/` | three.js r128, OrbitControls, r128's post-processing passes, GLTFLoader and SkeletonUtils |

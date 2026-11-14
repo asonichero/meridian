@@ -76,6 +76,7 @@ print('landmarks py: chin', chin_py, 'neck', neck_py, 'shoulder', shoulder_py, '
 # Real proportions rather than the reference's stylised long legs: the crotch lowered (the legs shortened above the ankle), the trunk lengthened to
 # match, the shoulders and head where they were. (The reference has the crotch at about half the height; people have it nearer 46–47%.)
 CROTCH_DROP = 0.05
+SEAT_K = 1.35      # (the seat fuller than the reference's)
 _ym0 = ym; _c0 = _ym0(crotch_py); _n0 = _ym0(neck_py); _f0 = 0.14
 def ym(py):
     y = _ym0(py)
@@ -117,7 +118,7 @@ def torso_profile():
     bust_a, bust_b = armpit_py - 30, armpit_py + 60
     seat_a, seat_b = crotch_py - 110, crotch_py + 6
     for py in ys_:
-        w = torso_w(py) / 2
+        w = torso_w(py) / 2 * (1 + 0.03 * gauss(py - (crotch_py - 25), 40))      # (a touch wider at the seat's fullest)
         if py >= crotch_py:           # (below the crotch the front view shows the two thighs: the trunk keeps the hips' width, outer edge to edge)
             rr = [r for r in front_runs(py) if r[1] > cx - 150 and r[0] < cx + 150]; w = max(cx - min(r[0] for r in rr), max(r[1] for r in rr) - cx)
         if py < armpit_py:            # above the armpits the front view shows the shoulders and arms too: the trunk itself narrows up to the neck
@@ -134,7 +135,7 @@ def torso_profile():
         zf = zm(base_f if bust else f); zb = -zm(b - seat if seat else b)
         lobes = []
         if bust: lobes += [(np.pi / 2 - 0.55, 0.3, bust * S * 1.1), (np.pi / 2 + 0.55, 0.3, bust * S * 1.1)]
-        if seat: lobes += [(-np.pi / 2 + 0.55, 0.48, seat * S), (-np.pi / 2 - 0.55, 0.48, seat * S), (-np.pi / 2, 0.11, -seat * S * 0.6)]
+        if seat: lobes += [(-np.pi / 2 + 0.56, 0.53, seat * S * SEAT_K), (-np.pi / 2 - 0.56, 0.53, seat * S * SEAT_K), (-np.pi / 2, 0.11, -seat * S * 0.6 * SEAT_K)]
         if armpit_py < py < crotch_py - 100: lobes += [(-np.pi / 2, 0.2, -0.0025)]      # the spine's groove, soft
         # (squareness: rounder at the chest, fuller at the hips' sides, where the thighs' tops come into them)
         pq = 2.0 + 0.15 * ss(armpit_py - 30, armpit_py + 30, py) + 0.55 * ss(crotch_py - 150, crotch_py, py)
@@ -159,7 +160,7 @@ def leg_profile():
         bl = min(bl, f + (r[1] - r[0]) * 1.15)         # (and a thigh no deeper than it is wide, near enough)
         hang = (b - bl) * S
         c = xm((r[0] + r[1]) / 2); hw = (r[1] - r[0]) / 2 * S
-        lobes = [(-np.pi / 2 - 0.35, 0.55, hang * 1.1)] if hang > 0 else []
+        lobes = [(-np.pi / 2 - 0.35, 0.58, hang * 1.1 * SEAT_K)] if hang > 0 else []
         out.append(ring(ym(py), (c, (zm(f) + zm(bl)) / 2), hw, (zm(f) - zm(bl)) / 2, (zm(f) - zm(bl)) / 2, 2.05, lobes))
     out.reverse()
     # down past the ankle into the foot, the ankle's row carried on; up only a little past the crotch, rounding into the trunk
@@ -240,7 +241,7 @@ def male(P, part):
             y = r['y']; t_sh = ss(ym(armpit_py) - 0.1, ym(shoulder_py), y); t_w = gauss(y - ym(crotch_py - 150), 0.1); t_h = gauss(y - ym(crotch_py - 40), 0.07)
             kx = 1.0 + 0.2 * t_sh + 0.2 * t_w - 0.12 * t_h + 0.16 * ss(ym(neck_py + 36), ym(neck_py), y)
             # (the bust's forms dropped; the seat's kept, smaller)
-            return kx, 1.03 + 0.05 * t_sh - 0.05 * t_h, 1.02 + 0.05 * t_sh, lambda a: 0.0 if a > 0 else 0.55
+            return kx, 1.03 + 0.05 * t_sh - 0.05 * t_h, 1.02 + 0.05 * t_sh, lambda a: 0.0 if a > 0 else 0.78
         out = scaled(P, f)
         # a man's chest: the pecs, broad and flat, high on it
         for r in out:
@@ -248,15 +249,35 @@ def male(P, part):
             if pc > 1e-5: r["lobes"] = r["lobes"] + [(np.pi / 2 - 0.55, 0.6, pc), (np.pi / 2 + 0.55, 0.6, pc)]
         return out
     # (the thighs' tops flatter behind, as the seat is)
-    if part == 'leg': return scaled(P, lambda r: (0.97 - 0.05 * ss(ym(knee_py), ym(crotch_py), r['y']), 0.98, 0.95 - 0.08 * ss(ym(crotch_py + 80), ym(crotch_py), r['y']), 0.55))
+    if part == 'leg': return scaled(P, lambda r: (0.97 - 0.05 * ss(ym(knee_py), ym(crotch_py), r['y']), 0.98, 0.95 - 0.06 * ss(ym(crotch_py + 80), ym(crotch_py), r['y']), 0.78))
     if part == 'arm': return scaled(P, lambda r: (1.16, 1.16, 1.16, 1))
+def bust_variant(P, k, spread=0.0, drop=0.0, widen=1.0, apart=0.55, round_=1.0):
+    """The torso with the bust's pair of forms k times the size: spread `spread` (m) further up and down, sitting `drop` lower, `widen` times
+    wider round the chest, set `apart` (radians from the middle), and fuller in profile (round_ > 1: rounder, less peaked, still easing out to
+    nothing at its edges, so no crease is left under it)."""
+    rows = sorted(P, key=lambda r: r['y']); ys = np.array([r['y'] for r in rows])
+    isb = lambda a, w: a > 0 and abs(abs(a - np.pi / 2) - 0.55) < 0.06 and abs(w - 0.3) < 0.02
+    amt = np.array([max([m for a, w, m in r['lobes'] if isb(a, w)] or [0.0]) for r in rows])
+    if spread > 0:
+        A = np.array([[gauss(yi - yj, spread) for yj in ys] for yi in ys]); sm = A @ amt / np.maximum(A.sum(1), 1e-9)
+        amt = sm * (amt.max() / max(sm.max(), 1e-9))
+    if round_ != 1.0: pk = max(amt.max(), 1e-9); amt = pk * (1 - (1 - amt / pk) ** round_)
+    amt = np.interp(ys + drop, ys, amt, left=0, right=0) * k
+    out = []
+    for r, m in zip(rows, amt):
+        lob = [l for l in r['lobes'] if not isb(l[0], l[1])]
+        if m > 1e-5: lob += [(np.pi / 2 - apart, 0.3 * widen, float(m)), (np.pi / 2 + apart, 0.3 * widen, float(m))]
+        out.append(dict(r, lobes=lob))
+    return out
+
 VARIANTS = {
     # (each a further scaling of the base, for a shape key: the extremes the game blends toward)
     'muscle': {'torso': lambda r: (1.05 + 0.05 * ss(ym(armpit_py) - 0.1, ym(shoulder_py), r['y']), 1.05, 1.06, 1.1), 'leg': lambda r: (1.1, 1.1, 1.12, 1), 'arm': lambda r: (1.16, 1.16, 1.16, 1)},
     'slight': {'torso': lambda r: (0.93, 0.93, 0.93, 0.85), 'leg': lambda r: (0.9, 0.9, 0.9, 1), 'arm': lambda r: (0.88, 0.88, 0.88, 1)},
     'soft': {'torso': lambda r: (1.0 + 0.16 * gauss(r['y'] - ym(crotch_py - 130), 0.12), 1.0 + 0.22 * gauss(r['y'] - ym(crotch_py - 110), 0.1), 1.05, 1.2), 'leg': lambda r: (1.0 + 0.1 * ss(ym(knee_py), ym(crotch_py), r['y']), 1.08, 1.08, 1), 'arm': lambda r: (1.08, 1.08, 1.08, 1)},
     'firm': {'torso': lambda r: (1.0 - 0.07 * gauss(r['y'] - ym(crotch_py - 150), 0.1), 0.95, 0.97, 0.95), 'leg': lambda r: (0.97, 0.97, 0.97, 1), 'arm': lambda r: (0.96, 0.96, 0.96, 1)},
-    'bust': {'torso': lambda r: (1, 1, 1, lambda a: 1.9 if a > 0 else 1), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
+    'bust': {'torsoP': lambda P: bust_variant(P, 3.4, spread=0.036, drop=0.032, widen=1.65, apart=0.62, round_=2.0), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
+    'bustSmall': {'torsoP': lambda P: bust_variant(P, 0.4), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
 }
 
 
@@ -625,7 +646,7 @@ def build(sex):
     print(sex, 'verts', len(X), {k: int((label == k).sum()) for k in names})
     # shape keys: each point of the trunk and limbs moved along its normal to where the variant's field crosses zero
     def along(Fn, P, n):
-        lo = np.full(len(P), -0.04); hi = np.full(len(P), 0.06)
+        lo = np.full(len(P), -0.04); hi = np.full(len(P), 0.15)
         ok = (Fn(P + lo[:, None] * n)[0] > 0) & (Fn(P + hi[:, None] * n)[0] < 0)
         for _ in range(22):
             m = (lo + hi) / 2; inside = Fn(P + m[:, None] * n)[0] > 0; lo = np.where(inside, m, lo); hi = np.where(inside, hi, m)
@@ -635,8 +656,8 @@ def build(sex):
     for pgn in body.data.polygons: pgn.use_smooth = True
     body.shape_key_add(name='Basis')
     for v, fns in VARIANTS.items():
-        if v == 'bust' and sex == 'm': continue
-        Fv = body_field(scaled(torso, fns['torso']), scaled(leg, fns['leg']), scaled(arm, fns['arm']), sex)
+        if v.startswith('bust') and sex == 'm': continue
+        Fv = body_field(fns['torsoP'](torso) if 'torsoP' in fns else scaled(torso, fns['torso']), scaled(leg, fns['leg']), scaled(arm, fns['arm']), sex)
         t_v = along(Fv, X, Nrm)
         dt = np.where(limb & ~np.isnan(t_v) & ~np.isnan(t_base), t_v - t_base, 0.0)
         acc = np.zeros(len(X)); cnt = np.zeros(len(X))

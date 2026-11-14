@@ -1,30 +1,123 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Meridian · Crew</title>
-<style>html,body{margin:0;height:100%;background:#07090c;overflow:hidden}#view{position:fixed;inset:0}
-#bar{position:fixed;left:12px;top:12px;font:13px system-ui,sans-serif;color:#d8d2c4;display:flex;gap:6px;flex-wrap:wrap}
-#bar button{background:#1c232bcc;color:#e8dcc4;border:1px solid #3a4652;border-radius:10px;padding:6px 10px;cursor:pointer}</style></head>
-<body><div id="view"></div><div id="bar"></div>
-<script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script><script src="vendor/GLTFLoader.js"></script>
-<script src="js/figure.js"></script><script src="js/crew.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Meridian · Figures</title>
+<style>
+:root { --panel: rgba(250, 248, 244, 0.9); --line: #cfc8bd; --ink: #2a2622; --dim: #7a7268; --amber: #b8782a; }
+html, body { margin: 0; height: 100%; background: #d6d2cc; color: var(--ink); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+#view { position: fixed; inset: 0; }
+#panel { position: fixed; top: calc(12px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); width: 300px; max-height: calc(100% - 24px); overflow: auto; box-sizing: border-box;
+  padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(6px); box-shadow: 0 6px 24px rgba(40, 30, 20, 0.12); }
+h1 { font-size: 15px; margin: 0 0 8px; letter-spacing: 0.03em; } h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--dim); margin: 12px 0 5px; }
+.row { display: flex; flex-wrap: wrap; gap: 5px; }
+button, select { font: inherit; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 5px 9px; cursor: pointer; }
+select { width: 100%; padding: 6px 8px; } button:hover { border-color: #a89e90; } button.on { background: #f3e2c6; border-color: var(--amber); color: #5a3a10; }
+#hide { position: fixed; top: calc(12px + env(safe-area-inset-top)); left: calc(324px + env(safe-area-inset-left)); } #panel.closed { display: none; }
+a { color: var(--dim); }
+@media (max-width: 640px) { #panel { width: auto; right: 12px; max-height: 46%; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); } #hide { left: auto; right: 12px; } }
+</style></head>
+<body><div id="view"></div>
+<div id="panel">
+  <h1>Figures</h1>
+  <h2>Who</h2><select id="who"></select>
+  <h2>Translated as</h2><div class="row" id="sex"><button data-v="f">Female</button><button data-v="m">Male</button></div>
+  <h2>Outfit</h2><div class="row" id="outfit"><button data-v="uniform">Uniform</button><button data-v="offduty">Off duty</button></div>
+  <h2>Clothes</h2><div class="row"><button id="cTop"></button><button id="cBot"></button><button id="cUnd"></button></div>
+  <h2>Pose</h2><div class="row" id="pose"></div>
+  <h2>Expression</h2><select id="expr"></select>
+  <h2>View</h2><div class="row" id="views"></div><div class="row" style="margin-top:5px"><button id="spin">Turntable</button></div>
+  <p style="margin:12px 0 0;color:var(--dim);font-size:12px">Drag to orbit, scroll or pinch to zoom. <a href="session.html">The correction test</a></p>
+</div>
+<button id="hide">☰</button>
+<script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/GLTFLoader.js"></script>
+<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/crew.js"></script>
 <script>
-// The crew side by side in the suit bay: a look at the figures (?sex=f|m, ?outfit=uniform|offduty, ?expr=…, ?clothes=top,bottoms,under).
-const q = new URLSearchParams(location.search), st = Stage.create(document.getElementById('view'), { keep: true, fov: +(q.get('fov') || 38) }), bay = SuitBay.build(st.scene);
-const sex = q.get('sex') || 'mix', outfit = q.get('outfit') || 'uniform', figs = [];
-(q.get('built') ? Promise.resolve() : Figure.preload()).then(() => {
-const only = q.get('only'); (only ? [only] : Crew.IDS).forEach((id, i) => {
-  const s = sex === 'mix' ? (i % 2 ? 'f' : 'm') : sex, f = Figure.make(Crew.figureSpec(id, s, outfit));
-  f.root.position.set(-1.6 + i * 0.62, 0, 0.6); f.root.rotation.y = q.get('back') ? Math.PI : 0; st.scene.add(f.root); figs.push(f);
-  if (q.get('clothes')) { const [top, bottoms, under] = q.get('clothes').split(','); f.setClothes({ top, bottoms, under }); }
-  if (q.get('expr')) f.setExpr(q.get('expr'));
-  const abd = f.H ? f.H.abd : 0; f.bone.upperArmL.rotation.z = 0.08 - abd; f.bone.upperArmR.rotation.z = -(0.08 - abd);
-});
-if (q.get('lit')) { const d = new THREE.DirectionalLight(0xffffff, 3); d.position.set(1, 2, 3); st.scene.add(d); st.scene.add(new THREE.AmbientLight(0xffffff, 0.6)); }
-const cap = only ? null : Figure.make(Crew.captainSpec({ sex: q.get('csex') || 'm' })); if (cap) { cap.root.position.set(2.2, 0, 0.6); st.scene.add(cap.root); figs.push(cap); }
-st.go(new THREE.Vector3(0.3, 1.25, 2.1), new THREE.Vector3(0.3, 0.95, 0.6));
-if (q.get('cam')) { const c = q.get('cam').split(',').map(Number); st.go(new THREE.Vector3(c[0], c[1], c[2]), new THREE.Vector3(c[3], c[4], c[5])); }
-const each = dt => { for (const f of figs) f.tick(dt); bay.tick(dt); };
-if (q.get('still')) { st.controls.enableDamping = false; for (let i = 0; i < 12; i++) st.step(50, each); window.ready = true; }
-else { st.start(each); window.ready = true; }
-});
+'use strict';
+// One figure at a time, in a plain, well-lit space: any crew member (or the Captain) in either translation, either outfit, the clothes as worn
+// or lowered, a choice of poses and expressions. ?who=pilot&sex=f&outfit=uniform&clothes=down,up,up&pose=stand&expr=calm&view=front&spin=1
+const $ = id => document.getElementById(id), q = new URLSearchParams(location.search), V3 = THREE.Vector3;
+const cfg = { who: q.get('who') || 'pilot', sex: q.get('sex') || 'f', outfit: q.get('outfit') || 'uniform', pose: q.get('pose') || 'stand', expr: q.get('expr') || 'calm',
+  view: q.get('view') || 'three', spin: !!q.get('spin'), clothes: (q.get('clothes') || 'down,up,up').split(',') };
+
+// ── The space: a soft backdrop and floor, lit from three sides ──
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.outputEncoding = THREE.sRGBEncoding; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+$('view').appendChild(renderer.domElement);
+const scene = new THREE.Scene(), BG = new THREE.Color('#d6d2cc');
+scene.background = BG; scene.fog = new THREE.Fog(BG, 7, 16);
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 60), controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.target.set(0, 0.95, 0); controls.minDistance = 0.6; controls.maxDistance = 9;
+scene.add(new THREE.HemisphereLight(0xfffcf6, 0x9a9288, 0.42));
+const key = new THREE.DirectionalLight(0xfff2e2, 0.8); key.position.set(2.2, 4.2, 3.2); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -2, right: 2, top: 2.6, bottom: -0.4, near: 0.5, far: 12 }); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; scene.add(key);
+const fill = new THREE.DirectionalLight(0xe4ecff, 0.26); fill.position.set(-3, 2.2, 1.8); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffffff, 0.3); rim.position.set(0.5, 3, -4); scene.add(rim);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(12, 64), new THREE.MeshStandardMaterial({ color: '#cbc6be', roughness: 0.95 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+// (props, for the poses that need them: a plain block to sit on, a rail to hold)
+const props = new THREE.Group(); scene.add(props);
+const propM = new THREE.MeshStandardMaterial({ color: '#b9b1a5', roughness: 0.8 });
+const block = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.46, 0.44), propM); block.position.set(0, 0.23, -0.12); block.castShadow = block.receiveShadow = true; props.add(block);
+const rail = new THREE.Group(); props.add(rail);
+{ const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 1.1, 16), new THREE.MeshStandardMaterial({ color: '#a8803e', roughness: 0.4, metalness: 0.4 })); bar.rotation.z = Math.PI / 2; bar.castShadow = true; rail.add(bar);
+  for (const x of [-0.5, 0.5]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.2, 0.04), propM); p.position.set(x, -0.56, 0.03); p.castShadow = true; rail.add(p); } }
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+// ── The figure ──
+const POSES = [['rest', 'At rest'], ['stand', 'Standing'], ['fold', 'Arms folded'], ['parade', 'Parade rest'], ['clasp', 'Hands clasped'], ['head', 'Hands on head'], ['seated', 'Seated'], ['bend', 'Bent at a rail']];
+let F = null, yaw = 0;
+function build() {
+  if (F) scene.remove(F.root);
+  const spec = cfg.who === 'captain' ? Crew.captainSpec({ sex: cfg.sex }) : Crew.figureSpec(cfg.who, cfg.sex, cfg.outfit);
+  spec.outfit = cfg.outfit; F = Figure.make(spec); scene.add(F.root);
+  F.root.traverse(o => { if (o.isMesh) o.castShadow = o.castShadow !== false; });
+  F.setClothes({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] }); F.setExpr(cfg.expr);
+  refresh();
+}
+// the pose, set again each frame (the face and the breath move on top of it), turned by the turntable
+function pose() {
+  const at = new V3(0, 0, 0), P = Poses, s = F.root.scale.x;
+  block.visible = cfg.pose === 'seated'; rail.visible = cfg.pose === 'bend'; props.rotation.y = yaw;
+  if (cfg.pose === 'rest') { F.resetPose(); P.setRoot(F, at, yaw); }
+  else if (cfg.pose === 'seated') P.seat(F, at, yaw, { seatY: 0.46 });
+  else if (cfg.pose === 'bend') { const d = 0.62; P.bend(F, at, yaw, { y: 1.12, d }); rail.position.set(0, 1.12, d * s + 0.02); }
+  else { P.stand(F, at, yaw, { weight: 0.6 }); if (cfg.pose !== 'stand') P.arms(F, { fold: 'fold', parade: 'rest', clasp: 'clasp', head: 'head' }[cfg.pose]); }
+  F.root.updateMatrixWorld(true);
+}
+
+// ── The camera's views: front, three-quarter, side, back ──
+const VIEWS = [['front', 'Front', 0], ['three', '¾', 0.6], ['side', 'Side', Math.PI / 2], ['back', 'Back', Math.PI]];
+function view(name) {
+  const v = VIEWS.find(x => x[0] === name) || VIEWS[1], a = v[2], d = cfg.pose === 'bend' ? 4.2 : 3.9, ty = cfg.pose === 'seated' ? 0.8 : cfg.pose === 'bend' ? 0.85 : 0.95;
+  controls.target.set(0, ty, 0); camera.position.set(Math.sin(a) * d, ty + 0.25, Math.cos(a) * d); controls.update(); cfg.view = name; refresh();
+}
+
+// ── The panel ──
+const seg = (id, items, cur, fn) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const b = document.createElement('button'); b.textContent = label; b.className = v === cur ? 'on' : ''; b.onclick = () => fn(v); el.append(b); } };
+for (const id of [...Crew.IDS, 'captain']) { const o = document.createElement('option'); o.value = id; o.textContent = id === 'captain' ? 'The Captain' : `${Crew.ROSTER[id].name} · ${Crew.ROSTER[id].role}`; $('who').append(o); }
+for (const e of Object.keys(Figure.EXPRS)) { const o = document.createElement('option'); o.value = e; o.textContent = e; $('expr').append(o); }
+$('who').onchange = () => { cfg.who = $('who').value; build(); };
+$('expr').onchange = () => { cfg.expr = $('expr').value; F.setExpr(cfg.expr); };
+const flip = (i, a, b) => { cfg.clothes[i] = cfg.clothes[i] === a ? b : a; F.setClothes({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] }); refresh(); };
+$('cTop').onclick = () => flip(0, 'down', 'up'); $('cBot').onclick = () => flip(1, 'up', 'down'); $('cUnd').onclick = () => flip(2, 'up', 'down');
+$('spin').onclick = () => { cfg.spin = !cfg.spin; refresh(); };
+$('hide').onclick = () => $('panel').classList.toggle('closed');
+function refresh() {
+  $('who').value = cfg.who; $('expr').value = cfg.expr;
+  seg('sex', [['f', 'Female'], ['m', 'Male']], cfg.sex, v => { cfg.sex = v; build(); });
+  seg('outfit', [['uniform', 'Uniform'], ['offduty', 'Off duty']], cfg.outfit, v => { cfg.outfit = v; build(); });
+  seg('pose', POSES, cfg.pose, v => { cfg.pose = v; view(cfg.view); });
+  seg('views', VIEWS.map(v => [v[0], v[1]]), cfg.view, view);
+  $('cTop').textContent = 'Top: ' + (cfg.clothes[0] === 'up' ? 'raised' : 'down'); $('cBot').textContent = 'Trousers: ' + (cfg.clothes[1] === 'down' ? 'lowered' : 'up');
+  $('cUnd').textContent = 'Briefs: ' + (cfg.clothes[2] === 'down' ? 'lowered' : 'up'); $('spin').classList.toggle('on', cfg.spin);
+}
+
+// ── Run ──
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (F) { if (cfg.spin) yaw += dt * 0.5; pose(); F.tick(dt); }
+  controls.update(); renderer.render(scene, camera); requestAnimationFrame(frame);
+}
+Figure.preload().then(() => { build(); view(cfg.view); requestAnimationFrame(frame); setTimeout(() => (window.ready = true), 300); });
 </script></body></html>

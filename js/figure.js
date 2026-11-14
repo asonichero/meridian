@@ -379,7 +379,7 @@ function shapeOf(o) {
     shoulder: (f ? 0.92 : 1.04) * (0.94 + 0.12 * m),
     chest: f ? 0.9 : 1.0, waist: (f ? 0.82 : 0.97) * (0.9 + 0.12 * m + 0.25 * fat), hip: (f ? 1.12 : 0.98) * (0.94 + 0.08 * m + 0.14 * fat),
     glute: (f ? 0.034 : 0.022) * (0.75 + 0.5 * fat + 0.3 * m), belly: 0.035 * fat * (f ? 0.8 : 1.1),
-    bust: f ? (o.bust == null ? 0.035 : o.bust) * (0.8 + 0.5 * fat) : 0.006 * m,
+    bust: f ? lerp(0.016, 0.07, o.bust == null ? 0.4 : o.bust) * (0.8 + 0.5 * fat) : 0.006 * m,
     limb: (f ? 0.9 : 1.0) * (0.88 + 0.18 * m + 0.14 * fat), thigh: (f ? 1.05 : 1.0) * (0.9 + 0.12 * m + 0.2 * fat),
   };
 }
@@ -481,7 +481,7 @@ function make(spec) {
   if (GLB.sex[spec.sex] && spec.model !== 'built') return makeGLB(spec, GLB.sex[spec.sex]);
   const S = shapeOf(spec), F = { spec, S, root: new THREE.Group(), bone: {}, bones: [] };
   // (the heights posing works from, in the figure's own units: the pelvis, the ankle, the pelvis over what it sits on; the arms' rest angle out)
-  F.H = { hips: 0.95, ankle: 0.08, sit: 0.13, abd: 0, waist: 1.0, blades: 1.3 };
+  F.H = { hips: 0.95, ankle: 0.08, sit: 0.13, abd: 0, waist: 1.0, blades: 1.3, shoulder: [S.f ? 0.15 : 0.165, 1.41] };
   F.root.scale.setScalar(spec.height / 1.75);
 
   // Skeleton
@@ -599,13 +599,19 @@ function spotsOn(F, bodyGeo, at, reach) {
   syncMarks();
 }
 // Places on the body for a hand to rest (F.surface takes them as it does the spots): the outer side of the waist, just over the hip, on each side
-// (sideL, sideR), the small of the back (back), and between the shoulder blades (blades).
+// (sideL, sideR), the small of the back (back), between the shoulder blades (blades), and the back of the top of each shoulder (shoulderL, shoulderR).
 function anchorsOn(F, geo) {
   const p = geo.attributes.position, n = geo.attributes.normal, reg = geo.attributes.region, yW = F.H.waist;
   const torso = [R.CHEST, R.WAIST, R.WAIST_HI, R.HIPS, R.HIPS_LO, R.SEAT];
   const pick = (score, y) => { y = y == null ? yW : y; let best = -1, bs = -1e9; for (let i = 0; i < p.count; i++) { if (!torso.includes(reg.getX(i)) || Math.abs(p.getY(i) - y) > 0.012) continue; const v = score(i); if (v > bs) { bs = v; best = i; } } return best; };
   F.anchor = {};
   for (const [k, sx] of [['sideL', 1], ['sideR', -1]]) { const i = pick(j => (sx * n.getX(j) > 0.75 ? sx * p.getX(j) : -1e9)); F.anchor[k] = { i, bind: new V3(p.getX(i), p.getY(i), p.getZ(i)) }; }
+  { const [sx0, sy0] = F.H.shoulder, sh = [...torso, R.UPARM];
+    for (const [k, sx] of [['shoulderL', 1], ['shoulderR', -1]]) {
+      let best = -1, bs = -1e9;
+      for (let i = 0; i < p.count; i++) { if (!sh.includes(reg.getX(i)) || Math.abs(p.getX(i) - sx * sx0) > 0.02 || Math.abs(p.getY(i) - sy0) > 0.03 || n.getZ(i) > -0.3) continue; const v = -p.getZ(i) + 0.5 * p.getY(i); if (v > bs) { bs = v; best = i; } }
+      F.anchor[k] = { i: best, bind: new V3(p.getX(best), p.getY(best), p.getZ(best)) };
+    } }
   for (const [k, y] of [['back', yW], ['blades', F.H.blades]]) { const i = pick(j => (Math.abs(p.getX(j)) < 0.015 && n.getZ(j) < -0.7 ? -p.getZ(j) : -1e9), y); F.anchor[k] = { i, bind: new V3(p.getX(i), p.getY(i), p.getZ(i)) }; }
 }
 // Expression and life: the face easing between expressions, blinking, breathing, the hands' grip, the rest pose, the flesh's give.
@@ -1077,11 +1083,12 @@ function bodyRegion(P, dom, L, sex) {
   if (y >= L.downTop - 0.04) return R.KNEE;
   return R.SHIN;
 }
-// The body's build, as the shape keys' amounts: mass (muscle and frame) toward muscle or slight, fat toward soft or firm, the bust.
+// The body's build, as the shape keys' amounts: mass (muscle and frame) toward muscle or slight, fat toward soft or firm; the bust's size (0 small
+// – 1 large; the model as built is about 0.4) toward the smaller or the larger.
 function bodyKeys(spec) {
-  const m = spec.mass == null ? 0.5 : spec.mass, fat = spec.fat == null ? 0.4 : spec.fat;
+  const m = spec.mass == null ? 0.5 : spec.mass, fat = spec.fat == null ? 0.4 : spec.fat, b = spec.bust == null ? 0.4 : spec.bust, her = spec.sex === 'f';
   return { muscle: clamp((m - 0.5) / 0.4, 0, 1), slight: clamp((0.5 - m) / 0.25, 0, 1) * 0.8, soft: clamp((fat - 0.4) / 0.35, 0, 1), firm: clamp((0.4 - fat) / 0.3, 0, 1) * 0.8,
-    bust: spec.sex === 'f' ? clamp(((spec.bust == null ? 0.035 : spec.bust) - 0.035) / 0.03, 0, 1) : 0 };
+    bust: her ? clamp((b - 0.4) / 0.6, 0, 1) : 0, bustSmall: her ? clamp((0.4 - b) / 0.4, 0, 1) : 0 };
 }
 function setKeys(mesh, keys) {
   const dict = mesh.geometry.userData.keys || {}, inf = mesh.morphTargetInfluences;
@@ -1098,7 +1105,7 @@ function makeGLB(spec, T) {
   F.root.updateMatrixWorld(true);
   F.skeleton = new THREE.Skeleton(F.bones); F.bindM = F.root.matrixWorld.clone();
   F.rest = {}; for (const b of F.bones) F.rest[b.name] = b.getWorldPosition(new V3());
-  F.H = { hips: T.joints.hips[1], ankle: T.joints.footL[1], sit: T.joints.hips[1] - T.L.crotch + 0.008, abd: T.L.abd, waist: T.L.waist - 0.03, blades: T.L.armpit + 0.03 };
+  F.H = { hips: T.joints.hips[1], ankle: T.joints.footL[1], sit: T.joints.hips[1] - T.L.crotch + 0.008, abd: T.L.abd, waist: T.L.waist - 0.03, blades: T.L.armpit + 0.03, shoulder: [T.L.shX * 0.95, T.L.shoulder + 0.02] };
   F.keys = bodyKeys(spec);
   for (const k in T.mesh) T.mesh[k].geo.userData.keys = T.mesh[k].keys;
   // the body
@@ -1108,8 +1115,8 @@ function makeGLB(spec, T) {
   const L = T.L;
   // the seat's spots from its own shape (measured in Blender): the cheek where it's fullest, the sit spot just above the fold beneath it, the
   // thighs below the fold (for a flatter seat, within sensible bounds of the fullest point)
-  const pk = clamp(L.seatPeak, L.crotch + 0.02, L.crotch + 0.07), fold = clamp(L.seatFold, pk - 0.07, pk - 0.03);
-  const SEAT = { cheek: [L.hipX * 0.84, pk], sitspot: [L.hipX * 0.86, fold + 0.012], thighs: [L.hipX * 0.95, fold - 0.055] };
+  const pk = clamp(L.seatPeak, L.crotch + 0.02, L.crotch + 0.07), sit = Math.min(clamp(L.seatFold, pk - 0.07, pk - 0.03) + 0.012, pk - 0.05);
+  const SEAT = { cheek: [L.hipX * 0.84, pk], sitspot: [L.hipX * 0.86, sit], thighs: [L.hipX * 0.95, sit - 0.06] };
   spotsOn(F, T.mesh.Body.geo, area => SEAT[area], 0.006);
   buildHead(F, spec, S);
   // the clothes: each garment made when it's first worn, then shown or hidden
