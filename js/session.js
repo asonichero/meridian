@@ -96,7 +96,7 @@ function create(stage, bay, opts) {
       // side of their nearest foot, knees a little bent, leaning in; the left hand on their back, the right at the seat
       const hipZ = cur.f.bone.hips.position.z * sc(cur.f), at = local(cur.f, 0.44 * sc(cur.f), 0, hipZ + 0.04); at.y = 0;
       const face = toWorldDir(cur.f, -1, 0, -0.1).normalize(), yaw = Math.atan2(face.x, face.z);
-      stand(F, at, yaw, { weight: 0.25, wide: 0.22, crouch: 0.22, lean: 0.24 - 0.08 * rz, look: 0.45, headYaw: 0.1, arms: null });
+      stand(F, at, yaw, { weight: 0.25, wide: 0.22, crouch: 0.22, lean: 0.34 - 0.08 * rz, look: 0.45, headYaw: 0.1, arms: null });
       F.bone.spine.rotation.y += 0.1 - 0.12 * rz; F.bone.chest.rotation.y += 0.06 - 0.08 * rz;
     }
     F.bone.clavR.rotation.z = -0.08 * rz; F.bone.clavR.rotation.y = 0.06 * rz;
@@ -216,7 +216,7 @@ function create(stage, bay, opts) {
   function poseCaptainHands(dt) {
     const F = captain, sw = st.swing, cs = sc(F);
     // the left hand: across the knee, resting on the small of their back, the fingers on toward their hips and round the far side, the forearm
-    // lying along their back (the elbow down on it, toward their shoulders); at the wall, resting on their near shoulder
+    // lying along their back (the elbow down on it, toward their shoulders); at the wall, the arm along their shoulders, the hand on the far one
     const back = W_(cur.f, 'spine'), bn = toWorldDir(cur.f, 0, 0, -1).normalize(), cloth = lift() * 0.6;
     if (st.position === 'otk') {
       const bk = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth), far = otkX.clone().negate(), s_ = sc(cur.f);
@@ -227,10 +227,10 @@ function create(stage, bay, opts) {
       reach(F, 'L', LW, elbowAt.sub(sh.clone().lerp(LW, 0.5)).normalize(), bk.n.clone().negate(), fing);
       F.grip('L', 0.22, 0.15, 0.2);
     } else {
-      // (on their near shoulder: the palm on the back of it, the fingers over its top toward their head, cupping round it)
-      const sh = cur.f.surface('shoulderL', { p: new V3(), n: new V3() }, cloth), fwd = toWorldDir(cur.f, 0, 1, 0.4), fing = fwd.clone().addScaledVector(sh.n, -fwd.dot(sh.n)).normalize();
-      reach(F, 'L', sh.p.clone().addScaledVector(sh.n, 0.014).addScaledVector(fing, -0.06 * cs), toWorldDir(F, 0.8, -0.5, -0.3).normalize(), sh.n.clone().negate(), fing);
-      F.grip('L', 0.38, 0.12, 0.3);
+      // (the arm resting along their shoulders: the forearm across the top of their back, the hand on the far shoulder, the fingers over it)
+      const sh = cur.f.surface('shoulderR', { p: new V3(), n: new V3() }, cloth), over = toWorldDir(cur.f, -1, 0, 0.35), fing = over.clone().addScaledVector(sh.n, -over.dot(sh.n)).normalize();
+      reach(F, 'L', sh.p.clone().addScaledVector(sh.n, 0.014).addScaledVector(fing, -0.06 * cs), UP.clone().negate().addScaledVector(toWorldDir(cur.f, 0, 0, 1), 0.3).normalize(), sh.n.clone().negate(), fing);
+      F.grip('L', 0.34, 0.1, 0.3);
     }
     // the right: by the swing, or soothing, or resting just above the seat
     const key = spotOf(sw ? sw.side : (st.side === 'alt' ? st.nextSide : st.side), st.area), c = contactFor(key);

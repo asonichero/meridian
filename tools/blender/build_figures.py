@@ -76,7 +76,7 @@ print('landmarks py: chin', chin_py, 'neck', neck_py, 'shoulder', shoulder_py, '
 # Real proportions rather than the reference's stylised long legs: the crotch lowered (the legs shortened above the ankle), the trunk lengthened to
 # match, the shoulders and head where they were. (The reference has the crotch at about half the height; people have it nearer 46–47%.)
 CROTCH_DROP = 0.05
-SEAT_K = 1.35      # (the seat fuller than the reference's)
+SEAT_K = 1.15      # (the seat a little fuller than the reference's)
 _ym0 = ym; _c0 = _ym0(crotch_py); _n0 = _ym0(neck_py); _f0 = 0.14
 def ym(py):
     y = _ym0(py)
@@ -118,7 +118,7 @@ def torso_profile():
     bust_a, bust_b = armpit_py - 30, armpit_py + 60
     seat_a, seat_b = crotch_py - 110, crotch_py + 6
     for py in ys_:
-        w = torso_w(py) / 2 * (1 + 0.03 * gauss(py - (crotch_py - 25), 40))      # (a touch wider at the seat's fullest)
+        w = torso_w(py) / 2 * (1 + 0.012 * gauss(py - (crotch_py - 25), 40))      # (a touch wider at the seat's fullest)
         if py >= crotch_py:           # (below the crotch the front view shows the two thighs: the trunk keeps the hips' width, outer edge to edge)
             rr = [r for r in front_runs(py) if r[1] > cx - 150 and r[0] < cx + 150]; w = max(cx - min(r[0] for r in rr), max(r[1] for r in rr) - cx)
         if py < armpit_py:            # above the armpits the front view shows the shoulders and arms too: the trunk itself narrows up to the neck
@@ -241,7 +241,7 @@ def male(P, part):
             y = r['y']; t_sh = ss(ym(armpit_py) - 0.1, ym(shoulder_py), y); t_w = gauss(y - ym(crotch_py - 150), 0.1); t_h = gauss(y - ym(crotch_py - 40), 0.07)
             kx = 1.0 + 0.2 * t_sh + 0.2 * t_w - 0.12 * t_h + 0.16 * ss(ym(neck_py + 36), ym(neck_py), y)
             # (the bust's forms dropped; the seat's kept, smaller)
-            return kx, 1.03 + 0.05 * t_sh - 0.05 * t_h, 1.02 + 0.05 * t_sh, lambda a: 0.0 if a > 0 else 0.78
+            return kx, 1.03 + 0.05 * t_sh - 0.05 * t_h, 1.02 + 0.05 * t_sh, lambda a: 0.0 if a > 0 else 0.66
         out = scaled(P, f)
         # a man's chest: the pecs, broad and flat, high on it
         for r in out:
@@ -249,7 +249,7 @@ def male(P, part):
             if pc > 1e-5: r["lobes"] = r["lobes"] + [(np.pi / 2 - 0.55, 0.6, pc), (np.pi / 2 + 0.55, 0.6, pc)]
         return out
     # (the thighs' tops flatter behind, as the seat is)
-    if part == 'leg': return scaled(P, lambda r: (0.97 - 0.05 * ss(ym(knee_py), ym(crotch_py), r['y']), 0.98, 0.95 - 0.06 * ss(ym(crotch_py + 80), ym(crotch_py), r['y']), 0.78))
+    if part == 'leg': return scaled(P, lambda r: (0.97 - 0.05 * ss(ym(knee_py), ym(crotch_py), r['y']), 0.98, 0.95 - 0.07 * ss(ym(crotch_py + 80), ym(crotch_py), r['y']), 0.66))
     if part == 'arm': return scaled(P, lambda r: (1.16, 1.16, 1.16, 1))
 def bust_variant(P, k, spread=0.0, drop=0.0, widen=1.0, apart=0.55, round_=1.0):
     """The torso with the bust's pair of forms k times the size: spread `spread` (m) further up and down, sitting `drop` lower, `widen` times
@@ -646,10 +646,16 @@ def build(sex):
     print(sex, 'verts', len(X), {k: int((label == k).sum()) for k in names})
     # shape keys: each point of the trunk and limbs moved along its normal to where the variant's field crosses zero
     def along(Fn, P, n):
-        lo = np.full(len(P), -0.04); hi = np.full(len(P), 0.15)
-        ok = (Fn(P + lo[:, None] * n)[0] > 0) & (Fn(P + hi[:, None] * n)[0] < 0)
-        for _ in range(22):
-            m = (lo + hi) / 2; inside = Fn(P + m[:, None] * n)[0] > 0; lo = np.where(inside, m, lo); hi = np.where(inside, hi, m)
+        """How far along its normal each point's surface lies in the field Fn: the crossing (inside to outside, going out) nearest the point
+        itself, refined (not just any crossing in reach, which under an arm can be the body's other surface across the gap)."""
+        ts = np.arange(-0.04, 0.1501, 0.005)
+        inside = np.stack([Fn(P + t * n)[0] > 0 for t in ts], 1)
+        cross = inside[:, :-1] & ~inside[:, 1:]
+        cost = np.where(cross, np.abs((ts[:-1] + ts[1:]) / 2)[None, :], np.inf)
+        k = np.argmin(cost, 1); ok = np.isfinite(cost[np.arange(len(P)), k])
+        lo = ts[k].copy(); hi = ts[k + 1].copy()
+        for _ in range(14):
+            m = (lo + hi) / 2; ins = Fn(P + m[:, None] * n)[0] > 0; lo = np.where(ins, m, lo); hi = np.where(ins, hi, m)
         return np.where(ok, (lo + hi) / 2, np.nan)
     limb = ~np.char.startswith(label.astype(str), 'hand') & ~np.char.startswith(label.astype(str), 'foot')
     t_base = along(F, X, Nrm)
@@ -783,16 +789,22 @@ def body_data(body):
             k = np.zeros(n * 3); kb.data.foreach_get('co', k); keys[kb.name] = k.reshape(-1, 3) - co
     return names, W, co, keys
 
-def dress_from(ob, body, BD, label, allowed, rig):
-    """A garment's weights and shape keys, from the nearest skin of the parts it covers (inverse-distance over a few neighbours)."""
+def dress_from(ob, body, BD, label, allowed, rig, split=None):
+    """A garment's weights and shape keys, from the nearest skin of the parts it covers (inverse-distance over a few neighbours). split:
+    (which, allowed2): its points `which` picks (a function of points, ours) take theirs from the parts `allowed2` instead."""
     from mathutils.kdtree import KDTree
     names, W, co, keys = BD
-    idx = np.where(np.isin(label, allowed))[0]
-    kd = KDTree(len(idx))
-    for j, i in enumerate(idx): kd.insert(co[i], j)
-    kd.balance()
-    me = ob.data; n = len(me.vertices); G = np.zeros((n, W.shape[1])); D = {k: np.zeros((n, 3)) for k in keys}
+    def tree(allow):
+        idx = np.where(np.isin(label, allow))[0]; kd = KDTree(len(idx))
+        for j, i in enumerate(idx): kd.insert(co[i], j)
+        kd.balance(); return kd, idx
+    T1 = tree(allowed); me = ob.data; n = len(me.vertices)
+    other = np.zeros(n, bool)
+    if split:
+        X = np.array([fromB(v.co) for v in me.vertices]); other = split[0](X); T2 = tree(split[1])
+    G = np.zeros((n, W.shape[1])); D = {k: np.zeros((n, 3)) for k in keys}
     for v in me.vertices:
+        kd, idx = T2 if other[v.index] else T1
         hits = kd.find_n(v.co, 6); w = np.array([1 / (h[2] + 0.004) ** 2 for h in hits]); w /= w.sum(); src = idx[[h[1] for h in hits]]
         G[v.index] = w @ W[src]
         for k in keys: D[k][v.index] = w @ keys[k][src]
@@ -815,9 +827,9 @@ def garments(sex, torso, leg, arm, body, label, rig):
     hk = HAND_K[sex]; legs_ = lambda Ls: (lambda P: np.maximum(Ls[0].f(P), Ls[1].f(P)))
     lerp_crotch = lambda T, Lf: (lambda P: (lambda s: s * T.f(P) + (1 - s) * Lf(P))(ss(CROTCH_Y - 0.012, CROTCH_Y + 0.04, P[:, 1])))
     dr = DELT_R[sex] * float(np.interp(0.06, [r['y'] for r in arm], [r['rx'] for r in arm])) / 0.0397
-    def make(name, fn, lo, hi, faces, planes, allowed, h=0.003):
+    def make(name, fn, lo, hi, faces, planes, allowed, h=0.003, split=None):
         V, Fc = march(lambda P: (fn(P), None), h=h, lo=lo, hi=hi)
-        ob = mesh_from(name, V, Fc, faces); cut(ob, planes); dress_from(ob, body, BD, label, allowed, rig)
+        ob = mesh_from(name, V, Fc, faces); cut(ob, planes); dress_from(ob, body, BD, label, allowed, rig, split)
         print(sex, name, len(ob.data.vertices), 'verts'); out.append(ob); return ob
     TORSO_L = ['torso', 'legL', 'legR']; ARMS_L = ['armL', 'armR', 'deltL', 'deltR']; LEGS_L = ['legL', 'legR']; FEET_L = ['footL', 'footR', 'legL', 'legR']
     up_ = (0, 1.0, 0); down_ = (0, -1.0, 0)
@@ -861,7 +873,7 @@ def garments(sex, torso, leg, arm, body, label, rig):
                 return np.maximum(a, b) + h * h * k * 0.25
             is_sl = lambda X, T=T, sleeve=sleeve: sleeve(X) > T.f(X)
             planes = [((0, hem, 0), down_, lambda X, f=is_sl: ~f(X))] + [(c[0], c[1], is_sl) for c in cuffs] + neck_planes
-            make(nm + ('Up' if up else ''), top, (-0.42, min(hem, WRIST_Y) - 0.04, -0.2), (0.42, L['collar'] + 0.03, 0.24), 11000 if not up else 9000, planes, TORSO_L + ARMS_L)
+            make(nm + ('Up' if up else ''), top, (-0.42, min(hem, WRIST_Y) - 0.04, -0.2), (0.42, L['collar'] + 0.03, 0.24), 11000 if not up else 9000, planes, TORSO_L, split=(is_sl, ARMS_L + ['torso']))
     # ── the trousers: up to the waist, the legs easing out over the boots; or lowered, bunched round the knees with the seat's cloth hanging between
     make('Trousers', trousers_f, (-0.25, 0.09, -0.19), (0.25, L['trouserTop'] + 0.03, 0.2), 8000,
          [((0, L['trouserTop'], 0), up_), ((0, L['trouserFoot'], 0), down_)], TORSO_L)
