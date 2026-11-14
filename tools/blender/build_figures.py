@@ -602,7 +602,7 @@ def front_z(Sf, y, x=0.0):
         else: hi = m
     return lo
 # her outer forms: either side of the middle at the front of the crotch, hanging a little below it between the thighs (centre, radii)
-LAB_C, LAB_R = np.array([0.0068, -0.004, 0.028]), np.array([0.0125, 0.019, 0.021])
+LAB_C, LAB_R = np.array([0.0078, -0.004, 0.028]), np.array([0.0125, 0.019, 0.021])
 def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     """Hers: the two outer forms at the bottom of the mons, rounded, hanging a little below the crotch between the thighs (meeting them at a
     crease), the slit between them where they meet. His: the scrotum and penis, hanging, their roots well up
@@ -613,7 +613,7 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
         def parts(P):
             # (each its own rounded form, the two meeting in the middle in a narrow V: the slit between them is where they meet)
             fl = [(1 - np.linalg.norm((P - C * np.array([sx, 1, 1])) / R_, axis=1)) * R_.min() for sx in (1, -1)]
-            return smax(fl[0], fl[1], 0.003)
+            return smax(fl[0], fl[1], 0.002)
         return parts, None, 0.007
 
     kg, kl, ks = k
@@ -751,6 +751,10 @@ def build(sex):
         near = (np.abs(X[:, 0]) < 0.06) & (X[:, 1] > CROTCH_Y - 0.32) & (X[:, 1] < CROTCH_Y + 0.22) & (label != 'sex')
         bad = near & ((Yv[:, 0] * sg) < lim)
         Yv[bad, 0] = sg[bad] * lim[bad]
+        if sex == 'f':      # (her forms the same whatever the build; round them, the thighs fill out but never in over them)
+            Yv[label == 'sex'] = X[label == 'sex']
+            ring = (label != 'sex') & (np.abs(X[:, 0]) < 0.045) & (X[:, 1] > CROTCH_Y - 0.06) & (X[:, 1] < CROTCH_Y + 0.02) & (X[:, 2] > -0.015)
+            Yv[ring, 0] = sg[ring] * np.maximum(Yv[ring, 0] * sg[ring], np.abs(X[ring, 0]))
         k = body.shape_key_add(name=v, from_mix=False); k.data.foreach_set('co', np.stack([Yv[:, 0], -Yv[:, 2], Yv[:, 1]], 1).ravel())
     ink_weights(body)
     a = body.data.attributes.new('_PART', 'FLOAT', 'POINT'); a.data.foreach_set('value', (label == 'sex').astype(np.float32))
