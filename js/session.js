@@ -166,11 +166,12 @@ function create(stage, bay, opts) {
       // torso turning a touch more into it, and leans in as the hand comes down
       seat(F, OTK.seat, OTK.seatYaw, { lean: 0.08 - 0.03 * rz, twist: -0.1 - 0.05 * rz, roll: 0.02 * rz, look: 0.45 - 0.08 * rz, headYaw: -0.25, headRoll: 0.05, spread: 0.03 });
     } else {
-      // close in at their left, a little behind, knees bent and leaning over them: the left hand on their back, the right at the seat
-      const at = local(cur.f, 0.42, 0, -0.36); at.y = 0;
-      const look = local(cur.f, 0, 0.8, -0.2); const yaw = Math.atan2(look.x - at.x, look.z - at.z) - 0.2;
-      stand(F, at, yaw, { weight: -0.5, wide: 0.19, crouch: 0.45, lean: 0.48 - 0.1 * rz, look: 0.4, headYaw: 0.15, stagger: 0.08, arms: null });
-      F.bone.spine.rotation.y += 0.12 - 0.14 * rz; F.bone.chest.rotation.y += 0.08 - 0.1 * rz;
+      // right beside them at their left, facing their side (turned a little toward the seat): hips level with theirs, feet planted wide either
+      // side of their nearest foot, knees a little bent, leaning in; the left hand on their back, the right at the seat
+      const hipZ = cur.f.bone.hips.position.z * sc(cur.f), at = local(cur.f, 0.44 * sc(cur.f), 0, hipZ + 0.04); at.y = 0;
+      const face = toWorldDir(cur.f, -1, 0, -0.1).normalize(), yaw = Math.atan2(face.x, face.z);
+      stand(F, at, yaw, { weight: 0.25, wide: 0.22, crouch: 0.22, lean: 0.24 - 0.08 * rz, look: 0.45, headYaw: 0.1, arms: null });
+      F.bone.spine.rotation.y += 0.1 - 0.12 * rz; F.bone.chest.rotation.y += 0.06 - 0.08 * rz;
     }
     F.bone.clavR.rotation.z = -0.08 * rz; F.bone.clavR.rotation.y = 0.06 * rz;
     F.root.updateMatrixWorld(true);
@@ -263,7 +264,8 @@ function create(stage, bay, opts) {
       const R = wall.rail, toWall = toWorldDir(F, 0, 0, 1), hk = sc(F);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
         const fdir = toWall.clone().addScaledVector(UP, -0.25).normalize();
-        const G = new V3(R.x, R.y, R.z - sx * 0.25 * s), Wt = G.clone().addScaledVector(fdir, -0.072 * hk).addScaledVector(UP, 0.03);
+        const G = local(F, sx * 0.25 * s, 0, 0); G.set(R.x, R.y, G.z);
+        const Wt = G.clone().addScaledVector(fdir, -0.07 * hk).addScaledVector(UP, 0.036);
         reach(F, side, Wt, toWorldDir(F, sx * 1, -0.6, -0.2).normalize(), UP.clone().negate().addScaledVector(toWall, 0.25).normalize(), fdir);
         F.grip(side, 0.72 + 0.2 * g, 0.05, 0.7);
       }
@@ -299,8 +301,8 @@ function create(stage, bay, opts) {
       reach(F, 'L', LW, elbowAt.sub(sh.clone().lerp(LW, 0.5)).normalize(), bk.n.clone().negate(), fing);
       F.grip('L', 0.22, 0.15, 0.2);
     } else {
-      const bk = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth), across = toWorldDir(cur.f, 1, 0, 0), fing = across.clone().addScaledVector(bk.n, -across.dot(bk.n)).normalize();
-      reach(F, 'L', bk.p.clone().addScaledVector(bk.n, 0.014).addScaledVector(fing, -0.08 * cs), toWorldDir(F, 1, -0.2, -0.5).normalize(), bk.n.clone().negate(), fing);
+      const bk = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth), across = toWorldDir(cur.f, -1, 0, 0.25), fing = across.clone().addScaledVector(bk.n, -across.dot(bk.n)).normalize();
+      reach(F, 'L', bk.p.clone().addScaledVector(bk.n, 0.014).addScaledVector(fing, -0.07 * cs), toWorldDir(F, 0.8, -0.5, -0.2).normalize(), bk.n.clone().negate(), fing);
       F.grip('L', 0.1, 0.25, 0.15);
     }
     // the right: by the swing, or soothing, or resting just above the seat
@@ -439,8 +441,8 @@ function create(stage, bay, opts) {
     otk: [['Side', [0.05, 1.2, 2.4], [0.05, 0.76, 0.3]], ['Behind', [-1.4, 1.3, 0.67], [-0.05, 0.72, 0.3]], ['Seat', [-0.46, 1.5, 1.07], [-0.1, 0.82, 0.35]],
       ['Their face', [0.42, 0.36, 1.05], [0.24, 0.55, 0.36]], ['Captain', [0.3, 0.92, 0.95], [0.0, 1.18, 0.1]], ['Room', [1.5, 1.9, 1.5], [0.0, 0.7, 0.25]]]
       .map(([n, p, l]) => [n, ...[p, l].map(v => { const q = new V3(v[0], 0, v[2]).applyAxisAngle(UP, OTK.seatYaw).add(OTK.seat); return [clamp(q.x, -2.4, 2.4), v[1], clamp(q.z, -2.0, 2.0)]; })]),
-    wall: [['Side', [-1.3, 1.3, -0.55], [-1.95, 0.9, 1.0]], ['Behind', [-0.5, 1.2, 0.6], [-1.9, 0.85, 0.95]], ['Seat', [-1.0, 1.25, 0.4], [-1.75, 0.88, 0.95]],
-      ['Their face', [-2.45, 1.05, 0.25], [-2.25, 1.2, 0.95]], ['Captain', [-2.1, 1.6, 0.85], [-1.5, 1.6, 1.45]], ['Room', [1.2, 1.9, 2.0], [-1.6, 0.8, 0.8]]],
+    wall: [['Side', [-1.7, 1.4, -0.95], [-1.85, 1.0, 1.05]], ['Behind', [-0.5, 1.2, 0.6], [-1.9, 0.85, 0.95]], ['Seat', [-1.0, 1.25, 0.4], [-1.75, 0.88, 0.95]],
+      ['Their face', [-2.45, 1.05, 0.25], [-2.25, 1.2, 0.95]], ['Captain', [-1.5, 1.42, 0.55], [-1.68, 1.5, 1.38]], ['Room', [1.2, 1.9, 2.0], [-1.6, 0.8, 0.8]]],
     after: [['Two-shot', [0.3, 1.0, 1.75], [0.3, 0.85, 0.0]], ['Close', [0.55, 1.05, 1.1], [0.3, 0.95, 0.0]]],
   };
   function camera(i, ms) {

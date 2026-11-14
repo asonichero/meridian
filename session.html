@@ -293,8 +293,9 @@ function refresh() {
 
 // ── Run ──
 const each = dt => { if (ses) ses.update(dt); bay.tick(dt); window.__meter(); };
-// (the camera's picture centred in what the HUD leaves visible: beside it, or above it on a phone held upright)
-const insets = () => { const r = $('bar').getBoundingClientRect(); stage.setInsets(r.left > innerWidth * 0.3 ? { right: Math.max(0, innerWidth - r.left) } : { bottom: Math.max(0, innerHeight - r.top) }); };
+// (on a phone the camera's picture is centred in what the controls leave visible, above them or beside them; on a desktop it stays centred)
+const small = matchMedia('(max-width: 760px), (max-height: 520px)');
+const insets = () => { const r = $('bar').getBoundingClientRect(); stage.setInsets(!small.matches ? {} : r.left > innerWidth * 0.3 ? { right: Math.max(0, innerWidth - r.left) } : { bottom: Math.max(0, innerHeight - r.top) }); };
 if (window.ResizeObserver) new ResizeObserver(insets).observe($('bar')); addEventListener('resize', insets); insets();
 models.then(() => {
   begin();
