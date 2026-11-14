@@ -601,20 +601,26 @@ def front_z(Sf, y, x=0.0):
         if Sf.f(np.array([[x, y, m]]))[0] > 0: lo = m
         else: hi = m
     return lo
+# her outer forms: either side of the middle at the front of the crotch, hanging a little below it between the thighs (centre, radii)
+LAB_C, LAB_R = np.array([0.0068, -0.003, 0.015]), np.array([0.0122, 0.018, 0.02])
 def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
-    """Hers: a cleft down the front of the mons into the crotch, a soft raised form either side of it (as a field to cut from the body: the
-    groove positive, the forms negative). His: the scrotum and penis, hanging, their roots well up in the body so they join it without a crease
-    (a field to be joined to it); k: (girth, length, scrotum) for the shape keys toward smaller or larger. Simple, soft forms, as the rest is."""
+    """Hers: the two outer forms at the bottom of the mons, rounded, hanging a little below the crotch between the thighs (meeting them at a
+    crease), a narrow slit between them and a small inner form recessed at its top. His: the scrotum and penis, hanging, their roots well up
+    in the body so they join it without a crease; k: (girth, length, scrotum) for the shape keys toward smaller or larger. Returns the forms
+    to join to the body, a field to cut from it, and how softly they're joined. Simple, soft forms, as the rest is."""
     if sex == 'f':
+        C = LAB_C + np.array([0.0, CROTCH_Y, 0.0]); R_ = LAB_R; Ci = np.array([0.0, CROTCH_Y + 0.0015, 0.02]); Ri = np.array([0.0026, 0.009, 0.009])
+        def parts(P):
+            fl = [(1 - np.linalg.norm((P - C * np.array([sx, 1, 1])) / R_, axis=1)) * R_.min() for sx in (1, -1)]
+            inner = (1 - np.linalg.norm((P - Ci) / Ri, axis=1)) * Ri.min()
+            return np.maximum(np.maximum(fl[0], fl[1]), inner - 0.0006)
         def cut(P):
             x, y, z = P[:, 0], P[:, 1], P[:, 2]
-            front = ss(-0.03, 0.0, z)
-            gw = ss(CROTCH_Y - 0.03, CROTCH_Y - 0.008, y) * ss(CROTCH_Y + 0.048, CROTCH_Y + 0.026, y)
-            bw = ss(CROTCH_Y - 0.034, CROTCH_Y - 0.01, y) * ss(CROTCH_Y + 0.05, CROTCH_Y + 0.022, y)
-            groove = 0.0045 * np.exp(-0.5 * (x / 0.003) ** 2) * gw
-            forms = 0.0027 * np.exp(-0.5 * ((np.abs(x) - 0.0072) / 0.0034) ** 2) * bw
-            return (groove - forms) * front
-        return None, cut
+            w = ss(CROTCH_Y + 0.016, CROTCH_Y + 0.006, y) * ss(-0.012, 0.0, z)
+            inner = (1 - np.linalg.norm((P - Ci) / Ri, axis=1)) * Ri.min()
+            return 0.0042 * np.exp(-0.5 * (x / 0.0017) ** 2) * w * (1 - ss(-0.002, 0.001, inner))     # (the slit, down to the inner form)
+        return parts, cut, 0.007
+
     kg, kl, ks = k
     zp = front_z(T, CROTCH_Y + 0.025)
     S0, R0 = np.array([0.0, CROTCH_Y - 0.02, zp - 0.03]), np.array([0.026, 0.031, 0.023]) * ks
@@ -623,7 +629,7 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     def parts(P):
         q = np.linalg.norm((P - S0) / R0, axis=1); scrotum = (1 - q) * R0.min()
         return smax(scrotum, capsule(P, A, B, 0.016 * kg, 0.0148 * kg), 0.012)
-    return parts, None
+    return parts, None, 0.026
 
 def body_field(torso, leg, arm, sex, sexk=(1.0, 1.0, 1.0)):
     """The body's parts as fields, and how they're joined: the trunk, the legs and arms (the measured surfaces), the hands and feet, the sex."""
@@ -633,7 +639,7 @@ def body_field(torso, leg, arm, sex, sexk=(1.0, 1.0, 1.0)):
     S_ = {'torso': Surface(torso), 'legL': Surface(leg, 1), 'legR': Surface(leg, -1), 'armL': Surface(arm, 1, arm_axis(1)), 'armR': Surface(arm, -1, arm_axis(1))}
     H = {'handL': hand_parts(1, hk), 'handR': hand_parts(-1, hk)}; Ft = {'footL': foot_part(1, leg), 'footR': foot_part(-1, leg)}
     comps = {k: v.f for k, v in S_.items()}; comps.update({k: v[0] for k, v in H.items()}); comps.update({k: v[0] for k, v in Ft.items()})
-    add, cut = sex_parts(sex, S_['torso'], sexk)
+    add, cut, ksex = sex_parts(sex, S_['torso'], sexk)
     if add: comps['sex'] = add
     dr = DELT_R[sex] * float(np.interp(0.06, [r['y'] for r in arm], [r['rx'] for r in arm])) / 0.0397
     for sx, s_ in ((1, 'L'), (-1, 'R')):
@@ -663,7 +669,7 @@ def body_field(torso, leg, arm, sex, sexk=(1.0, 1.0, 1.0)):
             a = smax(smax(c['arm' + s_], c['hand' + s_], 0.008), c['delt' + s_], 0.02)
             f = smax(f, a, 0.022)
         f = smax(f, c['footL'], 0.014); f = smax(f, c['footR'], 0.014)
-        if add: f = smax(f, c['sex'], 0.026)      # (a soft join, no crease where it meets the body)
+        if add: f = smax(f, c['sex'], ksex)      # (his a soft join, no crease where it meets the body; hers closer, a crease against the thighs)
         if cut: f = f - cut(P)
         return f, c
     return F
@@ -832,9 +838,10 @@ def landmarks(sex, torso):
     L['cuffA'] = ARM_LEN - 0.014; L['rollA'] = ARM_LEN * 0.6
     L['trouserTop'] = L['waist'] - 0.012; L['trouserFoot'] = 0.115
     L['briefTop'] = CROTCH_Y + (0.135 if sex == 'f' else 0.155); L['briefLeg'] = CROTCH_Y - (0.0 if sex == 'f' else 0.075)
+    L['briefCut'] = [0.022, CROTCH_Y - 0.03, 0.64]       # (her leg openings: a line from beside the gusset's bottom (x, y) rising at this slope to the hip)
     L['downTop'] = KNEE_Y + 0.085; L['briefDown'] = CROTCH_Y - 0.115
     L['bootTop'] = 0.205; L['hipX'] = float(at(LEG, CROTCH_Y - 0.02, 'cx')); L['shX'] = SH_X; L['abd'] = ABD
-    return {k: float(v) for k, v in L.items()}
+    return {k: ([float(a) for a in v] if isinstance(v, list) else float(v)) for k, v in L.items()}
 
 def mesh_from(name, V, Fc, faces):
     me = bpy.data.meshes.new(name); ob = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(ob)
@@ -947,6 +954,10 @@ def garments(sex, torso, leg, arm, body, label, rig):
         zp = front_z(Surface(torso), CROTCH_Y + 0.025); PC = np.array([0.0, CROTCH_Y + 0.014, zp - 0.022]); PR = np.array([0.042, 0.056, 0.03])
         pouch = lambda P: (1 - np.linalg.norm((P - PC) / PR, axis=1)) * PR.min()
         briefs_f = (lambda b: lambda P: smax(b(P), pouch(P), 0.03))(briefs_f)
+    else:      # (hers: the gusset carried down round her forms, smooth over them)
+        GC = np.array([0.0, CROTCH_Y - 0.004, LAB_C[2]]); GR = np.array([0.026, 0.0215, 0.026])
+        gus = lambda P: (1 - np.linalg.norm((P - GC) / GR, axis=1)) * GR.min()
+        briefs_f = (lambda b: lambda P: smax(b(P), gus(P), 0.014))(briefs_f)
     def pouch_keys(ob, base_f, gap):
         """The pouch's size with his: the garment's sexLarge and sexSmall keys, where the pouch is, moved out from its middle (or in)."""
         if pouch is None or not ob.data.shape_keys: return
@@ -1021,7 +1032,8 @@ def garments(sex, torso, leg, arm, body, label, rig):
          [((0, L['downTop'], 0), up_), ((0, L['trouserFoot'], 0), down_)], LEGS_L)
     # ── underwear: briefs (trunks, for the men), close-fitting; or lowered round the thighs
     if sex == 'f':     # (cut high at the sides: up from the crotch to the hip)
-        legcut = [((sx * 0.012, L['briefLeg'] - 0.006, 0), (sx * 0.07, -0.16, 0)) for sx in (1, -1)]
+        bx, by, bk = L['briefCut']
+        legcut = [((sx * bx, by, 0), (sx * bk, -1.0, 0)) for sx in (1, -1)]
     else:
         legcut = [((0, L['briefLeg'], 0), down_)]
     br = make('Briefs', briefs_f, (-0.24, CROTCH_Y - 0.12, -0.18), (0.24, L['briefTop'] + 0.03, 0.18), 3500,

@@ -115,7 +115,7 @@ function paint(m, o) {
   o = o || {};
   const U = { uRim: { value: srgb(o.rim || '#2a3440').multiplyScalar(o.rimK == null ? 1 : o.rimK) }, uGrain: { value: o.grain == null ? 0.03 : o.grain }, uGrainScale: { value: o.scale || 60 }, uHide: { value: 0 },
     uMarks: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9, 0, 0)) }, uMarkCol: { value: srgb(o.markCol || '#b8323a') },
-    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() }, uCleft: { value: new THREE.Vector4() }, uNape: { value: new THREE.Vector4() } };
+    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() }, uNape: { value: new THREE.Vector4() } };
   m.userData.u = U;
   const key = 'paint|' + [o.regions, o.marks, o.bindAttr].map(x => (x ? 1 : 0)).join('') + (o.pattern || '');
   m.customProgramCacheKey = () => key;
@@ -129,14 +129,11 @@ vBind = ${o.bindAttr ? 'bind' : 'position'};
 ${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'} ${o.pattern ? 'vPart = region;' : 'vPart = 0.0;'}`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uCleft; uniform vec4 uNape; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
+varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uNape; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
 if (uNape.z > 0.5 && vBind.y > uNape.x + max(0.0, vBind.z - uNape.y) * uNape.w) discard;      // (the nape, under the skull: see makeGLB)
-if (uCleft.z > 0.5) { float win = smoothstep(uCleft.y, uCleft.y + 0.008, vBind.y) * (1.0 - smoothstep(uCleft.x - 0.01, uCleft.x, vBind.y)) * step(uCleft.w, vBind.z), ax = abs(vBind.x);
-  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.9, 0.84, 0.82), (1.0 - smoothstep(0.007, 0.012, ax)) * win);      // (the forms either side a shade darker)
-  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62, 0.48, 0.45), (1.0 - smoothstep(0.0005, 0.0014, ax)) * win * 0.85); }
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
 diffuseColor.rgb *= 1.0 + uGrain * (g - 0.5) * 2.0;
 ${o.pattern ? PATTERNS[o.pattern] : ''}
@@ -1120,16 +1117,10 @@ function prepare(sx, gltf, M) {
     }
     g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
     g.setAttribute('bind', g.attributes.position.clone());
-    const part = g.attributes._part;      // (his sex, all of it, is under the briefs, however far it hangs)
+    const part = g.attributes._part;      // (the sex, all of it, is under the briefs, however far it hangs)
     if (name === 'Body') for (let i = 0; i < n; i++) reg[i] = part && part.getX(i) > 0.5 ? R.SEAT : bodyRegion([p.getX(i), p.getY(i), p.getZ(i)], dom[i], L, sx);
     else if (/^(Tunic|Shirt)/.test(name)) for (let i = 0; i < n; i++) reg[i] = ARM_BONES.test(dom[i]) ? 1 : 0;
     g.setAttribute('region', new THREE.Float32BufferAttribute(reg, 1));
-    // (her cleft, where it runs down into the crotch: no outline standing out of it, only the painted line)
-    const ink = g.attributes._ink;
-    if (name === 'Body' && ink && sx === 'f') for (let i = 0; i < n; i++) {
-      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), v = (y - L.crotch) / 0.05;
-      if (Math.abs(v) < 1.4 && z > -0.03) ink.setX(i, ink.getX(i) * (1 - 0.85 * Math.exp(-((x / 0.012) ** 2)) * Math.exp(-(v ** 4))));
-    }
     g.userData.shared = true;
     mesh[name] = { geo: g, keys: Object.assign({}, o.morphTargetDictionary || {}) };
   });
@@ -1153,7 +1144,8 @@ function bodyRegion(P, dom, L, sex) {
   if (y >= L.briefTop - 0.008) return R.HIPS;
   // under the briefs (to their leg openings: cut high at the sides for her) is the seat; below, the thighs, the knee (just above where lowered
   // trousers bunch) and the shins
-  const inBriefs = sex === 'f' ? ((x - sx * 0.012) * sx * 0.07 - (y - (L.briefLeg - 0.006)) * 0.16) / 0.1746 < -0.009 : y >= L.briefLeg + 0.009;
+  const bc = L.briefCut || [0.012, L.briefLeg - 0.006, 0.4375];
+  const inBriefs = sex === 'f' ? ((x * sx - bc[0]) * bc[2] - (y - bc[1])) / Math.hypot(1, bc[2]) < -0.009 : y >= L.briefLeg + 0.009;
   if (y >= L.briefTop - 0.022 && inBriefs) return R.HIPS_LO;      // (only within the leg openings: hers rise nearly to the waistband at the hip)
   if (inBriefs) return R.SEAT;
   if (y >= L.downTop + 0.02) return R.THIGH;
@@ -1191,7 +1183,6 @@ function makeGLB(spec, T) {
   // the body
   const skinM = tmat(spec.skin, { skin: true, morph: true, regions: true, marks: true, bindAttr: true, unique: true, rim: '#6a5048', rimK: 0.5 });
   F.body = skinned(F, T.mesh.Body.geo, skinM); F.body.castShadow = true; F.body.receiveShadow = false; F.skinMat = skinM;
-  if (spec.sex === 'f') skinM.userData.u.uCleft.value.set(T.L.crotch + 0.044, T.L.crotch - 0.022, 1, -0.02);
   // (the nape, from just above the collar up under the skull, isn't drawn: the head's own skin is there, and the neck's would show through the
   // back of the head as it tips back; cut level behind, rising round the sides toward the jaw)
   skinM.userData.u.uNape.value.set(T.L.collar + 0.002, -0.025, 1, 3);
