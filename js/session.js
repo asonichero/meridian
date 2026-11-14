@@ -50,6 +50,8 @@ function create(stage, bay, opts) {
   // ── Positions ──
   const bench = bay.spots.bench, wall = bay.spots.wall;
   const sc = F => F.root.scale.x;
+  // (each figure's own heights, in its own units: the pelvis, the ankle, the pelvis over a seat; and how far out its arms hang at rest)
+  const H = F => F.H || { hips: 0.95, ankle: 0.08, sit: 0.13, abd: 0 }, ankleY = F => H(F).ankle * sc(F) + 0.005;
   const setRoot = (F, pos, yaw) => { F.root.position.copy(pos); F.root.quaternion.copy(yawQ(yaw)); F.root.updateMatrixWorld(true); };
   const local = (F, x, y, z) => new V3(x, y, z).applyQuaternion(F.root.quaternion).add(F.root.position);
   const toWorldDir = (F, x, y, z) => new V3(x, y, z).applyQuaternion(F.root.quaternion);
@@ -73,7 +75,7 @@ function create(stage, bay, opts) {
   function stand(F, at, yaw, o) {
     o = o || {}; F.resetPose(); setRoot(F, at, yaw);
     const w = o.weight == null ? 0.6 : o.weight, wide = o.wide == null ? 0.11 : o.wide, cr = o.crouch || 0, s = sc(F);
-    F.bone.hips.position.x = 0.022 * w; F.bone.hips.position.y = 0.95 - 0.006 * Math.abs(w) - 0.14 * cr; F.bone.hips.position.z = -0.06 * cr;
+    F.bone.hips.position.x = 0.022 * w; F.bone.hips.position.y = H(F).hips - 0.006 * Math.abs(w) - 0.14 * cr; F.bone.hips.position.z = -0.06 * cr;
     F.bone.hips.rotation.set(0.3 * cr, 0.04 * w, -0.05 * w);
     F.bone.spine.rotation.set(0.02 + (o.lean || 0) * 0.6, -0.03 * w, 0.035 * w); F.bone.chest.rotation.set((o.lean || 0) * 0.4, -0.02 * w, 0.025 * w);
     F.bone.neck.rotation.set(o.look == null ? 0.08 : o.look, o.headYaw || 0, -0.02 * w);
@@ -81,11 +83,11 @@ function create(stage, bay, opts) {
     const fwd = toWorldDir(F, 0, 0, 1);
     for (const [side, sx] of [['L', 1], ['R', -1]]) {
       const free = (sx > 0) !== (w > 0), out = free ? 0.025 : 0;
-      const A = local(F, sx * (wide + out), 0.085, (free ? 0.05 : 0) + (o.stagger ? o.stagger * sx : 0));
+      const A = local(F, sx * (wide + out), ankleY(F), (free ? 0.05 : 0) + (o.stagger ? o.stagger * sx : 0));
       legTo(F, side, A, toWorldDir(F, sx * 0.15, 0, 1).normalize());
       footFlat(F, side, toWorldDir(F, sx * (free ? 0.25 : 0.1), 0, 1).normalize(), 0);
     }
-    if (o.arms !== null) { for (const [side, sx] of [['L', 1], ['R', -1]]) { F.bone['upperArm' + side].rotation.set(0.04, 0, sx * 0.09); F.bone['foreArm' + side].rotation.x = -0.22; F.bone['hand' + side].rotation.set(0, sx * 0.25, 0); F.grip(side, 0.32, 0.1, 0.3); } }
+    if (o.arms !== null) { for (const [side, sx] of [['L', 1], ['R', -1]]) { F.bone['upperArm' + side].rotation.set(0.04, 0, sx * (0.09 - H(F).abd)); F.bone['foreArm' + side].rotation.x = -0.22; F.bone['hand' + side].rotation.set(0, sx * 0.25, 0); F.grip(side, 0.32, 0.1, 0.3); } }
     F.root.updateMatrixWorld(true);
   }
   // How someone waiting holds their arms: folded across the chest, at parade rest (clasped behind), or clasped in front.
@@ -112,16 +114,16 @@ function create(stage, bay, opts) {
   function seat(F, at, yaw, o) {
     o = o || {}; F.resetPose(); setRoot(F, at, yaw);
     const s = sc(F);
-    F.bone.hips.position.y = (bench.seatY + 0.13) / s; F.bone.hips.position.z = -0.03 / s; F.bone.hips.rotation.x = -0.08 + (o.tilt || 0);
+    F.bone.hips.position.y = (bench.seatY + H(F).sit * s) / s; F.bone.hips.position.z = -0.03 / s; F.bone.hips.rotation.x = -0.08 + (o.tilt || 0);
     F.bone.spine.rotation.set(0.06 + (o.lean || 0), o.twist || 0, o.roll || 0); F.bone.chest.rotation.set(0.04 + (o.lean || 0) * 0.5, (o.twist || 0) * 0.6, (o.roll || 0) * 0.5);
     F.bone.neck.rotation.set(o.look == null ? 0.12 : o.look, o.headYaw || 0, o.headRoll || 0);
     F.root.updateMatrixWorld(true);
     for (const [side, sx] of [['L', 1], ['R', -1]]) {
-      const ank = local(F, sx * (0.14 + (o.spread || 0)), 0.085, 0.43 + (o.feetZ || 0) + (sx > 0 ? 0.03 : -0.02));
+      const ank = local(F, sx * (0.14 + (o.spread || 0)), ankleY(F), 0.43 + (o.feetZ || 0) + (sx > 0 ? 0.03 : -0.02));
       legTo(F, side, ank, toWorldDir(F, sx * 0.1, 0.5, 1).normalize());
       footFlat(F, side, toWorldDir(F, sx * 0.15, 0, 1).normalize(), 0);
     }
-    for (const [side, sx] of [['L', 1], ['R', -1]]) { F.bone['upperArm' + side].rotation.set(-0.25, 0, sx * 0.1); F.bone['foreArm' + side].rotation.x = -0.9; F.grip(side, 0.35, 0.1, 0.3); }
+    for (const [side, sx] of [['L', 1], ['R', -1]]) { F.bone['upperArm' + side].rotation.set(-0.25, 0, sx * (0.1 - H(F).abd)); F.bone['foreArm' + side].rotation.x = -0.9; F.grip(side, 0.35, 0.1, 0.3); }
     F.root.updateMatrixWorld(true);
   }
 
@@ -136,7 +138,7 @@ function create(stage, bay, opts) {
     const lapTop = bench.seatY + 0.155 * cs;
     // the hips over the Captain's right thigh, a little past its middle; a flinch presses them down into the lap and away from the hand
     otkH.set(bench.at.x - 0.11 * cs + 0.012 * flinch, lapTop + 0.125 * s * (0.9 + 0.2 * (P.r.body.fat + P.r.body.mass) / 2) - 0.012 * flinch, bench.at.z + 0.25);
-    F.root.quaternion.copy(otkQ); F.root.position.copy(otkH).sub(new V3(0, 0.95 * s, 0).applyQuaternion(otkQ)); F.root.updateMatrixWorld(true);
+    F.root.quaternion.copy(otkQ); F.root.position.copy(otkH).sub(new V3(0, H(F).hips * s, 0).applyQuaternion(otkQ)); F.root.updateMatrixWorld(true);
   }
   // How far the hand is raised, 0 … 1, by the swing's phase (for the shoulder and the torso turning into it).
   function raiseOf(sw) { if (!sw) return 0; const ph = swingPhase(sw); const at = x => (x === 'raised' ? 1 : 0); return lerp(at(ph.from), at(ph.to), ph.e); }
@@ -225,7 +227,7 @@ function create(stage, bay, opts) {
       // the bulkhead and the back straightening, the head coming up; now and then a foot comes off the deck
       setRoot(F, wall.at, wall.yaw);
       const toe = sp.toe.to(0, dt), fwd = Math.max(0, fl);
-      F.bone.hips.position.set(0.012 * wrig, 0.93 - 0.03 + 0.04 * toe, -0.1 + 0.07 * fwd);
+      F.bone.hips.position.set(0.012 * wrig, H(F).hips - 0.05 + 0.04 * toe, -0.1 + 0.07 * fwd);
       F.bone.hips.rotation.set(0.72 - 0.35 * fwd - 0.15 * ar, 0.05 * wrig, 0.05 * wrig);
       F.bone.spine.rotation.set(0.12 - 0.06 * ar, 0, 0.03 * wrig); F.bone.chest.rotation.set(0.06 - 0.08 * ar, 0, 0);
       F.bone.neck.rotation.set(0.25 - 0.7 * hd - 0.15 * ar, 0.1 * Math.sin(t * 1.3) * dd, 0);
@@ -234,7 +236,7 @@ function create(stage, bay, opts) {
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
         const st_ = side === J.side ? Math.max(0, stamp) : 0, pd = side === 'L' ? Math.max(0, pedal) : Math.max(0, -pedal);
         const up = 0.03 * Math.max(0, toe) + 0.16 * st_ + 0.1 * pd;
-        legTo(F, side, local(F, sx * 0.25, 0.085 + up, 0.0 - 0.1 * st_), toWorldDir(F, sx * 0.15, 0.1, 1).normalize());
+        legTo(F, side, local(F, sx * 0.25, ankleY(F) + up, 0.0 - 0.1 * st_), toWorldDir(F, sx * 0.15, 0.1, 1).normalize());
         footFlat(F, side, toWorldDir(F, sx * 0.12, 0, 1).normalize(), clamp(toe * 1.2 + st_ + pd, 0, 1));
       }
       // the hands over the rail: palms down on it, the fingers wrapped over its far side, the wrists a hand's length back toward them

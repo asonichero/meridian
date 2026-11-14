@@ -66,6 +66,46 @@ const PATTERNS = {
   diffuseColor.rgb *= 1.0 - 0.18 * smoothstep(1.004, 1.007, b.y) * (1.0 - uParam.y);
 }`,
 };
+// The same details on the Blender-built clothes, placed by the body's landmarks (uL0, uL1) rather than fixed heights.
+// tunicG: uParam (hem, raised, shoulder x, uniform?), uL0 (–, –, collar, waist), uL1 (shoulder y, armpit y, cuff y, neckline). vPart: sleeve 1.
+// trousersG: uParam (–, lowered, leg centre x, uniform?), uL0 (knee, waist top).
+PATTERNS.tunicG = `{
+  vec3 b = vBind; float ax = abs(b.x), hem = uParam.x, up = uParam.y, shX = uParam.z, collar = uL0.z, waist = uL0.w, shY = uL1.x, pit = uL1.y, cuffY = uL1.z, nl = uL1.w;
+  if (uParam.w > 0.5) {
+    if (vPart < 0.5) {
+      float yTop = collar - 0.04, lx = mix(-0.065, 0.115, clamp((yTop - b.y) / (yTop - hem), 0.0, 1.0)), d = b.x - lx;
+      float front = smoothstep(0.005, 0.03, b.z), inY = step(hem + 0.006, b.y) * (1.0 - smoothstep(yTop - 0.002, yTop + 0.002, b.y));
+      diffuseColor.rgb *= 1.0 - 0.2 * front * inY * smoothstep(-0.032, -0.004, d) * (1.0 - smoothstep(-0.0035, -0.0015, d));
+      diffuseColor.rgb = mix(diffuseColor.rgb, uPat1, front * inY * (1.0 - smoothstep(0.0012, 0.0028, abs(d + 0.0005))));
+      float belt = smoothstep(waist - 0.034, waist - 0.031, b.y) * (1.0 - smoothstep(waist + 0.003, waist + 0.006, b.y));
+      diffuseColor.rgb = mix(diffuseColor.rgb, uPat2, belt);
+      float bk = belt * front * (1.0 - smoothstep(0.016, 0.019, abs(b.x - 0.02)));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.28, 0.24), bk * 0.9);
+      diffuseColor.rgb *= 1.0 - 0.28 * smoothstep(collar - 0.018, collar - 0.014, b.y);
+      diffuseColor.rgb *= 1.0 - 0.25 * (1.0 - up) * (1.0 - smoothstep(hem + 0.009, hem + 0.012, b.y));
+    } else {
+      float flash = step(0.0, b.x) * smoothstep(pit + 0.03, pit + 0.033, b.y) * (1.0 - smoothstep(shY + 0.012, shY + 0.015, b.y)) * smoothstep(shX + 0.022, shX + 0.03, b.x);
+      float cuff = smoothstep(cuffY + 0.004, cuffY + 0.007, b.y) * (1.0 - smoothstep(cuffY + 0.022, cuffY + 0.025, b.y));
+      diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, max(flash, cuff));
+    }
+  } else if (vPart < 0.5) {
+    float fr = smoothstep(0.03, 0.05, b.z), pTop = nl - 0.03;
+    diffuseColor.rgb *= 1.0 - 0.3 * fr * (1.0 - smoothstep(0.009, 0.011, ax)) * smoothstep(pTop - 0.13, pTop - 0.127, b.y);
+    for (int i = 0; i < 3; i++) { float bd = length(vec2(b.x, b.y - (pTop - 0.025 - 0.035 * float(i)))); diffuseColor.rgb = mix(diffuseColor.rgb, uPat1, fr * (1.0 - smoothstep(0.0035, 0.0048, bd))); }
+    diffuseColor.rgb *= 1.0 - 0.22 * (1.0 - up) * (1.0 - smoothstep(hem + 0.009, hem + 0.012, b.y));
+  }
+}`;
+PATTERNS.trousersG = `{
+  vec3 b = vBind; float ax = abs(b.x), knee = uL0.x, top = uL0.y;
+  if (uParam.w > 0.5 && uParam.y < 0.5) {
+    float front = smoothstep(0.01, 0.03, b.z), kn = front * smoothstep(knee - 0.072, knee - 0.068, b.y) * (1.0 - smoothstep(knee + 0.128, knee + 0.132, b.y));
+    diffuseColor.rgb *= 1.0 - 0.16 * kn;
+    float seam = front * (1.0 - smoothstep(0.0008, 0.0022, min(abs(b.y - knee + 0.07), abs(b.y - knee - 0.13))));
+    diffuseColor.rgb *= 1.0 + 0.4 * seam;
+  }
+  if (uParam.w < 0.5 && b.y < top - 0.06) diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, (1.0 - smoothstep(0.0025, 0.0045, abs(b.z))) * step(uParam.z + 0.03, ax));
+  diffuseColor.rgb *= 1.0 - 0.18 * smoothstep(top - 0.032, top - 0.029, b.y) * (1.0 - uParam.y);
+}`;
 const NOISE = `
 float fh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float fn3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
@@ -75,7 +115,7 @@ function paint(m, o) {
   o = o || {};
   const U = { uRim: { value: srgb(o.rim || '#2a3440').multiplyScalar(o.rimK == null ? 1 : o.rimK) }, uGrain: { value: o.grain == null ? 0.03 : o.grain }, uGrainScale: { value: o.scale || 60 }, uHide: { value: 0 },
     uMarks: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9, 0, 0)) }, uMarkCol: { value: srgb(o.markCol || '#b8323a') },
-    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() } };
+    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() } };
   m.userData.u = U;
   const key = 'paint|' + [o.regions, o.marks, o.bindAttr].map(x => (x ? 1 : 0)).join('') + (o.pattern || '');
   m.customProgramCacheKey = () => key;
@@ -89,7 +129,7 @@ vBind = ${o.bindAttr ? 'bind' : 'position'};
 ${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'} ${o.pattern ? 'vPart = region;' : 'vPart = 0.0;'}`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
+varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
@@ -150,10 +190,12 @@ function dqs(m) {
   m.customProgramCacheKey = () => 'dqs|' + prevKey();
   return m;
 }
-const DEPTHM = dqs(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, skinning: true }));
+const DEPTHM = dqs(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, skinning: true })), DEPTHM_M = dqs(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, skinning: true, morphTargets: true }));
+const morphed = g => !!(g.morphAttributes && g.morphAttributes.position && g.morphAttributes.position.length);
 // A skinned part of a figure: bound with the rest pose's matrix, dual-quaternion skinned, casting its shadow with the same skinning.
 function skinned(F, geo, m) {
-  const sm = new THREE.SkinnedMesh(geo, m); F.root.add(sm); sm.bind(F.skeleton, F.bindM); sm.frustumCulled = false; sm.customDepthMaterial = DEPTHM;
+  const sm = new THREE.SkinnedMesh(geo, m); F.root.add(sm); sm.bind(F.skeleton, F.bindM); sm.frustumCulled = false; sm.customDepthMaterial = morphed(geo) ? DEPTHM_M : DEPTHM;
+  if (F.keys && morphed(geo)) setKeys(sm, F.keys);
   return sm;
 }
 
@@ -182,21 +224,26 @@ function tmat(hex, o) {
   o = Object.assign({ grain: 0 }, o || {});
   const key = JSON.stringify([hex, o]);
   if (!o.unique && TMATS.has(key)) return TMATS.get(key);
-  let m = paint(new THREE.MeshToonMaterial({ color: srgb(hex), gradientMap: ramp(), skinning: !!o.skin, vertexColors: !!o.vc, side: o.side || THREE.FrontSide }), o);
+  let m = paint(new THREE.MeshToonMaterial({ color: srgb(hex), gradientMap: ramp(), skinning: !!o.skin, morphTargets: !!o.morph, vertexColors: !!o.vc, side: o.side || THREE.FrontSide }), o);
   if (o.skin) m = dqs(m);
   if (!o.unique) TMATS.set(key, m);
   return m;
 }
 const INK = '#2a1a16';
-const INKM = { plain: new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide }), skinned: dqs(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true })) };
+const INKM = { plain: new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide }), skinned: dqs(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true })),
+  morph: dqs(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true })) };
 function hullGeo(geo, w) {
   const g = geo.clone(), p = g.attributes.position, n = g.attributes.normal;
   for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * w, p.getY(i) + n.getY(i) * w, p.getZ(i) + n.getZ(i) * w);
   return g;
 }
 // An outline round a mesh: for a plain one, a child; for a skinned one, a second skinned mesh on the same skeleton (mat: its own, e.g. sharing hidden regions).
+// (an outline's hull is kept with the geometry it's made from, so figures sharing a body share its hull too)
 function ink(mesh, w, F, m) {
-  if (mesh.isSkinnedMesh) { const h = skinned(F, hullGeo(mesh.geometry, w), m || INKM.skinned); h.castShadow = false; mesh.userData.hull = h; return h; }
+  if (mesh.isSkinnedMesh) {
+    const g = mesh.geometry, hg = g.userData.shared ? (g.userData.hull = g.userData.hull || hullGeo(g, w)) : hullGeo(g, w);
+    const h = skinned(F, hg, m || (morphed(g) ? INKM.morph : INKM.skinned)); h.castShadow = false; mesh.userData.hull = h; return h;
+  }
   const h = new THREE.Mesh(hullGeo(mesh.geometry, w), INKM.plain); mesh.add(h); return h;
 }
 const INK_W = 0.0045;
@@ -321,7 +368,7 @@ function weldSeams(g) {
 }
 
 // ── Regions of skin, so what's under clothes can be hidden ────────────────────────────────────────────────────────────────────────────────────
-const R = { HEAD: 0, CHEST: 1, WAIST: 2, HIPS: 3, SEAT: 4, THIGH: 5, KNEE: 6, SHIN: 7, UPARM: 8, FOREARM: 9, HAND: 10, WAIST_HI: 11, HIPS_LO: 12 };
+const R = { HEAD: 0, CHEST: 1, WAIST: 2, HIPS: 3, SEAT: 4, THIGH: 5, KNEE: 6, SHIN: 7, UPARM: 8, FOREARM: 9, HAND: 10, WAIST_HI: 11, HIPS_LO: 12, FOOT: 13 };
 
 // ── The body's shape, from sex, mass (muscle and frame, 0–1) and fat (softness, 0–1). ──────────────────────────────────────────────────────────
 function shapeOf(o) {
@@ -431,7 +478,10 @@ const SPOT_AT = { upper: 0.93, centre: 0.875, sitspot: 0.825, thighs: 0.76 };
 function make(spec) {
   spec = Object.assign({ sex: 'm', height: 1.75, mass: 0.5, fat: 0.4, skin: '#c8987a', hair: '#3a2a20', hairStyle: 'crop', eyes: '#4a5a4a', lips: null,
     outfit: 'uniform', dept: '#c89a3a', beard: false }, spec || {});
+  if (GLB.sex[spec.sex] && spec.model !== 'built') return makeGLB(spec, GLB.sex[spec.sex]);
   const S = shapeOf(spec), F = { spec, S, root: new THREE.Group(), bone: {}, bones: [] };
+  // (the heights posing works from, in the figure's own units: the pelvis, the ankle, the pelvis over what it sits on; the arms' rest angle out)
+  F.H = { hips: 0.95, ankle: 0.08, sit: 0.13, abd: 0 };
   F.root.scale.setScalar(spec.height / 1.75);
 
   // Skeleton
@@ -489,17 +539,38 @@ function make(spec) {
   F.skinMat = skinM;
   { const hm = dqs(paint(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true }), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; ink(F.body, INK_W, F, hm); }
 
-  // The seat's spots: the vertex on the back of the seat nearest each, for aiming at and marking.
+  spotsOn(F, bodyGeo, area => [area === 'thighs' ? 0.088 : 0.078, SPOT_AT[area]]);
+
+  // ── Head, face and hair ──
+  buildHead(F, spec, S);
+  // ── Boots ──
+  for (const sd of [1, -1]) buildBoot(F, spec, sd, BI, w);
+
+  // ── Clothes ──
+  F.clothes = {};
+  F.state = { top: 'down', bottoms: 'up', under: 'up' };
+  F.setClothes = st => { Object.assign(F.state, st || {}); dress(F, spec, S, BI, w, torsoW, legW, armW); };
+  F.setClothes();
+  F.setOutfit = (outfit, dept) => { spec.outfit = outfit; if (dept) spec.dept = dept; F.setClothes(); };
+
+  finish(F, spec);
+  return F;
+}
+
+// The seat's spots: the point on the back of the seat nearest each place (at(area) → [x from the middle, y]), for aiming at and marking; and the
+// marks themselves.
+function spotsOn(F, bodyGeo, at, reach) {
+  reach = reach || 0.03;
   F.spot = {};
   {
     const p = bodyGeo.attributes.position, n = bodyGeo.attributes.normal, reg = bodyGeo.attributes.region;
     for (const k of SPOTS) {
-      const area = k.slice(0, -1), sd = k.slice(-1) === 'L' ? 1 : -1, tx = (area === 'thighs' ? 0.088 : 0.078) * sd, ty = SPOT_AT[area];
+      const area = k.slice(0, -1), sd = k.slice(-1) === 'L' ? 1 : -1, [ax, ty] = at(area), tx = ax * sd;
       // (the outermost point there: the cheek's own surface, not the top of a leg tube buried inside it: of the points within 3 cm, the one
       // furthest back)
       let best = -1, bd = 1e9, bz = 1e9;
       const ok = i => n.getZ(i) <= -0.55 && [R.SEAT, R.HIPS, R.HIPS_LO, R.THIGH].includes(reg.getX(i));
-      for (let i = 0; i < p.count; i++) { if (!ok(i)) continue; const d = Math.hypot(p.getX(i) - tx, p.getY(i) - ty); if (d < 0.03 && p.getZ(i) < bz) { bz = p.getZ(i); best = i; } }
+      for (let i = 0; i < p.count; i++) { if (!ok(i)) continue; const d = Math.hypot(p.getX(i) - tx, p.getY(i) - ty); if (d < reach && p.getZ(i) < bz) { bz = p.getZ(i); best = i; } }
       if (best < 0) for (let i = 0; i < p.count; i++) { if (!ok(i)) continue; const d = Math.hypot(p.getX(i) - tx, p.getY(i) - ty); if (d < bd) { bd = d; best = i; } }
       F.spot[k] = { i: best, bind: new V3(p.getX(best), p.getY(best), p.getZ(best)), mark: 0 };
     }
@@ -525,20 +596,9 @@ function make(spec) {
     if (F.underMat) SPOTS.forEach((k, i) => { const sp = F.spot[k]; F.underMat.userData.u.uMarks.value[i].set(sp.bind.x, sp.bind.y, sp.bind.z, sp.mark * 0.25); });
   }
   syncMarks();
-
-  // ── Head, face and hair ──
-  buildHead(F, spec, S);
-  // ── Boots ──
-  for (const sd of [1, -1]) buildBoot(F, spec, sd, BI, w);
-
-  // ── Clothes ──
-  F.clothes = {};
-  F.state = { top: 'down', bottoms: 'up', under: 'up' };
-  F.setClothes = st => { Object.assign(F.state, st || {}); dress(F, spec, S, BI, w, torsoW, legW, armW); };
-  F.setClothes();
-  F.setOutfit = (outfit, dept) => { spec.outfit = outfit; if (dept) spec.dept = dept; F.setClothes(); };
-
-  // ── Expression and life ──
+}
+// Expression and life: the face easing between expressions, blinking, breathing, the hands' grip, the rest pose, the flesh's give.
+function finish(F, spec) {
   F.expr = flatExpr('calm'); F.exprTo = flatExpr('calm'); F.exprName = 'calm'; F.drawn = {};
   F.setExpr = name => { if (EXPRS[name]) { F.exprTo = flatExpr(name); F.exprName = name; } };
   F.t = Math.random() * 10; F.blink = 2 + Math.random() * 3; F.breath = 0.3; F.gaze = new V3(0, 0, 1);
@@ -550,7 +610,6 @@ function make(spec) {
   F.jig = { L: { x: 0, v: 0 }, R: { x: 0, v: 0 } };
   F.impact = (s, power) => { F.jig[s].v += 0.32 * power; F.jig[s === 'L' ? 'R' : 'L'].v += 0.08 * power; };
   F.resetPose();
-  return F;
 }
 
 // A hand: the palm (the thumb's pad bulging on its inner side), four fingers of two joints each with rounded tips, and the thumb. Every part
@@ -935,6 +994,156 @@ function tickFace(F, dt) {
 }
 
 
+// ── The Blender-built figures (models/meridian_f.glb, meridian_m.glb: tools/blender/build_figures.py) ─────────────────────────────────────────────
+// Each holds the body (with shape keys toward each extreme of build: muscle, slight, soft, firm, and the bust for her) and the clothing layers over
+// it (the uniform's jacket and the off-duty shirt, each down or raised; trousers, up or lowered; briefs, up or lowered; boots), skinned to a
+// skeleton named as the one above, in the same units and axes. models/meridian_meta.json gives each joint's place and the body's landmarks (where
+// the hems, cuffs, waist and the rest fall). A figure made from them is posed exactly as a built one, and keeps the toon head, face and hair.
+// Figure.preload() loads them (make() builds figures in code until it has); Figure.adopt(meta, sex, arrayBuffer) takes one already in hand.
+const GLB = { meta: null, sex: {}, ready: null };
+function preload(base) {
+  if (GLB.ready) return GLB.ready;
+  base = base == null ? 'models/' : base;
+  if (!THREE.GLTFLoader || typeof fetch === 'undefined') return (GLB.ready = Promise.resolve(false));
+  GLB.ready = fetch(base + 'meridian_meta.json').then(r => r.json())
+    .then(meta => Promise.all(['f', 'm'].map(sx => fetch(base + 'meridian_' + sx + '.glb').then(r => r.arrayBuffer()).then(buf => adopt(meta, sx, buf)))))
+    .then(() => true).catch(e => { console.warn('Figure: the Blender-built models did not load; building the figures in code.', e); GLB.sex = {}; return false; });
+  return GLB.ready;
+}
+function adopt(meta, sx, buf) {
+  GLB.meta = meta;
+  return new Promise((res, rej) => new THREE.GLTFLoader().parse(buf, '', g => { GLB.sex[sx] = prepare(sx, g, meta[sx]); res(GLB.sex[sx]); }, rej));
+}
+const ARM_BONES = /^(upperArm|foreArm|hand|index|middle|ring|pinky|thumb)/;
+// A GLB's meshes made ready to share between figures: joint indices renumbered to the skeleton's order, weights normalised, the rest pose kept
+// (`bind`, for the details drawn on the clothes and the marks), each point of the body given its region (for hiding what's under clothes) and each
+// point of a top its part (the body 0, a sleeve 1).
+function prepare(sx, gltf, M) {
+  const order = Object.keys(M.joints), BIx = {}, L = M.landmarks, mesh = {};
+  order.forEach((n, i) => (BIx[n] = i));
+  gltf.scene.traverse(o => {
+    if (!o.isSkinnedMesh) return;
+    const g = o.geometry.clone(), map = o.skeleton.bones.map(b => BIx[b.name]), si = g.attributes.skinIndex, sw = g.attributes.skinWeight, n = si.count;
+    const idx = new Uint16Array(n * 4), wt = new Float32Array(n * 4), dom = new Array(n), wmax = sw.normalized ? (sw.array instanceof Uint8Array ? 255 : 65535) : 1;
+    for (let i = 0; i < n; i++) {
+      const j = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)], w = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)].map(v => v / wmax), t = w[0] + w[1] + w[2] + w[3] || 1;
+      let best = 0;
+      for (let k = 0; k < 4; k++) { idx[i * 4 + k] = w[k] > 0 ? map[j[k]] : 0; wt[i * 4 + k] = w[k] / t; if (w[k] > w[best]) best = k; }
+      dom[i] = order[map[j[best]]];
+    }
+    g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
+    g.setAttribute('bind', g.attributes.position.clone());
+    const name = o.name.replace(/_\d+$/, ''), p = g.attributes.position, reg = new Float32Array(n);
+    if (name === 'Body') for (let i = 0; i < n; i++) reg[i] = bodyRegion([p.getX(i), p.getY(i), p.getZ(i)], dom[i], L, sx);
+    else if (/^(Tunic|Shirt)/.test(name)) for (let i = 0; i < n; i++) reg[i] = ARM_BONES.test(dom[i]) ? 1 : 0;
+    g.setAttribute('region', new THREE.Float32BufferAttribute(reg, 1));
+    g.userData.shared = true;
+    mesh[name] = { geo: g, keys: Object.assign({}, o.morphTargetDictionary || {}) };
+  });
+  return { sex: sx, order, joints: M.joints, parents: M.parents, L, mesh };
+}
+// Where a point of the body is, for hiding what's under each garment: the garments' own edges (from the landmarks) decide it, each region's
+// edge a little inside the garment that hides it (so no gap opens at a hem or cuff).
+function bodyRegion(P, dom, L, sex) {
+  const [x, y, z] = P, sx = x >= 0 ? 1 : -1;
+  if (ARM_BONES.test(dom)) {
+    const a = (x - sx * L.shX) * sx * Math.sin(L.abd) - (y - L.shoulder) * Math.cos(L.abd);       // (along the arm from the shoulder)
+    return a > L.cuffA - 0.015 ? R.HAND : a > L.rollA - 0.015 ? R.FOREARM : R.UPARM;
+  }
+  if (/^(foot|toe)/.test(dom) || y < L.bootTop - 0.012) return R.FOOT;
+  // (the neck above the open shirt's neckline, lower in front, shows with any top)
+  if (Math.cos(0.42) * (y - L.neckline) + Math.sin(0.42) * z > -0.006) return R.HEAD;
+  if (y >= L.hemUp + 0.06) return R.CHEST;
+  if (y >= L.hemUp + 0.04) return R.WAIST_HI;      // (well up under the raised hem, which rides up as they bend)
+  if (y >= L.trouserTop - 0.01) return R.WAIST;
+  if (y >= L.briefTop - 0.008) return R.HIPS;
+  if (y >= L.briefTop - 0.022) return R.HIPS_LO;
+  // under the briefs (to their leg openings: cut high at the sides for her) is the seat; below, the thighs, the knee (just above where lowered
+  // trousers bunch) and the shins
+  const inBriefs = sex === 'f' ? ((x - sx * 0.012) * sx * 0.07 - (y - (L.briefLeg - 0.006)) * 0.16) / 0.1746 < -0.004 : y >= L.briefLeg + 0.004;
+  if (inBriefs) return R.SEAT;
+  if (y >= L.downTop + 0.02) return R.THIGH;
+  if (y >= L.downTop - 0.04) return R.KNEE;
+  return R.SHIN;
+}
+// The body's build, as the shape keys' amounts: mass (muscle and frame) toward muscle or slight, fat toward soft or firm, the bust.
+function bodyKeys(spec) {
+  const m = spec.mass == null ? 0.5 : spec.mass, fat = spec.fat == null ? 0.4 : spec.fat;
+  return { muscle: clamp((m - 0.5) / 0.4, 0, 1), slight: clamp((0.5 - m) / 0.25, 0, 1) * 0.8, soft: clamp((fat - 0.4) / 0.35, 0, 1), firm: clamp((0.4 - fat) / 0.3, 0, 1) * 0.8,
+    bust: spec.sex === 'f' ? clamp(((spec.bust == null ? 0.035 : spec.bust) - 0.035) / 0.03, 0, 1) : 0 };
+}
+function setKeys(mesh, keys) {
+  const dict = mesh.geometry.userData.keys || {}, inf = mesh.morphTargetInfluences;
+  if (inf) for (const k in dict) inf[dict[k]] = keys[k] || 0;
+}
+function makeGLB(spec, T) {
+  const S = shapeOf(spec), F = { spec, S, root: new THREE.Group(), bone: {}, bones: [], model: T, L: T.L };
+  F.root.scale.setScalar(spec.height / T.L.height);
+  for (const name of T.order) {
+    const par = T.parents[name], p = T.joints[name], q = par ? T.joints[par] : [0, 0, 0];
+    const b = new THREE.Bone(); b.name = name; b.position.set(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+    (par ? F.bone[par] : F.root).add(b); F.bone[name] = b; F.bones.push(b);
+  }
+  F.root.updateMatrixWorld(true);
+  F.skeleton = new THREE.Skeleton(F.bones); F.bindM = F.root.matrixWorld.clone();
+  F.rest = {}; for (const b of F.bones) F.rest[b.name] = b.getWorldPosition(new V3());
+  F.H = { hips: T.joints.hips[1], ankle: T.joints.footL[1], sit: T.joints.hips[1] - T.L.crotch - 0.025, abd: T.L.abd };
+  F.keys = bodyKeys(spec);
+  for (const k in T.mesh) T.mesh[k].geo.userData.keys = T.mesh[k].keys;
+  // the body
+  const skinM = tmat(spec.skin, { skin: true, morph: true, regions: true, marks: true, bindAttr: true, unique: true, rim: '#6a5048', rimK: 0.5 });
+  F.body = skinned(F, T.mesh.Body.geo, skinM); F.body.castShadow = true; F.body.receiveShadow = false; F.skinMat = skinM;
+  { const hm = dqs(paint(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; ink(F.body, INK_W, F, hm); }
+  const L = T.L;
+  spotsOn(F, T.mesh.Body.geo, area => ({ upper: [L.hipX * 0.84, L.crotch + 0.125], centre: [L.hipX * 0.84, L.crotch + 0.072], sitspot: [L.hipX * 0.86, L.crotch + 0.026], thighs: [L.hipX * 0.95, L.crotch - 0.04] })[area], 0.012);
+  buildHead(F, spec, S);
+  // the clothes: each garment made when it's first worn, then shown or hidden
+  F.gm = {}; F.clothes = {};
+  F.state = { top: 'down', bottoms: 'up', under: 'up' };
+  F.setClothes = st => { Object.assign(F.state, st || {}); dressGLB(F); };
+  F.setOutfit = (outfit, dept) => { spec.outfit = outfit; if (dept) spec.dept = dept; for (const k in F.gm) { const m = F.gm[k]; for (const x of [m, m.userData.hull]) if (x) x.parent.remove(x); } F.gm = {}; F.setClothes(); };
+  F.setClothes();
+  finish(F, spec);
+  return F;
+}
+function garmentGLB(F, name) {
+  if (F.gm[name]) return F.gm[name];
+  const spec = F.spec, O = OUTFITS[spec.outfit] || OUTFITS.uniform, L = F.L, uni = spec.outfit === 'uniform' ? 1 : 0, geo = F.model.mesh[name].geo;
+  let m;
+  if (/^(Tunic|Shirt)/.test(name)) {
+    m = tmat(O.tunic, { skin: true, morph: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6, pattern: 'tunicG', bindAttr: true, unique: true });
+    const U = m.userData.u; U.uPat0.value.copy(srgb(spec.dept)); U.uPat1.value.copy(srgb(O.edge || shade(O.tunic, -0.4))); U.uPat2.value.copy(srgb(O.belt || '#222'));
+    const up = /Up$/.test(name);
+    U.uParam.value.set(up ? L.hemUp : L.hem, up ? 1 : 0, L.shX, uni);
+    U.uL0.value.set(0, 0, L.collar, L.waist); U.uL1.value.set(L.shoulder, L.armpit, L.shoulder - L.cuffA * Math.cos(L.abd), L.neckline);
+  } else if (/^Trousers/.test(name)) {
+    m = tmat(O.trousers, { skin: true, morph: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6, pattern: 'trousersG', bindAttr: true, unique: true });
+    const U = m.userData.u; U.uPat0.value.copy(srgb(O.pipe || spec.dept)); U.uParam.value.set(0, /Down$/.test(name) ? 1 : 0, L.hipX, uni); U.uL0.value.set(L.knee, L.trouserTop, 0, 0);
+  } else if (/^Briefs/.test(name)) {
+    F.underMat = F.underMat || tmat(O.under, { skin: true, morph: true, side: THREE.DoubleSide, marks: true, bindAttr: true, unique: true, markCol: shade(O.under, -0.2), rim: '#2a3440', rimK: 0.5 });
+    m = F.underMat;
+  } else m = tmat(spec.outfit === 'offduty' ? '#4a3424' : '#1e2024', { skin: true, morph: true, rim: '#3a4048', rimK: 0.4 });
+  const depth = /^Briefs/.test(name) ? 2 : /^Trousers/.test(name) ? 1 : 0;
+  if (depth) { m.polygonOffset = true; m.polygonOffsetFactor = depth; m.polygonOffsetUnits = 2 * depth; }
+  const sm = skinned(F, geo, m); sm.castShadow = true; sm.receiveShadow = false; ink(sm, INK_W, F);
+  F.gm[name] = sm; return sm;
+}
+function dressGLB(F) {
+  const st = F.state, tops = F.spec.outfit === 'offduty' ? ['Shirt', 'ShirtUp'] : ['Tunic', 'TunicUp'];
+  const want = { top: tops[st.top === 'up' ? 1 : 0], bottoms: st.bottoms === 'down' ? 'TrousersDown' : 'Trousers', under: st.under === 'down' ? 'BriefsDown' : 'Briefs', boots: 'Boots' };
+  const on = new Set(Object.values(want));
+  for (const k of Object.values(want)) garmentGLB(F, k);
+  for (const k in F.gm) { const m = F.gm[k], v = on.has(k); m.visible = v; if (m.userData.hull) m.userData.hull.visible = v; }
+  F.clothes = { top: F.gm[want.top], bottoms: F.gm[want.bottoms], under: F.gm[want.under] }; F.bootL = F.bootR = F.gm.Boots;
+  // the skin under each garment hidden (so nothing pokes through as they move)
+  let hide = 1 << R.FOOT; const H = r => { hide |= 1 << r; };
+  H(R.CHEST); H(R.UPARM); H(R.WAIST_HI); if (F.spec.outfit !== 'offduty') H(R.FOREARM); if (st.top !== 'up') H(R.WAIST);
+  if (st.bottoms !== 'down') { H(R.HIPS); H(R.HIPS_LO); H(R.SEAT); H(R.THIGH); H(R.KNEE); H(R.SHIN); } else H(R.SHIN);
+  if (st.under !== 'down') { H(R.SEAT); H(R.HIPS_LO); }
+  F.skinMat.userData.u.uHide.value = hide;
+  if (F.spot) for (const k of SPOTS) F.mark(k, 0);      // (the briefs' copy of the marks)
+}
+
 // ── Posing helpers ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 function setWorldQuat(obj, qw) { obj.parent.getWorldQuaternion(_q).invert(); obj.quaternion.copy(_q.multiply(qw)); }
@@ -951,8 +1160,13 @@ function ik2(F, a, b, c, W, pole, bendSign) {
   // the upper bone: its -y along u1; its +z toward the bend for an elbow (−1), away for a knee (+1)
   let Z = f.clone().addScaledVector(u1, -f.dot(u1)); if (Z.lengthSq() < 1e-8) Z = pp.clone(); Z.normalize(); if (bendSign > 0) Z.negate();
   const Y = u1.clone().negate(), X = new V3().crossVectors(Y, Z);
-  setWorldQuat(a, new THREE.Quaternion().setFromRotationMatrix(_m.makeBasis(X, Y, Z)));
-  b.rotation.set(bendSign * Math.acos(clamp(u1.dot(f), -1, 1)), 0, 0);
+  // (the upper bone's rest direction to its joint need not be straight down its -y: turned so that direction lies along u1; then the lower bone
+  // turned the least that takes its own rest direction onto f)
+  const q0 = new THREE.Quaternion().setFromUnitVectors(new V3(0, -1, 0), b.position.clone().normalize());
+  setWorldQuat(a, new THREE.Quaternion().setFromRotationMatrix(_m.makeBasis(X, Y, Z)).multiply(q0.invert()));
+  a.updateMatrixWorld(true);
+  const fl = f.clone().applyQuaternion(a.getWorldQuaternion(new THREE.Quaternion()).invert());
+  b.quaternion.setFromUnitVectors(c.position.clone().normalize(), fl.normalize());
   F.root.updateMatrixWorld(true);
 }
 // Turn a bone so its local axes point the given world ways: X and Y (Y made perpendicular to X).
@@ -961,6 +1175,6 @@ function aim(obj, X, Y) {
   setWorldQuat(obj, new THREE.Quaternion().setFromRotationMatrix(_m.makeBasis(x, y, z)));
 }
 
-const api = { tmat, ink, dqs, grip, FINGERS, make, EXPRS, MOUTHS, HEAD_SCALE, OUTFITS, SPOTS, ik2, aim, setWorldQuat, mat, paint, srgb, shade, R };
+const api = { tmat, ink, dqs, grip, FINGERS, make, preload, adopt, models: () => Object.keys(GLB.sex), EXPRS, MOUTHS, HEAD_SCALE, OUTFITS, SPOTS, ik2, aim, setWorldQuat, mat, paint, srgb, shade, R };
 root.Figure = api;
 })(typeof window !== 'undefined' ? window : globalThis);

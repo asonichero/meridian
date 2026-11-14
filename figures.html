@@ -5,18 +5,19 @@
 #bar{position:fixed;left:12px;top:12px;font:13px system-ui,sans-serif;color:#d8d2c4;display:flex;gap:6px;flex-wrap:wrap}
 #bar button{background:#1c232bcc;color:#e8dcc4;border:1px solid #3a4652;border-radius:10px;padding:6px 10px;cursor:pointer}</style></head>
 <body><div id="view"></div><div id="bar"></div>
-<script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script>
+<script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script><script src="vendor/GLTFLoader.js"></script>
 <script src="js/figure.js"></script><script src="js/crew.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script>
 <script>
 // The crew side by side in the suit bay: a look at the figures (?sex=f|m, ?outfit=uniform|offduty, ?expr=…, ?clothes=top,bottoms,under).
 const q = new URLSearchParams(location.search), st = Stage.create(document.getElementById('view'), { keep: true, fov: +(q.get('fov') || 38) }), bay = SuitBay.build(st.scene);
 const sex = q.get('sex') || 'mix', outfit = q.get('outfit') || 'uniform', figs = [];
+(q.get('built') ? Promise.resolve() : Figure.preload()).then(() => {
 const only = q.get('only'); (only ? [only] : Crew.IDS).forEach((id, i) => {
   const s = sex === 'mix' ? (i % 2 ? 'f' : 'm') : sex, f = Figure.make(Crew.figureSpec(id, s, outfit));
   f.root.position.set(-1.6 + i * 0.62, 0, 0.6); f.root.rotation.y = q.get('back') ? Math.PI : 0; st.scene.add(f.root); figs.push(f);
   if (q.get('clothes')) { const [top, bottoms, under] = q.get('clothes').split(','); f.setClothes({ top, bottoms, under }); }
   if (q.get('expr')) f.setExpr(q.get('expr'));
-  f.bone.upperArmL.rotation.z = 0.08; f.bone.upperArmR.rotation.z = -0.08;
+  const abd = f.H ? f.H.abd : 0; f.bone.upperArmL.rotation.z = 0.08 - abd; f.bone.upperArmR.rotation.z = -(0.08 - abd);
 });
 if (q.get('lit')) { const d = new THREE.DirectionalLight(0xffffff, 3); d.position.set(1, 2, 3); st.scene.add(d); st.scene.add(new THREE.AmbientLight(0xffffff, 0.6)); }
 const cap = only ? null : Figure.make(Crew.captainSpec({ sex: q.get('csex') || 'm' })); if (cap) { cap.root.position.set(2.2, 0, 0.6); st.scene.add(cap.root); figs.push(cap); }
@@ -25,4 +26,5 @@ if (q.get('cam')) { const c = q.get('cam').split(',').map(Number); st.go(new THR
 const each = dt => { for (const f of figs) f.tick(dt); bay.tick(dt); };
 if (q.get('still')) { st.controls.enableDamping = false; for (let i = 0; i < 12; i++) st.step(50, each); window.ready = true; }
 else { st.start(each); window.ready = true; }
+});
 </script></body></html>

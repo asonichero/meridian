@@ -682,7 +682,7 @@ def landmarks(sex, torso):
     L['trouserTop'] = L['waist'] - 0.012; L['trouserFoot'] = 0.115
     L['briefTop'] = CROTCH_Y + (0.135 if sex == 'f' else 0.155); L['briefLeg'] = CROTCH_Y - (0.0 if sex == 'f' else 0.075)
     L['downTop'] = KNEE_Y + 0.085; L['briefDown'] = CROTCH_Y - 0.115
-    L['bootTop'] = 0.205; L['hipX'] = float(at(LEG, CROTCH_Y - 0.02, 'cx'))
+    L['bootTop'] = 0.205; L['hipX'] = float(at(LEG, CROTCH_Y - 0.02, 'cx')); L['shX'] = SH_X; L['abd'] = ABD
     return {k: float(v) for k, v in L.items()}
 
 def mesh_from(name, V, Fc, faces):
@@ -776,6 +776,17 @@ def garments(sex, torso, leg, arm, body, label, rig):
         print(sex, name, len(ob.data.vertices), 'verts'); out.append(ob); return ob
     TORSO_L = ['torso', 'legL', 'legR']; ARMS_L = ['armL', 'armR', 'deltL', 'deltR']; LEGS_L = ['legL', 'legR']; FEET_L = ['footL', 'footR', 'legL', 'legR']
     up_ = (0, 1.0, 0); down_ = (0, -1.0, 0)
+    # (the layers, inside out: briefs, trousers over them, a top over those; each kept a few millimetres clear of what's under it, so they never
+    # cross as they're drawn)
+    Tb = Cloth(torso, lambda y: 0.0045, slope=1.2, below=CROTCH_Y + 0.12)
+    Lb = [Cloth(leg, lambda y: 0.0045, sx) for sx in (1, -1)]
+    briefs_f = lerp_crotch(Tb, legs_(Lb))
+    Tt = Cloth(torso, lambda y: 0.01, slope=0.7, below=CROTCH_Y + 0.13)
+    leg_ease = lambda y: 0.009 + 0.011 * ss(0.33, 0.2, y)
+    Lt = [Cloth(leg, leg_ease, sx) for sx in (1, -1)]
+    over = lambda f_in, gap, top_y: (lambda P: f_in(P) + gap - 0.08 * ss(top_y - 0.004, top_y + 0.016, P[:, 1]))
+    trousers_f = (lambda base, inner: lambda P: np.maximum(base(P), inner(P)))(lerp_crotch(Tt, legs_(Lt)), over(briefs_f, 0.008, L['briefTop']))
+    under_top = over(trousers_f, 0.01, L['trouserTop'])
     tl = (-0.27, CROTCH_Y - 0.02, -0.2); th = (0.27, L['collar'] + 0.03, 0.24)
     # ── the tops: the uniform's jacket (fitted, a stand collar, long sleeves) and the off-duty shirt (easier, open at the neck, sleeves rolled);
     # each with its hem down over the hips, or raised above the waist and rolled
@@ -801,16 +812,13 @@ def garments(sex, torso, leg, arm, body, label, rig):
             # (joined smoothly over the shoulder and round the armhole; lower down, where the sleeve hangs by the hip, kept apart)
             def top(P, T=T, sleeve=sleeve):
                 k = 0.001 + 0.022 * ss(L['armpit'] - 0.07, L['armpit'] + 0.01, P[:, 1])
-                a, b = T.f(P), sleeve(P); h = np.maximum(k - np.abs(a - b), 0) / k
+                a, b = np.maximum(T.f(P), under_top(P)), sleeve(P); h = np.maximum(k - np.abs(a - b), 0) / k
                 return np.maximum(a, b) + h * h * k * 0.25
             is_sl = lambda X, T=T, sleeve=sleeve: sleeve(X) > T.f(X)
             planes = [((0, hem, 0), down_, lambda X, f=is_sl: ~f(X))] + [(c[0], c[1], is_sl) for c in cuffs] + neck_planes
             make(nm + ('Up' if up else ''), top, (-0.42, min(hem, WRIST_Y) - 0.04, -0.2), (0.42, L['collar'] + 0.03, 0.24), 11000 if not up else 9000, planes, TORSO_L + ARMS_L)
     # ── the trousers: up to the waist, the legs easing out over the boots; or lowered, bunched round the knees with the seat's cloth hanging between
-    Tt = Cloth(torso, lambda y: 0.009, slope=0.7, below=CROTCH_Y + 0.13)
-    leg_ease = lambda y: 0.008 + 0.011 * ss(0.33, 0.2, y)
-    Lt = [Cloth(leg, leg_ease, sx) for sx in (1, -1)]
-    make('Trousers', lerp_crotch(Tt, legs_(Lt)), (-0.25, 0.09, -0.19), (0.25, L['trouserTop'] + 0.03, 0.2), 8000,
+    make('Trousers', trousers_f, (-0.25, 0.09, -0.19), (0.25, L['trouserTop'] + 0.03, 0.2), 8000,
          [((0, L['trouserTop'], 0), up_), ((0, L['trouserFoot'], 0), down_)], TORSO_L)
     K = KNEE_Y
     def bunch(y):
@@ -825,13 +833,11 @@ def garments(sex, torso, leg, arm, body, label, rig):
     make('TrousersDown', lambda P: smax(legs_(Ld)(P), hang(P, K + 0.06, 0.05, 0.03, -0.03, 0.005), 0.01), (-0.25, 0.09, -0.16), (0.25, L['downTop'] + 0.03, 0.16), 6000,
          [((0, L['downTop'], 0), up_), ((0, L['trouserFoot'], 0), down_)], LEGS_L)
     # ── underwear: briefs (trunks, for the men), close-fitting; or lowered round the thighs
-    Tb = Cloth(torso, lambda y: 0.0045, slope=1.2, below=CROTCH_Y + 0.12)
-    Lb = [Cloth(leg, lambda y: 0.0045, sx) for sx in (1, -1)]
     if sex == 'f':     # (cut high at the sides: up from the crotch to the hip)
         legcut = [((sx * 0.012, L['briefLeg'] - 0.006, 0), (sx * 0.07, -0.16, 0)) for sx in (1, -1)]
     else:
         legcut = [((0, L['briefLeg'], 0), down_)]
-    make('Briefs', lerp_crotch(Tb, legs_(Lb)), (-0.24, CROTCH_Y - 0.12, -0.18), (0.24, L['briefTop'] + 0.03, 0.18), 3500,
+    make('Briefs', briefs_f, (-0.24, CROTCH_Y - 0.12, -0.18), (0.24, L['briefTop'] + 0.03, 0.18), 3500,
          [((0, L['briefTop'], 0), up_)] + legcut, TORSO_L)
     yb = L['briefDown']
     Lbd = [Cloth(leg, lambda y: 0.006 + 0.004 * gauss(y - (yb + 0.004), 0.008), sx) for sx in (1, -1)]

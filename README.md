@@ -5,9 +5,18 @@ A deep-space sci-fi psychological action-adventure and management sim, built on 
 ## Run it
 
 ```
-npm run serve        # http://localhost:8123/ opens the correction test (session.html); /figures.html is the crew line-up
-npm test             # the pain model, the scripted correction, the crew and their lines, the figures' rig
+npm run serve        # http://localhost:8123/ opens the correction test (session.html); /figures.html is the crew line-up; /model.html the bodies and clothes
+npm test             # the pain model, the scripted correction, the crew and their lines, the figures' rig (built in code and from the models)
 ```
+
+The figures' bodies and clothes are built in Blender (4.0, headless) from a reference turnaround, and saved as `models/meridian_f.glb` and `models/meridian_m.glb` (with `models/meridian_meta.json`). To rebuild them:
+
+```
+python3 tools/measure-reference.py path/to/turnaround.jpg     # → tools/blender/reference.json (already measured, kept in the repo)
+blender -b --python tools/blender/build_figures.py -- f m       # → models/meridian_{f,m}.glb, .blend, and meridian_meta.json
+```
+
+`model.html` shows them as a turnaround sheet: `?sex=f|m`, `?wear=uniform|offduty|down|under` (or a list of garments), `?key=muscle:1`, `?wire=1`, `?bones=1`, and `?overlay=<image>` to lay the reference over them.
 
 ## The correction test (`session.html`)
 
@@ -30,13 +39,19 @@ This is the first playable piece. It tests the control scheme, the models and th
 
 ## The look
 
-The style is redlessons' toon look on a smoother, more anatomical skeleton:
+The style is redlessons' toon look on bodies sculpted after a stylised reference turnaround:
+- **The bodies** (`tools/blender/build_figures.py`): the female body is measured from the reference's front and side silhouettes, row by row: the trunk, legs and arms each a surface of measured rows (the bust and seat as forms on the chest and the lower back, the thighs taking over from the hips across the crotch), the hands and feet modelled, all smoothly united and drawn by marching cubes. The male is derived from it: broader shoulders and chest, narrower hips, a flat chest, a fuller neck.
+- **The rig:** the game's own skeleton (below), placed on each body and weighted automatically. Shape keys move each body toward the extremes of build (muscle, slight, soft, firm, and the bust for her); each crew member's baseline build sets them.
+- **The clothes** are layers drawn as shells over the body: each row's outline made convex (cloth bridges the hollows) and hanging from the bust, shoulder blades and seat rather than following the body in, cut clean at the hem, collar, cuffs, waist and leg openings, and weighted from the skin under it with the body's shape keys. Each layer is kept clear of the one under it. The uniform's jacket (stand collar, long sleeves) and the off-duty shirt (open neck, sleeves rolled), each down or raised and rolled above the waist; trousers, up or lowered and bunched round the knees with the seat's cloth hanging between; briefs (trunks for the men), up or lowered round the thighs; boots.
+- The head, face and hair are still built in code (below), on the head bone. Figures fall back to the bodies built in code if the models don't load.
+
+For every figure:
 - **Skeleton:** real adult proportions, with the head a little larger for the toon lean (`HEAD_SCALE` in `js/figure.js`; 1 is realistic, redlessons used 1.34). The rig has:
   - a pelvis, two spine joints and clavicles;
   - hands with four two-jointed fingers and a two-jointed thumb, set with a grip (curl, spread, thumb);
   - a bone in each buttock for the flesh's give.
 - **Skinning:** dual-quaternion, applied to the body, the clothes, the outlines and the shadows. Elbows, knees, shoulders and hips keep their volume as they bend instead of collapsing or pinching.
-- **Surface:** the trunk, limbs and neck are one continuous surface. Each profile is interpolated on a smooth curve between its rows, so silhouettes flow rather than facet. Muscle forms are sculpted into the profiles and softened under clothing: pecs, shoulder blades and the spine's groove; deltoid, biceps, triceps and forearm; quads, the inner quad above the knee, the kneecap, the calves and the ankle bones.
+- **Surface** (the figures built in code): the trunk, limbs and neck are one continuous surface. Each profile is interpolated on a smooth curve between its rows, so silhouettes flow rather than facet. Muscle forms are sculpted into the profiles and softened under clothing: pecs, shoulder blades and the spine's groove; deltoid, biceps, triceps and forearm; quads, the inner quad above the knee, the kneecap, the calves and the ankle bones.
 - **Shading:** soft three-band toon shading, ink outlines (an inverted hull) and a faint rim light. Characters cast shadows but don't receive them, which keeps the shading clean, as in redlessons. Garment details (the closure edge, belt and buckle, collar, hem, the shoulder flash and cuff bands, knee panels, seams and buttons) are drawn per pixel from rest-pose coordinates, so they stay crisp at any distance.
 - **Faces:** redlessons' head shape and painted face layer (eyes, lids, brows, mouth, blush, tears), redrawn as expressions ease.
 - **Lighting:** the room is moody, with cool steel, amber pockets and bloom on the lights.
@@ -58,7 +73,10 @@ The style is redlessons' toon look on a smoother, more anatomical skeleton:
 
 | File | What it is |
 |---|---|
-| `js/figure.js` | The figures: skeleton (with fingers and cheek bones), dual-quaternion skinned body with smoothed, muscled profiles, toon materials and outlines, per-pixel garment details, painted face and expressions, hair, boots, garments (each with lowered variants), grip, the flesh's spring, marks, IK helpers |
+| `js/figure.js` | The figures: from the Blender-built models (`Figure.preload()`; the skeleton from their joints, the body's regions and the build's shape keys, each garment shown or hidden as worn), or built in code; skeleton (with fingers and cheek bones), dual-quaternion skinning, toon materials and outlines, per-pixel garment details, painted face and expressions, hair, grip, the flesh's spring, marks, IK helpers |
+| `models/` | The Blender-built bodies and clothes (`meridian_f.glb`, `meridian_m.glb`), and their joints and landmarks (`meridian_meta.json`) |
+| `tools/measure-reference.py`, `tools/blender/build_figures.py` | Measuring the reference turnaround; building the bodies, rig, shape keys and clothes in Blender |
+| `model.html` | The models as a turnaround sheet, with the reference overlaid |
 | `js/session.js` | The correction: positions, the Captain's strike (arm IK onto the skin), runs, soothing, reactions, the safe word, turns, witnesses, corner, cameras, aftercare posing |
 | `js/lines.js` | Each crew member's scripted responses and the aftercare conversation |
 | `js/crew.js` | The roster (GDD roles, plus drafted names, body types, looks, safe words and pain stats) |
@@ -66,4 +84,4 @@ The style is redlessons' toon look on a smoother, more anatomical skeleton:
 | `js/stage.js` | Renderer: HDR buffer, bloom, grading (filmic curve, split tone, vignette, grain) |
 | `js/suitbay.js` | The Airlock Anteroom and Suit Bay |
 | `session.html`, `figures.html` | The correction test; the crew line-up |
-| `vendor/` | three.js r128, OrbitControls, r128's post-processing passes |
+| `vendor/` | three.js r128, OrbitControls, r128's post-processing passes, GLTFLoader and SkeletonUtils |
