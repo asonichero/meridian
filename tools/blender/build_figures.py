@@ -602,7 +602,7 @@ def front_z(Sf, y, x=0.0):
         else: hi = m
     return lo
 # her outer forms: either side of the middle at the front of the crotch, hanging a little below it between the thighs (centre, radii)
-LAB_C, LAB_R = np.array([0.0078, -0.004, 0.028]), np.array([0.0125, 0.019, 0.021])
+LAB_C, LAB_R = np.array([0.0078, 0.001, 0.028]), np.array([0.0125, 0.024, 0.021])
 def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     """Hers: the two outer forms at the bottom of the mons, rounded, hanging a little below the crotch between the thighs (meeting them at a
     crease), the slit between them where they meet. His: the scrotum and penis, hanging, their roots well up
