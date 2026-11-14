@@ -605,21 +605,16 @@ def front_z(Sf, y, x=0.0):
 LAB_C, LAB_R = np.array([0.0068, -0.003, 0.015]), np.array([0.0122, 0.018, 0.02])
 def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     """Hers: the two outer forms at the bottom of the mons, rounded, hanging a little below the crotch between the thighs (meeting them at a
-    crease), a narrow slit between them and a small inner form recessed at its top. His: the scrotum and penis, hanging, their roots well up
+    crease), the slit between them where they meet. His: the scrotum and penis, hanging, their roots well up
     in the body so they join it without a crease; k: (girth, length, scrotum) for the shape keys toward smaller or larger. Returns the forms
     to join to the body, a field to cut from it, and how softly they're joined. Simple, soft forms, as the rest is."""
     if sex == 'f':
-        C = LAB_C + np.array([0.0, CROTCH_Y, 0.0]); R_ = LAB_R; Ci = np.array([0.0, CROTCH_Y + 0.0015, 0.02]); Ri = np.array([0.0026, 0.009, 0.009])
+        C = LAB_C + np.array([0.0, CROTCH_Y, 0.0]); R_ = LAB_R
         def parts(P):
+            # (each its own rounded form, the two meeting in the middle in a narrow V: the slit between them is where they meet)
             fl = [(1 - np.linalg.norm((P - C * np.array([sx, 1, 1])) / R_, axis=1)) * R_.min() for sx in (1, -1)]
-            inner = (1 - np.linalg.norm((P - Ci) / Ri, axis=1)) * Ri.min()
-            return np.maximum(np.maximum(fl[0], fl[1]), inner - 0.0006)
-        def cut(P):
-            x, y, z = P[:, 0], P[:, 1], P[:, 2]
-            w = ss(CROTCH_Y + 0.016, CROTCH_Y + 0.006, y) * ss(-0.012, 0.0, z)
-            inner = (1 - np.linalg.norm((P - Ci) / Ri, axis=1)) * Ri.min()
-            return 0.0042 * np.exp(-0.5 * (x / 0.0017) ** 2) * w * (1 - ss(-0.002, 0.001, inner))     # (the slit, down to the inner form)
-        return parts, cut, 0.007
+            return np.maximum(fl[0], fl[1])
+        return parts, None, 0.007
 
     kg, kl, ks = k
     zp = front_z(T, CROTCH_Y + 0.025)
@@ -645,13 +640,16 @@ def body_field(torso, leg, arm, sex, sexk=(1.0, 1.0, 1.0)):
     for sx, s_ in ((1, 'L'), (-1, 'R')):
         C = arm_at(sx, 0.008) + np.array([sx * 0.004, 0, 0.0])
         comps['delt' + s_] = lambda P, C=C, dr=dr: dr - np.linalg.norm(P - C, axis=1)
+    # (hers: the inner thighs eased back a little at their tops, so a small gap opens below her forms rather than the thighs closing over them)
+    gap = (lambda P: 0.008 * np.exp(-(P[:, 0] / 0.02) ** 2) * ss(CROTCH_Y - 0.11, CROTCH_Y - 0.05, P[:, 1]) * ss(CROTCH_Y + 0.015, CROTCH_Y - 0.005, P[:, 1])
+           * ss(-0.075, -0.035, P[:, 2])) if sex == 'f' else (lambda P: 0.0)
     def trunk(P, ct=None, legs=None):
-        if ct is None: ct = comps['torso'](P); legs = np.maximum(comps['legL'](P), comps['legR'](P))
+        if ct is None: ct = comps['torso'](P); legs = np.maximum(comps['legL'](P), comps['legR'](P)) - gap(P)
         s = ss(CROTCH_Y - 0.012, CROTCH_Y + 0.04, P[:, 1])
         return s * ct + (1 - s) * legs
     def F(P):
         c = {k: fn(P) for k, fn in comps.items()}
-        legs = np.maximum(c['legL'], c['legR'])
+        legs = np.maximum(c['legL'], c['legR']) - gap(P)
         # the trunk hands over to the thighs across the crotch: above it the trunk alone (the hips one form), below it the two thighs, and
         # between, the one form drawn in to the two (the crotch, front and back, rounding as it closes)
         f = trunk(P, c['torso'], legs)
