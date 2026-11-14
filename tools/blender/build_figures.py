@@ -602,7 +602,7 @@ def front_z(Sf, y, x=0.0):
         else: hi = m
     return lo
 # her outer forms: either side of the middle at the front of the crotch, hanging a little below it between the thighs (centre, radii)
-LAB_C, LAB_R = np.array([0.0068, -0.003, 0.015]), np.array([0.0122, 0.018, 0.02])
+LAB_C, LAB_R = np.array([0.0068, -0.004, 0.028]), np.array([0.0125, 0.019, 0.021])
 def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     """Hers: the two outer forms at the bottom of the mons, rounded, hanging a little below the crotch between the thighs (meeting them at a
     crease), the slit between them where they meet. His: the scrotum and penis, hanging, their roots well up
@@ -613,7 +613,7 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
         def parts(P):
             # (each its own rounded form, the two meeting in the middle in a narrow V: the slit between them is where they meet)
             fl = [(1 - np.linalg.norm((P - C * np.array([sx, 1, 1])) / R_, axis=1)) * R_.min() for sx in (1, -1)]
-            return np.maximum(fl[0], fl[1])
+            return smax(fl[0], fl[1], 0.003)
         return parts, None, 0.007
 
     kg, kl, ks = k
@@ -716,6 +716,7 @@ def build(sex):
     body.select_set(False)
     X, ed = mesh_arrays(body); Nrm = normals(body)
     _, comp = F(X); names = list(comp); label = np.array(names)[np.argmax(np.stack([comp[k] for k in names]), 0)]
+    if sex == 'f' and 'sex' in comp: label[comp['sex'] > -0.002] = 'sex'      # (her forms lie within the trunk's own field below the crotch: by nearness)
     print(sex, 'verts', len(X), {k: int((label == k).sum()) for k in names})
     # shape keys: each point of the trunk and limbs moved along its normal to where the variant's field crosses zero
     def along(Fn, P, n):
@@ -953,7 +954,7 @@ def garments(sex, torso, leg, arm, body, label, rig):
         pouch = lambda P: (1 - np.linalg.norm((P - PC) / PR, axis=1)) * PR.min()
         briefs_f = (lambda b: lambda P: smax(b(P), pouch(P), 0.03))(briefs_f)
     else:      # (hers: the gusset carried down round her forms, smooth over them)
-        GC = np.array([0.0, CROTCH_Y - 0.004, LAB_C[2]]); GR = np.array([0.026, 0.0215, 0.026])
+        GC = np.array([0.0, CROTCH_Y - 0.004, LAB_C[2]]); GR = np.array([0.026, 0.024, 0.026])
         gus = lambda P: (1 - np.linalg.norm((P - GC) / GR, axis=1)) * GR.min()
         briefs_f = (lambda b: lambda P: smax(b(P), gus(P), 0.014))(briefs_f)
     def pouch_keys(ob, base_f, gap):
