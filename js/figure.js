@@ -133,8 +133,9 @@ varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
-if (uCleft.z > 0.5) { float cl = (1.0 - smoothstep(0.0005, 0.0014, abs(vBind.x))) * smoothstep(uCleft.y, uCleft.y + 0.008, vBind.y) * (1.0 - smoothstep(uCleft.x - 0.01, uCleft.x, vBind.y)) * step(uCleft.w, vBind.z);
-  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62, 0.48, 0.45), cl * 0.85); }
+if (uCleft.z > 0.5) { float win = smoothstep(uCleft.y, uCleft.y + 0.008, vBind.y) * (1.0 - smoothstep(uCleft.x - 0.01, uCleft.x, vBind.y)) * step(uCleft.w, vBind.z), ax = abs(vBind.x);
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.9, 0.84, 0.82), (1.0 - smoothstep(0.007, 0.012, ax)) * win);      // (the forms either side a shade darker)
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62, 0.48, 0.45), (1.0 - smoothstep(0.0005, 0.0014, ax)) * win * 0.85); }
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
 diffuseColor.rgb *= 1.0 + uGrain * (g - 0.5) * 2.0;
 ${o.pattern ? PATTERNS[o.pattern] : ''}
@@ -235,21 +236,72 @@ const INK = '#2a1a16';
 const HULL_OFS = { polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 6 };
 const INKM = { plain: new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide }), skinned: dqs(new THREE.MeshBasicMaterial(Object.assign({ color: srgb(INK), side: THREE.BackSide, skinning: true }, HULL_OFS))),
   morph: dqs(new THREE.MeshBasicMaterial(Object.assign({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }, HULL_OFS))) };
-function hullGeo(geo, w) {
-  const g = geo.clone(), p = g.attributes.position, n = g.attributes.normal;
-  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * w, p.getY(i) + n.getY(i) * w, p.getZ(i) + n.getZ(i) * w);
+// (each point pushed out by its own share of w where the model gives one, `_ink`: less across a crease, so the two sides' outlines never reach
+// through each other; and for a garment, a slim round edge of ink along each open hem: its waist, its legs, cuffs and collar)
+function hullGeo(geo, w, hem) {
+  const g = geo.clone(), p = g.attributes.position, n = g.attributes.normal, k = g.attributes._ink;
+  for (let i = 0; i < p.count; i++) { const wi = w * (k ? k.getX(i) : 1); p.setXYZ(i, p.getX(i) + n.getX(i) * wi, p.getY(i) + n.getY(i) * wi, p.getZ(i) + n.getZ(i) * wi); }
+  return hem ? withHems(g, geo, hem) : g;
+}
+// A garment's open edges (welded by position, so a split vertex isn't taken for one), each with its direction round the surface: [a, b] pairs
+// of the first vertex at each place.
+function openEdges(geo) {
+  const p = geo.attributes.position, n = p.count, id = new Int32Array(n), at = new Map();
+  for (let i = 0; i < n; i++) { const key = Math.round(p.getX(i) * 2e4) + ',' + Math.round(p.getY(i) * 2e4) + ',' + Math.round(p.getZ(i) * 2e4); if (!at.has(key)) at.set(key, i); id[i] = at.get(key); }
+  const ix = geo.index ? geo.index.array : null, nt = (ix ? ix.length : n) / 3, E = new Map();
+  for (let t = 0; t < nt; t++) for (let e = 0; e < 3; e++) {
+    const a = id[ix ? ix[t * 3 + e] : t * 3 + e], b = id[ix ? ix[t * 3 + (e + 1) % 3] : t * 3 + (e + 1) % 3], key = a < b ? a + '_' + b : b + '_' + a, o = E.get(key);
+    if (o) o[2]++; else E.set(key, [a, b, 1]);
+  }
+  return [...E.values()].filter(e => e[2] === 1).map(e => [e[0], e[1]]);
+}
+const HEM_K = 6;
+function withHems(g, src, r) {
+  const E = openEdges(src); if (!E.length) return g;
+  const P = src.attributes.position, N = src.attributes.normal, nx = new Map(), pv = new Map();
+  for (const [a, b] of E) { if (!nx.has(a)) nx.set(a, b); if (!pv.has(b)) pv.set(b, a); }
+  const vs = [...new Set(E.flat())], ring = new Map(), pos = [], from = [];
+  const v3 = i => new THREE.Vector3(P.getX(i), P.getY(i), P.getZ(i)), t = new THREE.Vector3(), b = new THREE.Vector3(), nn = new THREE.Vector3(), q = new THREE.Vector3();
+  for (const v of vs) {
+    const o = v3(v), a = pv.has(v) ? v3(pv.get(v)) : o, c = nx.has(v) ? v3(nx.get(v)) : o;
+    t.subVectors(c, a).normalize(); nn.set(N.getX(v), N.getY(v), N.getZ(v));
+    b.crossVectors(t, nn).normalize(); nn.crossVectors(b, t).normalize();
+    ring.set(v, pos.length);
+    for (let j = 0; j < HEM_K; j++) {
+      const th = j / HEM_K * Math.PI * 2;
+      q.copy(o).addScaledVector(nn, r * (0.3 + Math.cos(th))).addScaledVector(b, r * Math.sin(th)); pos.push(q.clone()); from.push(v);
+    }
+  }
+  const n0 = g.attributes.position.count, m = pos.length;
+  const grow = (A, set) => {
+    const s = A.itemSize, get = [A.getX, A.getY, A.getZ, A.getW].slice(0, s), out = new A.array.constructor((n0 + m) * s);
+    for (let i = 0; i < n0; i++) for (let c = 0; c < s; c++) out[i * s + c] = get[c].call(A, i);
+    for (let j = 0; j < m; j++) for (let c = 0; c < s; c++) out[(n0 + j) * s + c] = set ? set(j, c) : get[c].call(A, from[j]);
+    return new THREE.BufferAttribute(out, s, A.normalized);
+  };
+  for (const name in g.attributes) g.setAttribute(name, grow(g.attributes[name], name === 'position' ? (j, c) => pos[j].getComponent(c) : null));
+  for (const name in g.morphAttributes) g.morphAttributes[name] = g.morphAttributes[name].map(A => grow(A));
+  const old = g.index ? Array.from(g.index.array) : Array.from({ length: n0 }, (_, i) => i), tri = [];
+  for (const [a, c] of E) {
+    const ra = n0 + ring.get(a), rc = n0 + ring.get(c);
+    for (let j = 0; j < HEM_K; j++) {
+      const j1 = (j + 1) % HEM_K;
+      tri.push(ra + j, ra + j1, rc + j1, ra + j, rc + j1, rc + j, ra + j, rc + j1, ra + j1, ra + j, rc + j, rc + j1);     // (both ways round)
+    }
+  }
+  g.setIndex(old.concat(tri));
   return g;
 }
 // An outline round a mesh: for a plain one, a child; for a skinned one, a second skinned mesh on the same skeleton (mat: its own, e.g. sharing hidden regions).
 // (an outline's hull is kept with the geometry it's made from, so figures sharing a body share its hull too)
-function ink(mesh, w, F, m) {
+function ink(mesh, w, F, m, hem) {
   if (mesh.isSkinnedMesh) {
-    const g = mesh.geometry, hg = g.userData.shared ? (g.userData.hull = g.userData.hull || hullGeo(g, w)) : hullGeo(g, w);
+    const g = mesh.geometry, hg = g.userData.shared ? (g.userData.hull = g.userData.hull || hullGeo(g, w, hem)) : hullGeo(g, w, hem);
     const h = skinned(F, hg, m || (morphed(g) ? INKM.morph : INKM.skinned)); h.castShadow = false; mesh.userData.hull = h; return h;
   }
   const h = new THREE.Mesh(hullGeo(mesh.geometry, w), INKM.plain); mesh.add(h); return h;
 }
-const INK_W = 0.0045;
+const INK_W = 0.0045, HEM_R = 0.0019;
 
 // ── Bones ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // Built for a figure 1.75 m tall; a figure of another height is scaled whole (f.root.scale). Women's shoulders narrower and hip joints a touch wider.
@@ -1054,7 +1106,8 @@ function prepare(sx, gltf, M) {
     g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
     g.setAttribute('bind', g.attributes.position.clone());
     const name = o.name.replace(/_\d+$/, ''), p = g.attributes.position, reg = new Float32Array(n);
-    if (name === 'Body') for (let i = 0; i < n; i++) reg[i] = bodyRegion([p.getX(i), p.getY(i), p.getZ(i)], dom[i], L, sx);
+    const part = g.attributes._part;      // (his sex, all of it, is under the briefs, however far it hangs)
+    if (name === 'Body') for (let i = 0; i < n; i++) reg[i] = part && part.getX(i) > 0.5 ? R.SEAT : bodyRegion([p.getX(i), p.getY(i), p.getZ(i)], dom[i], L, sx);
     else if (/^(Tunic|Shirt)/.test(name)) for (let i = 0; i < n; i++) reg[i] = ARM_BONES.test(dom[i]) ? 1 : 0;
     g.setAttribute('region', new THREE.Float32BufferAttribute(reg, 1));
     g.userData.shared = true;
@@ -1071,8 +1124,9 @@ function bodyRegion(P, dom, L, sex) {
     return a > L.cuffA - 0.015 ? R.HAND : a > L.rollA - 0.015 ? R.FOREARM : R.UPARM;
   }
   if (/^(foot|toe)/.test(dom) || y < L.bootTop - 0.012) return R.FOOT;
-  // (the neck above the open shirt's neckline, lower in front, shows with any top)
-  if (Math.cos(0.42) * (y - L.neckline) + Math.sin(0.42) * z > -0.006) return R.HEAD;
+  // (the neck above the open shirt's neckline, lower in front, shows with any top; behind, well down inside the collar, which the neck rises
+  // out of as the head goes forward)
+  if (Math.cos(0.42) * (y - L.neckline) + Math.sin(0.42) * z > -0.006 - 0.032 * clamp(-z / 0.04, 0, 1)) return R.HEAD;
   if (y >= L.hemUp + 0.06) return R.CHEST;
   if (y >= L.hemUp + 0.04) return R.WAIST_HI;      // (well up under the raised hem, which rides up as they bend)
   if (y >= L.trouserTop - 0.01) return R.WAIST;
@@ -1154,7 +1208,7 @@ function garmentGLB(F, name) {
   } else m = tmat(spec.outfit === 'offduty' ? '#4a3424' : '#1e2024', { skin: true, morph: true, rim: '#3a4048', rimK: 0.4 });
   const depth = /^Briefs/.test(name) ? 2 : /^Trousers/.test(name) ? 1 : 0;
   if (depth) { m.polygonOffset = true; m.polygonOffsetFactor = depth; m.polygonOffsetUnits = 2 * depth; }
-  const sm = skinned(F, geo, m); sm.castShadow = true; sm.receiveShadow = false; ink(sm, INK_W, F);
+  const sm = skinned(F, geo, m); sm.castShadow = true; sm.receiveShadow = false; ink(sm, INK_W, F, null, HEM_R);
   F.gm[name] = sm; return sm;
 }
 function dressGLB(F) {

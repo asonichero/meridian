@@ -611,8 +611,8 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
             front = ss(-0.03, 0.0, z)
             gw = ss(CROTCH_Y - 0.03, CROTCH_Y - 0.008, y) * ss(CROTCH_Y + 0.048, CROTCH_Y + 0.026, y)
             bw = ss(CROTCH_Y - 0.034, CROTCH_Y - 0.01, y) * ss(CROTCH_Y + 0.05, CROTCH_Y + 0.022, y)
-            groove = 0.005 * np.exp(-0.5 * (x / 0.0038) ** 2) * gw
-            forms = 0.0032 * np.exp(-0.5 * ((np.abs(x) - 0.0105) / 0.0058) ** 2) * bw
+            groove = 0.0045 * np.exp(-0.5 * (x / 0.003) ** 2) * gw
+            forms = 0.0027 * np.exp(-0.5 * ((np.abs(x) - 0.0072) / 0.0034) ** 2) * bw
             return (groove - forms) * front
         return None, cut
     kg, kl, ks = k
@@ -628,6 +628,8 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
 def body_field(torso, leg, arm, sex, sexk=(1.0, 1.0, 1.0)):
     """The body's parts as fields, and how they're joined: the trunk, the legs and arms (the measured surfaces), the hands and feet, the sex."""
     hk = HAND_K[sex]
+    _ty = np.array([r['y'] for r in sorted(torso, key=lambda r: r['y'])]); _tc = np.array([r['cz'] for r in sorted(torso, key=lambda r: r['y'])])
+    at_cz = lambda y: np.interp(y, _ty, _tc)
     S_ = {'torso': Surface(torso), 'legL': Surface(leg, 1), 'legR': Surface(leg, -1), 'armL': Surface(arm, 1, arm_axis(1)), 'armR': Surface(arm, -1, arm_axis(1))}
     H = {'handL': hand_parts(1, hk), 'handR': hand_parts(-1, hk)}; Ft = {'footL': foot_part(1, leg), 'footR': foot_part(-1, leg)}
     comps = {k: v.f for k, v in S_.items()}; comps.update({k: v[0] for k, v in H.items()}); comps.update({k: v[0] for k, v in Ft.items()})
@@ -637,13 +639,25 @@ def body_field(torso, leg, arm, sex, sexk=(1.0, 1.0, 1.0)):
     for sx, s_ in ((1, 'L'), (-1, 'R')):
         C = arm_at(sx, 0.008) + np.array([sx * 0.004, 0, 0.0])
         comps['delt' + s_] = lambda P, C=C, dr=dr: dr - np.linalg.norm(P - C, axis=1)
+    def trunk(P, ct=None, legs=None):
+        if ct is None: ct = comps['torso'](P); legs = np.maximum(comps['legL'](P), comps['legR'](P))
+        s = ss(CROTCH_Y - 0.012, CROTCH_Y + 0.04, P[:, 1])
+        return s * ct + (1 - s) * legs
     def F(P):
         c = {k: fn(P) for k, fn in comps.items()}
         legs = np.maximum(c['legL'], c['legR'])
         # the trunk hands over to the thighs across the crotch: above it the trunk alone (the hips one form), below it the two thighs, and
         # between, the one form drawn in to the two (the crotch, front and back, rounding as it closes)
-        s = ss(CROTCH_Y - 0.012, CROTCH_Y + 0.04, P[:, 1])
-        f = s * c['torso'] + (1 - s) * legs
+        f = trunk(P, c['torso'], legs)
+        # (behind, where the seat's underside meets the thighs, the two forms' blend evened out up and down: a gaussian over heights, so the
+        # seat rounds under into the fold without a dent where one hands over to the other)
+        m = ss(CROTCH_Y - 0.035, CROTCH_Y - 0.012, P[:, 1]) * ss(CROTCH_Y + 0.085, CROTCH_Y + 0.055, P[:, 1]) * ss(-0.004, -0.024, P[:, 2] - at_cz(P[:, 1])) * ss(0.2, 0.16, np.abs(P[:, 0]))
+        i = np.where(m > 1e-3)[0]
+        if len(i):
+            Q = P[i]; acc = np.zeros(len(i)); ws = 0.0
+            for dy in (-0.03, -0.015, 0.0, 0.015, 0.03):
+                w = math.exp(-0.5 * (dy / 0.016) ** 2); ws += w; acc += w * trunk(Q + np.array([0.0, dy, 0.0]))
+            f[i] = f[i] + m[i] * (acc / ws - f[i])
         # each arm: the measured arm, the hand, and over the top of the joint the deltoid's cap, a round form the trunk's slope runs onto
         for sx, s_ in ((1, 'L'), (-1, 'R')):
             a = smax(smax(c['arm' + s_], c['hand' + s_], 0.008), c['delt' + s_], 0.02)
@@ -726,13 +740,46 @@ def build(sex):
             acc[:] = 0; cnt[:] = 0; np.add.at(acc, ed[:, 0], dt[ed[:, 1]]); np.add.at(acc, ed[:, 1], dt[ed[:, 0]]); np.add.at(cnt, ed.ravel(), 1)
             dt = 0.5 * dt + 0.5 * np.where(cnt > 0, acc / np.maximum(cnt, 1), dt)
         Yv = X + dt[:, None] * Nrm
+        # (a fuller seat or thighs close the cleft between them, but never quite shut it: each side kept a few millimetres off the middle, so
+        # the two never pass through each other)
+        lim = np.minimum(np.abs(X[:, 0]), 0.003); sg = np.where(X[:, 0] >= 0, 1.0, -1.0)
+        near = (np.abs(X[:, 0]) < 0.06) & (X[:, 1] > CROTCH_Y - 0.32) & (X[:, 1] < CROTCH_Y + 0.22) & (label != 'sex')
+        bad = near & ((Yv[:, 0] * sg) < lim)
+        Yv[bad, 0] = sg[bad] * lim[bad]
         k = body.shape_key_add(name=v, from_mix=False); k.data.foreach_set('co', np.stack([Yv[:, 0], -Yv[:, 2], Yv[:, 1]], 1).ravel())
+    ink_weights(body)
+    a = body.data.attributes.new('_PART', 'FLOAT', 'POINT'); a.data.foreach_set('value', (label == 'sex').astype(np.float32))
     J = joints(sex, torso, leg, arm, None)
     rig = armature('Rig', J)
     bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); rig.select_set(True); bpy.context.view_layer.objects.active = rig
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
     print(sex, 'groups', len(body.vertex_groups))
     return body, rig, J, (torso, leg, arm, label)
+
+
+def ink_weights(ob, reach=0.016):
+    """How far each point's outline may stand out: where the skin faces more of itself close across a crease (the cleft, between the thighs,
+    under the bust), less, so that two sides' outlines don't reach through each other. Taken from the narrowest the gap gets, as built and
+    with each shape key (and the fuller ones together)."""
+    import bmesh
+    from mathutils.bvhtree import BVHTree
+    kb = ob.data.shape_keys.key_blocks; n = len(ob.data.vertices)
+    get = lambda k: (lambda a: (k.data.foreach_get('co', a), a.reshape(-1, 3))[1])(np.zeros(n * 3))
+    base = get(kb[0]); D = {k.name: get(k) - base for k in kb[1:]}
+    full = [k for k in ('muscle', 'soft', 'bust', 'sexLarge') if k in D]
+    configs = [base] + [base + d for d in D.values()] + [base + sum(D[k] for k in full)]
+    gap = np.full(n, 1.0)
+    for co in configs:
+        bm = bmesh.new(); bm.from_mesh(ob.data)
+        for v, c in zip(bm.verts, co): v.co = Vector(c)
+        bm.normal_update(); bvh = BVHTree.FromBMesh(bm)
+        for v in bm.verts:
+            hit = bvh.ray_cast(v.co + v.normal * 1e-4, v.normal, reach)
+            if hit[0] is not None: gap[v.index] = min(gap[v.index], hit[3])
+        bm.free()
+    ink = np.clip((gap - 0.001) / reach, 0.1, 1.0).astype(np.float32)
+    a = ob.data.attributes.new('_INK', 'FLOAT', 'POINT'); a.data.foreach_set('value', ink)
+    print('ink: thinned at', int((ink < 0.99).sum()), 'of', n, 'points')
 
 
 # ── Clothes ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -893,8 +940,25 @@ def garments(sex, torso, leg, arm, body, label, rig):
     Tb = Cloth(torso, lambda y: 0.0045, slope=1.2, below=CROTCH_Y + 0.12)
     Lb = [Cloth(leg, lambda y: 0.0045, sx) for sx in (1, -1)]
     briefs_f = lerp_crotch(Tb, legs_(Lb))
-    his = sex_parts(sex, Surface(torso), (1.35, 1.45, 1.15))[0]
-    if his: briefs_f = (lambda b: lambda P: np.maximum(b(P), his(P) + 0.006))(briefs_f)
+    # (his held in a pouch, close against him: a rounded form in front of the crotch, not the shape of what's in it; its size follows his by
+    # the garments' own shape keys)
+    pouch = None
+    if sex == 'm':
+        zp = front_z(Surface(torso), CROTCH_Y + 0.025); PC = np.array([0.0, CROTCH_Y + 0.004, zp - 0.014]); PR = np.array([0.04, 0.05, 0.029])
+        pouch = lambda P: (1 - np.linalg.norm((P - PC) / PR, axis=1)) * PR.min()
+        briefs_f = (lambda b: lambda P: smax(b(P), pouch(P), 0.018))(briefs_f)
+    def pouch_keys(ob, base_f, gap):
+        """The pouch's size with his: the garment's sexLarge and sexSmall keys, where the pouch is, moved out from its middle (or in)."""
+        if pouch is None or not ob.data.shape_keys: return
+        kbs = ob.data.shape_keys.key_blocks; n = len(ob.data.vertices)
+        b = np.zeros(n * 3); kbs['Basis'].data.foreach_get('co', b); Xb = b.reshape(-1, 3); X = np.stack([Xb[:, 0], Xb[:, 2], -Xb[:, 1]], 1)
+        wp = ss(-0.003, 0.004, pouch(X) + gap - base_f(X)) * ss(PC[2] - 0.035, PC[2] - 0.01, X[:, 2])
+        d = (X - PC) / PR; d /= np.linalg.norm(d, axis=1, keepdims=True) + 1e-9
+        for k, amt in (('sexLarge', 0.01), ('sexSmall', -0.006)):
+            if k not in kbs: continue
+            c = np.zeros(n * 3); kbs[k].data.foreach_get('co', c); c = c.reshape(-1, 3)
+            mv = d * amt * wp[:, None]; c = c * (1 - wp[:, None]) + (Xb + np.stack([mv[:, 0], -mv[:, 2], mv[:, 1]], 1)) * wp[:, None]
+            kbs[k].data.foreach_set('co', c.ravel())
     Tt = Cloth(torso, lambda y: 0.01, slope=0.7, below=CROTCH_Y + 0.13)
     leg_ease = lambda y: 0.009 + 0.011 * ss(0.33, 0.2, y)
     Lt = [Cloth(leg, leg_ease, sx) for sx in (1, -1)]
@@ -932,31 +996,42 @@ def garments(sex, torso, leg, arm, body, label, rig):
             planes = [((0, hem, 0), down_, lambda X, f=is_sl: ~f(X))] + [(c[0], c[1], is_sl) for c in cuffs] + neck_planes
             make(nm + ('Up' if up else ''), top, (-0.42, min(hem, WRIST_Y) - 0.04, -0.2), (0.42, L['collar'] + 0.03, 0.24), 11000 if not up else 9000, planes, TORSO_L, split=(is_sl, ARMS_L + ['torso']))
     # ── the trousers: up to the waist, the legs easing out over the boots; or lowered, bunched round the knees with the seat's cloth hanging between
-    make('Trousers', trousers_f, (-0.25, 0.09, -0.19), (0.25, L['trouserTop'] + 0.03, 0.2), 8000,
-         [((0, L['trouserTop'], 0), up_), ((0, L['trouserFoot'], 0), down_)], TORSO_L)
+    tr = make('Trousers', trousers_f, (-0.25, 0.09, -0.19), (0.25, L['trouserTop'] + 0.03, 0.2), 8000,
+              [((0, L['trouserTop'], 0), up_), ((0, L['trouserFoot'], 0), down_)], TORSO_L)
+    pouch_keys(tr, lerp_crotch(Tt, legs_(Lt)), 0.014)
     K = KNEE_Y
     def bunch(y):
         b = ss(K + 0.09, K + 0.03, y) * ss(K - 0.13, K - 0.03, y)
         return 0.008 + b * (0.024 + 0.006 * math.sin(y * 150)) + 0.011 * ss(0.33, 0.2, y) + 0.012 * gauss(y - (L['downTop'] - 0.008), 0.008)
     Ld = [Cloth(leg, bunch, sx) for sx in (1, -1)]
-    hx = L['hipX']
-    def hang(P, y0, drop, half, zc, th_):
-        x, y, z = P[:, 0], P[:, 1], P[:, 2]; mid = np.cos(np.clip(x / (hx - 0.01), -1, 1) * np.pi / 2)
-        yc = y0 - drop * mid; zz = zc - 0.02 * mid
-        return np.minimum(np.minimum(th_ - np.abs(z - zz), (hx - 0.015) - np.abs(x)), half - np.abs(y - yc))
-    make('TrousersDown', lambda P: smax(legs_(Ld)(P), hang(P, K + 0.06, 0.05, 0.03, -0.03, 0.005), 0.01), (-0.25, 0.09, -0.16), (0.25, L['downTop'] + 0.03, 0.16), 6000,
+    def sling(y0, b0, drop, ease, th_):
+        """What's lowered, between the legs: the garment's seat, crotch and front still one piece, slung between the two legs from the
+        waistband stretched across them, front and back, down to the gusset sagging between (a trough: two walls the legs' depth apart, a
+        rounded bottom, deepest midway between the legs)."""
+        xc = at(leg, y0, 'cx'); zc = at(leg, y0, 'cz'); a = (at(leg, y0, 'zF') + at(leg, y0, 'zB')) / 2 + ease
+        def f(P):
+            x, y, z = P[:, 0], P[:, 1], P[:, 2]
+            b = b0 + drop * np.cos(np.clip(x / xc, -1, 1) * np.pi / 2)
+            u = (z - zc) / a; v = np.minimum(y - y0, 0) / b; e = np.sqrt(u * u + v * v)
+            g = np.sqrt((u / a) ** 2 + (v / b) ** 2) / np.maximum(e, 1e-6)
+            return np.minimum(th_ - np.abs((e - 1) / np.maximum(g, 1e-6)), xc - np.abs(x))
+        return f
+    sl_t = sling(L['downTop'] - 0.014, 0.02, 0.05, 0.016, 0.0045)
+    make('TrousersDown', lambda P: smax(legs_(Ld)(P), sl_t(P), 0.01), (-0.25, 0.09, -0.16), (0.25, L['downTop'] + 0.03, 0.16), 6000,
          [((0, L['downTop'], 0), up_), ((0, L['trouserFoot'], 0), down_)], LEGS_L)
     # ── underwear: briefs (trunks, for the men), close-fitting; or lowered round the thighs
     if sex == 'f':     # (cut high at the sides: up from the crotch to the hip)
         legcut = [((sx * 0.012, L['briefLeg'] - 0.006, 0), (sx * 0.07, -0.16, 0)) for sx in (1, -1)]
     else:
         legcut = [((0, L['briefLeg'], 0), down_)]
-    make('Briefs', briefs_f, (-0.24, CROTCH_Y - 0.12, -0.18), (0.24, L['briefTop'] + 0.03, 0.18), 3500,
-         [((0, L['briefTop'], 0), up_)] + legcut, TORSO_L)
+    br = make('Briefs', briefs_f, (-0.24, CROTCH_Y - 0.12, -0.18), (0.24, L['briefTop'] + 0.03, 0.18), 3500,
+              [((0, L['briefTop'], 0), up_)] + legcut, TORSO_L)
+    pouch_keys(br, lerp_crotch(Tb, legs_(Lb)), 0.0)
     yb = L['briefDown']
     Lbd = [Cloth(leg, lambda y: 0.006 + 0.004 * gauss(y - (yb + 0.004), 0.008), sx) for sx in (1, -1)]
-    make('BriefsDown', lambda P: smax(legs_(Lbd)(P), hang(P, yb - 0.005, 0.03, 0.02, -0.035, 0.004), 0.008), (-0.24, yb - 0.1, -0.16), (0.24, yb + 0.03, 0.16), 2500,
-         [((0, yb + 0.006, 0), up_), ((0, yb - 0.045, 0), down_)], LEGS_L)
+    sl_b = sling(yb - 0.002, 0.012, 0.034, 0.008, 0.0038)
+    make('BriefsDown', lambda P: smax(legs_(Lbd)(P), sl_b(P), 0.008), (-0.24, yb - 0.1, -0.16), (0.24, yb + 0.03, 0.16), 3200,
+         [((0, yb + 0.006, 0), up_), ((0, yb - 0.062, 0), down_)], LEGS_L, h=0.0025)
     # ── boots: round the foot and up the shin, a sole and heel under them, flat on the deck
     Lk = [Cloth(leg, lambda y: 0.0095 + 0.003 * ss(0.12, 0.2, y), sx) for sx in (1, -1)]
     ft = [foot_part(sx, leg)[0] for sx in (1, -1)]
@@ -974,7 +1049,7 @@ def export(sex, objs):
     bpy.ops.object.select_all(action='DESELECT')
     for o in objs: o.select_set(True)
     path = os.path.join(OUT, 'meridian_' + sex + '.glb')
-    bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True, export_skins=True, export_morph=True, export_morph_normal=False,
+    bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True, export_skins=True, export_morph=True, export_morph_normal=False, export_attributes=True,
                               export_animations=False, export_yup=True, export_apply=False, export_materials='NONE')
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, 'meridian_' + sex + '.blend'))
     print('exported', path, round(os.path.getsize(path) / 1e6, 2), 'MB')

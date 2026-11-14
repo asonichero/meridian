@@ -89,7 +89,10 @@ function pose() {
 const VIEWS = [['front', 'Front', 0], ['three', '¾', 0.6], ['side', 'Side', Math.PI / 2], ['back', 'Back', Math.PI]];
 function view(name) {
   const v = VIEWS.find(x => x[0] === name) || VIEWS[1], a = v[2], d = cfg.pose === 'bend' ? 4.2 : 3.9, ty = cfg.pose === 'seated' ? 0.8 : cfg.pose === 'bend' ? 0.85 : 0.95;
-  controls.target.set(0, ty, 0); camera.position.set(Math.sin(a) * d, ty + 0.25, Math.cos(a) * d); controls.update(); cfg.view = name; refresh();
+  controls.target.set(0, ty, 0); camera.position.set(Math.sin(a) * d, ty + 0.25, Math.cos(a) * d);
+  // (a close look, from the address: ?at=x,y,z&cam=x,y,z)
+  const at = q.get('at'), cp = q.get('cam'); if (at) controls.target.fromArray(at.split(',').map(Number)); if (cp) camera.position.fromArray(cp.split(',').map(Number));
+  controls.update(); cfg.view = name; refresh();
 }
 
 // ── The panel ──
