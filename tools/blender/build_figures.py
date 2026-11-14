@@ -76,7 +76,7 @@ print('landmarks py: chin', chin_py, 'neck', neck_py, 'shoulder', shoulder_py, '
 # Real proportions rather than the reference's stylised long legs: the crotch lowered (the legs shortened above the ankle), the trunk lengthened to
 # match, the shoulders and head where they were. (The reference has the crotch at about half the height; people have it nearer 46–47%.)
 CROTCH_DROP = 0.05
-SEAT_K = 1.15      # (the seat a little fuller than the reference's)
+SEAT_K = 1.08      # (the seat a little fuller than the reference's)
 _ym0 = ym; _c0 = _ym0(crotch_py); _n0 = _ym0(neck_py); _f0 = 0.14
 def ym(py):
     y = _ym0(py)
@@ -106,6 +106,23 @@ def smooth_rows(P, sigma=3.0, keys=('cx', 'cz', 'rx', 'zF', 'zB')):
         for j, (a, wd, m) in enumerate(r['lobes']): tags.setdefault((round(a, 3), round(wd, 3)), np.zeros(n))[i] = m
     sm_tags = {k: sm(v) for k, v in tags.items()}
     for i, r in enumerate(out): r['lobes'] = [(a, wd, float(v[i])) for (a, wd), v in sm_tags.items() if abs(v[i]) > 1e-5]
+    return out
+
+def round_seat(rows, sigma=8.0, keep=0.97):
+    """The seat's forms (and the cleft between them) spread further up and down the rows, their fullest kept: a rounder curve from the small
+    of the back over the seat, without a flat face behind it."""
+    is_seat = lambda a, w: a < 0 and abs(abs(a + np.pi / 2) - 0.56) < 0.03 and abs(w - 0.53) < 0.02
+    is_cleft = lambda a, w: abs(a + np.pi / 2) < 0.01 and abs(w - 0.11) < 0.01
+    amt = np.array([max([m for a, w, m in r['lobes'] if is_seat(a, w)] or [0.0]) for r in rows])
+    cl = np.array([min([m for a, w, m in r['lobes'] if is_cleft(a, w)] or [0.0]) for r in rows])
+    if amt.max() <= 0: return rows
+    i = np.arange(len(rows)); K = np.exp(-0.5 * ((i[:, None] - i[None, :]) / sigma) ** 2); K /= K.sum(1, keepdims=True)
+    sm = K @ amt; sm *= amt.max() * keep / max(sm.max(), 1e-9); cs = K @ cl; cs *= (cl.min() * keep / cs.min()) if cs.min() < 0 else 0
+    out = []
+    for r, m, c in zip(rows, sm, cs):
+        lob = [l for l in r['lobes'] if not is_seat(l[0], l[1]) and not is_cleft(l[0], l[1])]
+        if m > 1e-5: lob += [(-np.pi / 2 + 0.56, 0.53, float(m)), (-np.pi / 2 - 0.56, 0.53, float(m)), (-np.pi / 2, 0.11, float(c))]
+        out.append(dict(r, lobes=lob))
     return out
 
 def torso_profile():
@@ -142,6 +159,7 @@ def torso_profile():
         out.append(ring(ym(py), (0.0, (zf - zb) / 2), w * S, (zf + zb) / 2, (zf + zb) / 2, pq, lobes))
     out.reverse()        # (from the bottom up)
     out = smooth_rows(out, 3.5)
+    out = round_seat(out)
     # (below the crotch the trunk carries on at the hips' width; body_field hands it over to the two thighs there in a blend, which shapes
     # the crotch)
     t = out[-1]
@@ -574,12 +592,38 @@ def foot_part(sx, leg):
         return np.minimum(f, P[:, 1] - 0.002)       # (the sole flat on the deck)
     return foot, (np.array([ax - 0.08, -0.01, -0.1]), np.array([ax + 0.08, ANKLE_Y + 0.06, FOOT_LEN + 0.02]))
 
+def front_z(Sf, y, x=0.0):
+    lo, hi = -0.05, 0.3
+    for _ in range(30):
+        m = (lo + hi) / 2
+        if Sf.f(np.array([[x, y, m]]))[0] > 0: lo = m
+        else: hi = m
+    return lo
+def sex_parts(sex, T):
+    """Hers: a groove (to be cut from the field) down the front of the mons into the crotch. His: the scrotum and penis, hanging (a field to be
+    joined to the body). Simple, soft forms, as the rest of the body is."""
+    if sex == 'f':
+        def groove(P):
+            x, y, z = P[:, 0], P[:, 1], P[:, 2]
+            win = ss(CROTCH_Y - 0.03, CROTCH_Y - 0.008, y) * ss(CROTCH_Y + 0.048, CROTCH_Y + 0.026, y)
+            return 0.0055 * np.exp(-0.5 * (x / 0.0042) ** 2) * win * ss(-0.03, 0.0, z)
+        return None, groove
+    zp = front_z(T, CROTCH_Y + 0.025)
+    S0, R0 = np.array([0.0, CROTCH_Y - 0.034, zp - 0.026]), np.array([0.026, 0.031, 0.023])
+    A, B = np.array([0.0, CROTCH_Y + 0.022, zp - 0.014]), np.array([0.0, CROTCH_Y - 0.068, zp + 0.01])
+    def parts(P):
+        q = np.linalg.norm((P - S0) / R0, axis=1); scrotum = (1 - q) * R0.min()
+        return smax(scrotum, capsule(P, A, B, 0.016, 0.0148), 0.012)
+    return parts, None
+
 def body_field(torso, leg, arm, sex):
-    """The body's parts as fields, and how they're joined: the trunk, the legs and arms (the measured surfaces), the hands and feet."""
+    """The body's parts as fields, and how they're joined: the trunk, the legs and arms (the measured surfaces), the hands and feet, the sex."""
     hk = HAND_K[sex]
     S_ = {'torso': Surface(torso), 'legL': Surface(leg, 1), 'legR': Surface(leg, -1), 'armL': Surface(arm, 1, arm_axis(1)), 'armR': Surface(arm, -1, arm_axis(1))}
     H = {'handL': hand_parts(1, hk), 'handR': hand_parts(-1, hk)}; Ft = {'footL': foot_part(1, leg), 'footR': foot_part(-1, leg)}
     comps = {k: v.f for k, v in S_.items()}; comps.update({k: v[0] for k, v in H.items()}); comps.update({k: v[0] for k, v in Ft.items()})
+    add, cut = sex_parts(sex, S_['torso'])
+    if add: comps['sex'] = add
     dr = DELT_R[sex] * float(np.interp(0.06, [r['y'] for r in arm], [r['rx'] for r in arm])) / 0.0397
     for sx, s_ in ((1, 'L'), (-1, 'R')):
         C = arm_at(sx, 0.008) + np.array([sx * 0.004, 0, 0.0])
@@ -596,6 +640,8 @@ def body_field(torso, leg, arm, sex):
             a = smax(smax(c['arm' + s_], c['hand' + s_], 0.008), c['delt' + s_], 0.02)
             f = smax(f, a, 0.022)
         f = smax(f, c['footL'], 0.014); f = smax(f, c['footR'], 0.014)
+        if add: f = smax(f, c['sex'], 0.02)      # (a soft join, no crease where it meets the body)
+        if cut: f = f - cut(P)
         return f, c
     return F
 
@@ -838,6 +884,8 @@ def garments(sex, torso, leg, arm, body, label, rig):
     Tb = Cloth(torso, lambda y: 0.0045, slope=1.2, below=CROTCH_Y + 0.12)
     Lb = [Cloth(leg, lambda y: 0.0045, sx) for sx in (1, -1)]
     briefs_f = lerp_crotch(Tb, legs_(Lb))
+    his = sex_parts(sex, Surface(torso))[0]
+    if his: briefs_f = (lambda b: lambda P: np.maximum(b(P), his(P) + 0.006))(briefs_f)
     Tt = Cloth(torso, lambda y: 0.01, slope=0.7, below=CROTCH_Y + 0.13)
     leg_ease = lambda y: 0.009 + 0.011 * ss(0.33, 0.2, y)
     Lt = [Cloth(leg, leg_ease, sx) for sx in (1, -1)]

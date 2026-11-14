@@ -115,7 +115,7 @@ function paint(m, o) {
   o = o || {};
   const U = { uRim: { value: srgb(o.rim || '#2a3440').multiplyScalar(o.rimK == null ? 1 : o.rimK) }, uGrain: { value: o.grain == null ? 0.03 : o.grain }, uGrainScale: { value: o.scale || 60 }, uHide: { value: 0 },
     uMarks: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9, 0, 0)) }, uMarkCol: { value: srgb(o.markCol || '#b8323a') },
-    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() } };
+    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() }, uCleft: { value: new THREE.Vector4() } };
   m.userData.u = U;
   const key = 'paint|' + [o.regions, o.marks, o.bindAttr].map(x => (x ? 1 : 0)).join('') + (o.pattern || '');
   m.customProgramCacheKey = () => key;
@@ -129,10 +129,12 @@ vBind = ${o.bindAttr ? 'bind' : 'position'};
 ${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'} ${o.pattern ? 'vPart = region;' : 'vPart = 0.0;'}`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
+varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uCleft; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
+if (uCleft.z > 0.5) { float cl = (1.0 - smoothstep(0.0006, 0.0017, abs(vBind.x))) * smoothstep(uCleft.y, uCleft.y + 0.008, vBind.y) * (1.0 - smoothstep(uCleft.x - 0.01, uCleft.x, vBind.y)) * step(uCleft.w, vBind.z);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.42, 0.3, 0.28), cl); }
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
 diffuseColor.rgb *= 1.0 + uGrain * (g - 0.5) * 2.0;
 ${o.pattern ? PATTERNS[o.pattern] : ''}
@@ -230,8 +232,9 @@ function tmat(hex, o) {
   return m;
 }
 const INK = '#2a1a16';
-const INKM = { plain: new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide }), skinned: dqs(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true })),
-  morph: dqs(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true })) };
+const HULL_OFS = { polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 6 };
+const INKM = { plain: new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide }), skinned: dqs(new THREE.MeshBasicMaterial(Object.assign({ color: srgb(INK), side: THREE.BackSide, skinning: true }, HULL_OFS))),
+  morph: dqs(new THREE.MeshBasicMaterial(Object.assign({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }, HULL_OFS))) };
 function hullGeo(geo, w) {
   const g = geo.clone(), p = g.attributes.position, n = g.attributes.normal;
   for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) + n.getX(i) * w, p.getY(i) + n.getY(i) * w, p.getZ(i) + n.getZ(i) * w);
@@ -1111,11 +1114,12 @@ function makeGLB(spec, T) {
   // the body
   const skinM = tmat(spec.skin, { skin: true, morph: true, regions: true, marks: true, bindAttr: true, unique: true, rim: '#6a5048', rimK: 0.5 });
   F.body = skinned(F, T.mesh.Body.geo, skinM); F.body.castShadow = true; F.body.receiveShadow = false; F.skinMat = skinM;
-  { const hm = dqs(paint(new THREE.MeshBasicMaterial({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; ink(F.body, INK_W, F, hm); }
+  if (spec.sex === 'f') skinM.userData.u.uCleft.value.set(T.L.crotch + 0.044, T.L.crotch - 0.022, 1, -0.02);
+  { const hm = dqs(paint(new THREE.MeshBasicMaterial(Object.assign({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }, HULL_OFS)), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; ink(F.body, INK_W, F, hm); }
   const L = T.L;
   // the seat's spots from its own shape (measured in Blender): the cheek where it's fullest, the sit spot just above the fold beneath it, the
   // thighs below the fold (for a flatter seat, within sensible bounds of the fullest point)
-  const pk = clamp(L.seatPeak, L.crotch + 0.02, L.crotch + 0.07), sit = Math.min(clamp(L.seatFold, pk - 0.07, pk - 0.03) + 0.012, pk - 0.05);
+  const pk = clamp(L.seatPeak, L.crotch + 0.02, L.crotch + 0.045), sit = Math.min(clamp(L.seatFold, pk - 0.07, pk - 0.03) + 0.012, pk - 0.05);
   const SEAT = { cheek: [L.hipX * 0.84, pk], sitspot: [L.hipX * 0.86, sit], thighs: [L.hipX * 0.95, sit - 0.06] };
   spotsOn(F, T.mesh.Body.geo, area => SEAT[area], 0.006);
   buildHead(F, spec, S);
