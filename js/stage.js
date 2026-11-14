@@ -51,19 +51,22 @@ function create(view, opts) {
   const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.6, 0.92); composer.addPass(bloom);
   const grade = new THREE.ShaderPass(GRADE); composer.addPass(grade);
 
-  // On a tall screen (a phone held upright) the view widens so it takes in as much across as a square one would; and the picture is shifted up by
-  // half of what the controls cover at the bottom (setInsets), so what the camera looks at sits in the middle of what's left to see.
-  const fov0 = camera.fov, insets = { top: 0, bottom: 0 }, DEG = Math.PI / 180;
+  // On a tall screen (a phone held upright) the view widens so it takes in as much across as a square one would; and the picture is shifted by
+  // half of what the controls cover (setInsets: at the bottom, or down one side), so what the camera looks at sits in the middle of what's left.
+  const fov0 = camera.fov, insets = { top: 0, bottom: 0, left: 0, right: 0 }, DEG = Math.PI / 180;
   function resize() {
     const w = view.clientWidth || 800, h = view.clientHeight || 600, a = w / h;
     renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = a;
     camera.fov = a < 1 ? 2 * Math.atan(Math.tan(fov0 / 2 * DEG) / a) / DEG : fov0;
-    const dy = Math.round((insets.bottom - insets.top) / 2);
-    if (dy) camera.setViewOffset(w, h, 0, dy, w, h); else camera.clearViewOffset();
+    const dx = Math.round((insets.right - insets.left) / 2), dy = Math.round((insets.bottom - insets.top) / 2);
+    if (dx || dy) camera.setViewOffset(w, h, dx, dy, w, h); else camera.clearViewOffset();
     camera.updateProjectionMatrix();
     const pr = renderer.getPixelRatio(); grade.uniforms.uRes.value.set(w * pr, h * pr);
   }
-  function setInsets(o) { const t = Math.round(o.top || 0), b = Math.round(o.bottom || 0); if (t !== insets.top || b !== insets.bottom) { insets.top = t; insets.bottom = b; resize(); } }
+  function setInsets(o) {
+    const n = { top: Math.round(o.top || 0), bottom: Math.round(o.bottom || 0), left: Math.round(o.left || 0), right: Math.round(o.right || 0) };
+    if (Object.keys(n).some(k => n[k] !== insets[k])) { Object.assign(insets, n); resize(); }
+  }
   root.addEventListener('resize', resize); resize();
 
   let tween = null;

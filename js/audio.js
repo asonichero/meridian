@@ -4,7 +4,7 @@
 (function (root) {
 'use strict';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-const A = { ctx: null, vols: { master: 0.8, music: 0.25, sfx: 0.8, voice: 0.7 }, nodes: {} };
+const A = { ctx: null, vols: { master: 0.8, music: 0.25, sfx: 0.8, voice: 0.7, amb: 0.8 }, nodes: {} };
 try { const v = JSON.parse(localStorage.getItem('meridian:volumes') || 'null'); if (v) Object.assign(A.vols, v); } catch (e) { /* no storage */ }
 
 function noiseBuffer(ctx, seconds) {
@@ -31,7 +31,7 @@ A.init = function () {
 A.setVol = function (k, v) {
   if (k) { A.vols[k] = clamp(v, 0, 1); try { localStorage.setItem('meridian:volumes', JSON.stringify(A.vols)); } catch (e) { /* no storage */ } }
   const N = A.nodes; if (!A.ctx) return;
-  N.master.gain.value = A.vols.master; N.music.gain.value = A.vols.music * 0.5; N.sfx.gain.value = A.vols.sfx; N.voice.gain.value = A.vols.voice * 1.1; N.amb.gain.value = A.vols.sfx * 0.16;      // (the dialogue sits well above the wind, the birds and the fire)
+  N.master.gain.value = A.vols.master; N.music.gain.value = A.vols.music * 0.5; N.sfx.gain.value = A.vols.sfx; N.voice.gain.value = A.vols.voice * 1.1; N.amb.gain.value = A.vols.amb * 0.16;      // (the dialogue sits well above the wind, the birds and the fire)
 };
 
 // ── Music: slow procedural pieces for the ship. `A.startMusic({ theme })` begins one (or crossfades from the one playing); `A.stopMusic(secs)` fades it out. ──

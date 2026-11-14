@@ -28,14 +28,15 @@ This is the first playable piece. It tests the control scheme, the models and th
   - Basic customisation for the Captain: gender, skin, hair colour and style, and build.
 - **Controls:**
   - Runs of smacks start and stop on a toggle (**Space**), not in counted runs.
-  - **Pace** (`[` `]`) and **strength** (`-` `=`).
-  - **Side**: alternate, left or right (**D**). **Where**: upper, centre, sit spot or thighs (**A**), placed from each body's own seat (measured in Blender): upper on its upper curve, centre where it's fullest, the sit spot just above the fold beneath it, the thighs below the fold. Nothing lands above the seat.
-  - **Soothe** (**S**): the palm in slow circles, between runs, on both cheeks, either one, the thighs or the small of the back (**F**). It takes the sting down.
+  - **Pace** (`[` `]`) and **strength** (`-` `=`), in steps of a quarter.
+  - **Side**: alternate, left or right (**D**). **Where**: cheek, sit spot or thighs (**A**), placed from each body's own seat (measured in Blender): the cheek where it's fullest, the sit spot just above the fold beneath it, the thighs below the fold. Nothing lands above the seat.
+  - **Soothe** (**S**): between runs, the palm in slow circles over every place a smack can land, each cheek, sit spot and thigh in turn, gliding from one to the next. It takes the sting down.
   - **Clothes** (**T B U**): each garment is its own mesh with a raised or lowered variant (top raised, trousers lowered to the knees, briefs lowered to mid-thigh).
   - **End turn** (**Enter**), and **cameras** (**C**, or the buttons).
 - **Consent:** each crew member has agreed a safe word (it's shown on screen). The player is the disciplinarian, so the trigger is the pain model's *too harsh* threshold. That bar is higher than redlessons' (1.8 against 1.5) and has to be held for 1.2 s, or overshot by a quarter, so corrections don't trend short. When it's crossed, the crew member calls their word and everything stops.
 - **Scripted responses** per character: as they're placed, at the first smack, as their distress reaches each band, now and then while it's hard, when soothed, the safe word, and at the end.
-- **On a phone,** upright or on its side: the controls are one row that scrolls sideways (with the run button kept at its start) under the dialogue, the set-up opens as a sheet over the view (☰), the crew member's name and agreed word sit compact at the top with the cameras in a row, touch targets are larger, and the view widens when upright and is centred in what the controls leave visible.
+- **Sound:** levels for master, effects, voices, music and ambience, in the set-up (☰); kept between visits.
+- **On a phone:** held upright, the controls take the lower third of the screen, laid out in rows, with the dialogue just above them and the cameras in a row under the crew member's name and agreed word; on its side, the controls are a sidebar down the right, the cameras down the left and the dialogue along the bottom between. The set-up opens as a sheet over the view (☰), touch targets are larger, and the view widens when upright and is centred in what the controls leave visible.
 - **After:** a conversation with each crew member in turn, seated side by side on the bench. Aftercare is delivered through what's said (reassure, say why it mattered, or ask how they are), followed by an instruction for the rest of the shift (rest detail, log reset, eat together, or back to station).
 
 ## The look

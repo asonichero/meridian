@@ -43,30 +43,47 @@ button:hover { border-color: #56687a; } button.on { background: #4a3a22; border-
 #summary { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 18px 22px; display: none; min-width: min(360px, calc(100% - 32px)); max-width: calc(100% - 32px); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; z-index: 6; }
 #summary table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; } #summary td { padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
 kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
-/* Phones and small windows, upright or on their side: the controls one row that scrolls sideways (the run button held at its start), the
-   set-up a sheet over the whole view, the crew member's name and word compact at the top, the cameras a row along the top. */
+.vols { display: grid; grid-template-columns: auto 1fr 40px; gap: 6px 10px; align-items: center; font-size: 13px; } .vols input { width: 100%; accent-color: var(--amber); } .vols .pct { color: var(--dim); font-size: 12px; text-align: right; }
+/* Phones and small windows: the set-up a sheet over the whole view (☰), the crew member's name and word compact at the top with the cameras in a
+   row; the controls laid out on a grid of two columns: held upright, in the lower third of the screen; on its side, in a sidebar down the right. */
 @media (max-width: 760px), (max-height: 520px) {
   #setup { left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); top: calc(56px + env(safe-area-inset-top)); width: auto; max-height: calc(100% - 64px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
   #hide { left: calc(8px + env(safe-area-inset-left)); top: calc(8px + env(safe-area-inset-top)); }
-  #dock { bottom: calc(6px + env(safe-area-inset-bottom)); width: calc(100% - 12px - env(safe-area-inset-left) - env(safe-area-inset-right)); gap: 14px; }
-  #bar { padding: 7px 8px 6px; border-radius: 14px; }
-  #bar .top { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; gap: 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
-  #bar .top::-webkit-scrollbar { display: none; }
-  #bar .grp { flex: 0 0 auto; } #bar .row { flex-wrap: nowrap; }
-  #bar .grp:first-child { position: sticky; left: 0; z-index: 1; background: var(--panel); padding-right: 4px; }
-  #run { min-width: 96px; padding: 8px 14px; font-size: 15px; }
-  #meter { margin-top: 6px; } #info { min-width: 0; font-size: 11px; }
+  #bar { padding: 8px 10px 6px; border-radius: 16px; overflow-y: auto; box-sizing: border-box; }
+  #bar .top { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; align-items: end; }
+  #bar .grp { min-width: 0; } #bar .lab { font-size: 9px; }
+  .g-run { order: 1; } .g-end { order: 2; } .g-pace { order: 3; } .g-str { order: 4; } .g-side { order: 5; } .g-soothe { order: 6; } .g-where { order: 7; grid-column: 1 / -1; } .g-clothes { order: 8; grid-column: 1 / -1; }
+  #run, #end, #soothe { width: 100%; } #run { min-width: 0; padding: 8px 10px; font-size: 15px; }
+  .g-run .lab, .g-end .lab, .g-soothe .lab { display: none; }      /* (the buttons say what they do) */
+  #bar .seg, .g-clothes .row { display: flex; flex-wrap: nowrap; } #bar .seg button, .g-clothes .row button { flex: 1 1 0; min-width: 0; padding-left: 4px; padding-right: 4px; }
+  .g-clothes .row button { font-size: 12px; } .g-pace .row, .g-str .row { justify-content: space-between; flex-wrap: nowrap; }
+  #meter { margin-top: 8px; } #info { min-width: 0; font-size: 11px; }
   #say { padding: 11px 14px 9px; } #say .txt { font-size: 14px; } #say .choices button { padding: 6px 10px; }
-  #who { min-width: 0; max-width: 46%; padding: 6px 10px; right: calc(8px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); border-radius: 14px; }
+  #who { min-width: 0; padding: 6px 10px; right: calc(8px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); border-radius: 14px; }
   #who .nm { font-size: 13px; } #whoSub { display: none !important; } #who small { font-size: 11px; }
-  #cams { flex-direction: row; top: calc(8px + env(safe-area-inset-top)); left: calc(56px + env(safe-area-inset-left)); right: calc(46% + 16px); overflow-x: auto; scrollbar-width: none; }
-  #cams::-webkit-scrollbar { display: none; } #cams button { flex: 0 0 auto; padding: 5px 9px; font-size: 12px; }
+  #cams { flex-direction: row; overflow-x: auto; scrollbar-width: none; } #cams::-webkit-scrollbar { display: none; } #cams button { flex: 0 0 auto; padding: 5px 9px; font-size: 12px; }
 }
-/* upright: the cameras get their own row under the name, which then has the width */
+/* upright: the controls the lower third; the dialogue just above them; the cameras a row under the name */
 @media (max-width: 760px) and (orientation: portrait) {
-  #who { max-width: none; left: calc(56px + env(safe-area-inset-left)); }
+  #dock { left: 0; transform: none; width: 100%; bottom: 0; gap: 14px; }
+  #say { width: calc(100% - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+  #bar .top { grid-template-columns: repeat(6, 1fr); gap: 6px 8px; }
+  .g-run { grid-column: span 2; order: 1; } .g-soothe { grid-column: span 2; order: 2; } .g-end { grid-column: span 2; order: 3; }
+  .g-pace { grid-column: span 3; order: 4; } .g-str { grid-column: span 3; order: 5; } .g-side { grid-column: span 3; order: 6; } .g-where { grid-column: span 3; order: 7; } .g-clothes { grid-column: 1 / -1; order: 8; }
+  #bar .seg button { font-size: 12px; }
+  #bar { height: max(35vh, 250px); border-radius: 18px 18px 0 0; border-bottom: none; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  #who { left: calc(56px + env(safe-area-inset-left)); }
   #cams { top: calc(62px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right)); }
-  #setup { top: calc(56px + env(safe-area-inset-top)); }
+}
+/* on its side: the controls a sidebar down the right; the dialogue along the bottom of what's left; the cameras down the left under the menu */
+@media (max-height: 520px) and (orientation: landscape) {
+  #bar { position: fixed; top: calc(8px + env(safe-area-inset-top)); bottom: calc(8px + env(safe-area-inset-bottom)); right: calc(8px + env(safe-area-inset-right)); width: 300px; }
+  #bar .top { gap: 6px 8px; } .g-side { grid-column: 1 / -1; }
+  #dock { left: calc(8px + env(safe-area-inset-left)); right: calc(318px + env(safe-area-inset-right)); width: auto; transform: none; bottom: calc(8px + env(safe-area-inset-bottom)); }
+  #who { right: calc(318px + env(safe-area-inset-right)); max-width: 200px; }
+  #cams { flex-direction: column; top: calc(56px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); right: auto; overflow: visible; }
+  #who { left: auto; } #dock { left: calc(96px + env(safe-area-inset-left)); }
+  #word { left: calc(50% - 155px); }
 }
 /* touch: bigger targets, no keyboard hints */
 @media (hover: none) { kbd { display: none; } button { min-height: 36px; } #bar .lab { font-size: 9px; } }
@@ -92,6 +109,8 @@ kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
   <div class="row" id="chair" style="margin-top:6px"></div>
   <div class="row" id="cstyle" style="margin-top:6px"></div>
   <div class="row seg" id="cbuild" style="margin-top:6px"><button data-v="lean">Lean</button><button data-v="average" class="on">Average</button><button data-v="heavy">Heavy</button></div>
+  <h2>Sound</h2>
+  <div class="vols" id="vols"></div>
   <div class="row" style="margin-top:14px"><button id="begin" class="on">Begin</button> <a href="figures.html" style="color:var(--dim);font-size:12px">the crew line-up</a></div>
 </div>
 <button id="hide">☰</button>
@@ -106,14 +125,14 @@ kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
 <div id="say" class="panel"><div class="who" id="sayWho"></div><div class="txt" id="sayTxt"></div><div class="choices" id="choices"></div></div>
 <div id="bar" class="panel">
   <div class="top">
-    <div class="grp"><span class="lab">Run <kbd>Space</kbd></span><button id="run">Start run</button></div>
-    <div class="grp"><span class="lab">Pace <kbd>[ ]</kbd></span><div class="row"><button data-k="pace" data-d="-0.1">−</button><span class="val" id="paceV">1.0×</span><button data-k="pace" data-d="0.1">+</button></div></div>
-    <div class="grp"><span class="lab">Strength <kbd>- =</kbd></span><div class="row"><button data-k="strength" data-d="-0.1">−</button><span class="val" id="strengthV">1.0×</span><button data-k="strength" data-d="0.1">+</button></div></div>
-    <div class="grp"><span class="lab">Side <kbd>D</kbd></span><div class="row seg" id="side"><button data-v="alt" class="on">Alt</button><button data-v="L">Left</button><button data-v="R">Right</button></div></div>
-    <div class="grp"><span class="lab">Where <kbd>A</kbd></span><div class="row seg" id="area"><button data-v="upper">Upper</button><button data-v="centre" class="on">Centre</button><button data-v="sitspot">Sit spot</button><button data-v="thighs">Thighs</button></div></div>
-    <div class="grp"><span class="lab">Soothe <kbd>S</kbd> · area <kbd>F</kbd></span><div class="row"><button id="soothe">Soothe</button><div class="seg row" id="sarea"><button data-v="seat" class="on">Both</button><button data-v="L">L</button><button data-v="R">R</button><button data-v="thighs">Thighs</button><button data-v="back">Back</button></div></div></div>
-    <div class="grp"><span class="lab">Clothes <kbd>T B U</kbd></span><div class="row"><button id="cTop">Top: down</button><button id="cBot">Trousers: up</button><button id="cUnd">Briefs: up</button></div></div>
-    <div class="grp"><span class="lab">Turn <kbd>Enter</kbd></span><button id="end">End turn</button></div>
+    <div class="grp g-run"><span class="lab">Run <kbd>Space</kbd></span><button id="run">Start run</button></div>
+    <div class="grp g-pace"><span class="lab">Pace <kbd>[ ]</kbd></span><div class="row"><button data-k="pace" data-d="-0.25">−</button><span class="val" id="paceV">1×</span><button data-k="pace" data-d="0.25">+</button></div></div>
+    <div class="grp g-str"><span class="lab">Strength <kbd>- =</kbd></span><div class="row"><button data-k="strength" data-d="-0.25">−</button><span class="val" id="strengthV">1×</span><button data-k="strength" data-d="0.25">+</button></div></div>
+    <div class="grp g-side"><span class="lab">Side <kbd>D</kbd></span><div class="row seg" id="side"><button data-v="alt" class="on">Alt</button><button data-v="L">Left</button><button data-v="R">Right</button></div></div>
+    <div class="grp g-where"><span class="lab">Where <kbd>A</kbd></span><div class="row seg" id="area"><button data-v="cheek" class="on">Cheek</button><button data-v="sitspot">Sit spot</button><button data-v="thighs">Thighs</button></div></div>
+    <div class="grp g-soothe"><span class="lab">Soothe <kbd>S</kbd></span><button id="soothe">Soothe</button></div>
+    <div class="grp g-clothes"><span class="lab">Clothes <kbd>T B U</kbd></span><div class="row"><button id="cTop">Top: down</button><button id="cBot">Trousers: up</button><button id="cUnd">Briefs: up</button></div></div>
+    <div class="grp g-end"><span class="lab">Turn <kbd>Enter</kbd></span><button id="end">End turn</button></div>
   </div>
   <div id="meter"><div id="track"><div id="fill"></div></div><div id="info"></div></div>
 </div>
@@ -156,6 +175,15 @@ seg('pos', cfg.position, v => { cfg.position = v; save(); if (ses) { fade(); ses
 seg('between', cfg.between, v => { cfg.between = v; save(); if (ses) ses.st.between = v; });
 seg('outfit', cfg.outfit, v => { cfg.outfit = v; save(); });
 drawCrew(); drawCaptain();
+// sound levels: each a slider, kept between visits (js/audio.js)
+{ const el = $('vols');
+  for (const [k, nm] of [['master', 'Master'], ['sfx', 'Effects'], ['voice', 'Voices'], ['music', 'Music'], ['amb', 'Ambience']]) {
+    const l = document.createElement('label'); l.textContent = nm; const r = document.createElement('input'); r.type = 'range'; r.min = 0; r.max = 100; r.step = 1;
+    const out = document.createElement('span'); out.className = 'pct'; const show = () => (out.textContent = r.value + '%');
+    r.value = Math.round((window.GameAudio ? GameAudio.vols[k] : 0.8) * 100); show();
+    r.oninput = () => { show(); if (window.GameAudio) GameAudio.setVol(k, r.value / 100); };
+    el.append(l, r, out);
+  } }
 $('hide').onclick = () => $('setup').classList.toggle('closed');
 
 // ── The stage ──
@@ -220,16 +248,16 @@ async function aftercareAll(results) {
 }
 
 // ── Live controls ──
-const P0 = { pace: [0.5, 2], strength: [0.4, 1.6] };
+// (pace and strength in quarters)
+const P0 = { pace: [0.5, 2], strength: [0.5, 1.5] }, STEP = 0.25, times = v => (Number.isInteger(v) ? v.toFixed(0) : String(v)) + '×';
 document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => bump(b.dataset.k, +b.dataset.d));
-function bump(k, d) { if (!ses) return; ses.set({ [k]: Math.round(Math.min(P0[k][1], Math.max(P0[k][0], ses.st[k] + d)) * 10) / 10 }); }
+function bump(k, d) { if (!ses) return; ses.set({ [k]: Math.round(Math.min(P0[k][1], Math.max(P0[k][0], ses.st[k] + d)) / STEP) * STEP }); refresh(); }
 seg('side', 'alt', v => ses && ses.set({ side: v }));
-seg('area', 'centre', v => ses && ses.set({ area: v }));
-seg('sarea', 'seat', v => ses && ses.set({ sootheArea: v }));
+seg('area', 'cheek', v => ses && ses.set({ area: v }));
 $('run').onclick = () => { audioOn(); ses && ses.run(); };
 $('soothe').onclick = () => ses && ses.set({ soothe: !ses.st.soothe });
 $('end').onclick = () => ses && ses.endTurn();
-const cyc = (k, list) => { const i = list.indexOf(ses.st[k]); const v = list[(i + 1) % list.length]; ses.set({ [k]: v }); const el = { side: 'side', area: 'area', sootheArea: 'sarea' }[k]; $(el).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); };
+const cyc = (k, list) => { const i = list.indexOf(ses.st[k]); const v = list[(i + 1) % list.length]; ses.set({ [k]: v }); const el = { side: 'side', area: 'area' }[k]; $(el).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); };
 const flip = k => { const c = ses.current; if (!c) return; const s = c.f.state; ses.dress({ [k]: s[k] === 'up' || s[k] === 'down' && k === 'top' ? (k === 'top' ? (s.top === 'up' ? 'down' : 'up') : 'down') : 'up' }); };
 $('cTop').onclick = () => ses && ses.dress({ top: ses.current.f.state.top === 'up' ? 'down' : 'up' });
 $('cBot').onclick = () => ses && ses.dress({ bottoms: ses.current.f.state.bottoms === 'up' ? 'down' : 'up' });
@@ -237,9 +265,9 @@ $('cUnd').onclick = () => ses && ses.dress({ under: ses.current.f.state.under ==
 addEventListener('keydown', e => {
   if (!ses || e.target.tagName === 'INPUT') return; const k = e.key;
   if (k === ' ') { e.preventDefault(); audioOn(); ses.run(); }
-  else if (k === '[') bump('pace', -0.1); else if (k === ']') bump('pace', 0.1); else if (k === '-') bump('strength', -0.1); else if (k === '=' || k === '+') bump('strength', 0.1);
+  else if (k === '[') bump('pace', -STEP); else if (k === ']') bump('pace', STEP); else if (k === '-') bump('strength', -STEP); else if (k === '=' || k === '+') bump('strength', STEP);
   else if (k === 'd' || k === 'D') cyc('side', ['alt', 'L', 'R']); else if (k === 'a' || k === 'A') cyc('area', ses.AREAS);
-  else if (k === 's' || k === 'S') ses.set({ soothe: !ses.st.soothe }); else if (k === 'f' || k === 'F') cyc('sootheArea', ['seat', 'L', 'R', 'thighs', 'back']);
+  else if (k === 's' || k === 'S') ses.set({ soothe: !ses.st.soothe });
   else if (k === 't' || k === 'T') $('cTop').click(); else if (k === 'b' || k === 'B') $('cBot').click(); else if (k === 'u' || k === 'U') $('cUnd').click();
   else if (k === 'Enter') ses.endTurn(); else if (k === 'c' || k === 'C') { ses.camera(ses.st.cam + 1); drawCams(); }
   else if (/^[1-4]$/.test(k) && window.__choose && window.__choose[+k - 1]) window.__choose[+k - 1]();
@@ -248,7 +276,7 @@ function drawCams() { const el = $('cams'); el.innerHTML = ''; if (!ses) return;
 function refresh() {
   if (!ses) return; const st = ses.st, c = ses.current;
   $('run').textContent = st.running ? 'Stop run' : 'Start run'; $('run').classList.toggle('on', st.running); $('run').disabled = !c || st.phase !== 'turn';
-  $('soothe').classList.toggle('on', st.soothe); $('paceV').textContent = st.pace.toFixed(1) + '×'; $('strengthV').textContent = st.strength.toFixed(1) + '×';
+  $('soothe').classList.toggle('on', st.soothe); $('paceV').textContent = times(st.pace); $('strengthV').textContent = times(st.strength);
   if (c && c.f) { const s = c.f.state; $('cTop').textContent = 'Top: ' + (s.top === 'up' ? 'raised' : 'down'); $('cBot').textContent = 'Trousers: ' + (s.bottoms === 'up' ? 'up' : 'lowered'); $('cUnd').textContent = 'Briefs: ' + (s.under === 'up' ? 'up' : 'lowered'); }
   if (c) { const r = c.r; $('whoNm').textContent = (r.title ? r.title + ' ' : '') + r.name; $('whoSub').textContent = r.role + (st.phase === 'after' ? ' · aftercare' : ''); $('whoWord').textContent = 'Agreed word: ' + r.word; }
 }
@@ -260,7 +288,7 @@ function refresh() {
 // ── Run ──
 const each = dt => { if (ses) ses.update(dt); bay.tick(dt); window.__meter(); };
 // (the camera's picture centred in what the controls at the bottom leave visible)
-const insets = () => stage.setInsets({ top: 0, bottom: Math.max(0, innerHeight - $('bar').getBoundingClientRect().top) });
+const insets = () => { const r = $('bar').getBoundingClientRect(); stage.setInsets(r.height > innerHeight * 0.6 ? { right: Math.max(0, innerWidth - r.left) } : { bottom: Math.max(0, innerHeight - r.top) }); };
 if (window.ResizeObserver) new ResizeObserver(insets).observe($('bar')); addEventListener('resize', insets); insets();
 models.then(() => {
   begin();

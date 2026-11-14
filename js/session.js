@@ -7,7 +7,7 @@
 // each has agreed their safe word; if it goes too far (js/pain.js's high, held bar), they call it, and it stops at once.
 //
 //   const ses = Session.create(stage, bay, { captain, queue: [{ id, sex, outfit }], witnesses: [...], position: 'otk' | 'wall', between: 'corner' | 'aside' })
-//   ses.run(on) · ses.set({ pace, strength, side, area, soothe, sootheArea }) · ses.dress({ top, bottoms, under }) · ses.endTurn() · ses.camera(i)
+//   ses.run(on) · ses.set({ pace, strength, side, area, soothe }) · ses.dress({ top, bottoms, under }) · ses.endTurn() · ses.camera(i)
 //   ses.on(fn): 'say' { who, id, text }, 'hit' {…}, 'state', 'turn' { i, id }, 'word' { id }, 'turnEnd' { id, outcome, stats }, 'done' { results }
 //   ses.update(dt) each frame; ses.aftercare(id) poses the two of them on the bench for the conversation.
 (function (root) {
@@ -18,14 +18,16 @@ const spring = (w, z) => ({ x: 0, v: 0, w, z, to(t, dt) { this.v += (this.w * th
 const TIMES = { lift: 0.42, hold: 0.14, strike: 0.1, contact: 0.24, back: 0.4 };
 const BANDS = ['composed', 'flinching', 'struggling', 'close to the edge of resistance', 'past the edge of resistance', 'too harsh'];
 const FACE = ['wince', 'gritted', 'crying', 'crying'];
-const AREAS = ['upper', 'centre', 'sitspot', 'thighs'];
+const AREAS = ['cheek', 'sitspot', 'thighs'];
+// soothing works over all of them, both sides, in a slow round (from the Captain's side to the far one, down, and back)
+const SOOTHE = ['cheekL', 'cheekR', 'sitspotR', 'sitspotL', 'thighsL', 'thighsR'];
 const UP = new V3(0, 1, 0);
 const yawQ = yaw => new Q().setFromAxisAngle(UP, yaw);
 
 function create(stage, bay, opts) {
   const scene = stage.scene, C = root.Crew, S = root.Pain, L = root.Lines, A = root.GameAudio;
   const listeners = [], emit = (type, data) => listeners.forEach(f => f(type, data));
-  const st = { running: false, pace: 1, strength: 1, side: 'alt', nextSide: 'R', area: 'centre', soothe: false, sootheArea: 'seat', position: opts.position || 'otk',
+  const st = { running: false, pace: 1, strength: 1, side: 'alt', nextSide: 'R', area: 'cheek', soothe: false, position: opts.position || 'otk',
     between: opts.between || 'corner', turn: -1, swing: null, ended: false, word: false, t: 0, sound: opts.sound !== false, cam: 0, phase: 'turn', results: [] };
 
   // ── The cast ──
@@ -319,13 +321,12 @@ function create(stage, bay, opts) {
       cock = lerp(ck(phase.from), ck(phase.to), e2); curl = phase.to === 'contact' || phase.from === 'contact' ? 0.03 : 0.12;
       if (sw.phase === 'contact') W.addScaledVector(c.n, 0.012 * sp.rebound.x);      // (a little give, coming off the skin)
     } else if (st.soothe) {
-      // slow circles on the area chosen
-      const ak = st.sootheArea === 'thighs' ? 'thighs' : st.sootheArea === 'back' ? 'upper' : 'centre';
-      const sides = st.sootheArea === 'L' ? ['L'] : st.sootheArea === 'R' ? ['R'] : ['L', 'R'];
-      const sd = sides[Math.floor(st.t / 2.4) % sides.length], c2 = contactFor(spotOf(sd, ak));
-      const a = st.t * 2.1, tang = new V3().crossVectors(c2.n, c2.f).normalize();
-      W = c2.W.clone().addScaledVector(c2.f, 0.03 * Math.cos(a)).addScaledVector(tang, 0.03 * Math.sin(a)).addScaledVector(c2.n, -0.004);
-      if (st.sootheArea === 'back') W = back.clone().addScaledVector(bn, 0.12 * sc(cur.f)).addScaledVector(tang, 0.04 * Math.sin(a)).addScaledVector(c2.f, -0.06);
+      // slow circles over every place a smack can land: each cheek, each sit spot, each thigh in turn, gliding from one to the next
+      const n_ = SOOTHE.length, k = st.t / 2.2, i = Math.floor(k) % n_, fr = k - Math.floor(k), glide = ease(clamp((fr - 0.72) / 0.28, 0, 1));
+      const ca = contactFor(SOOTHE[i]), cb = glide > 0 ? contactFor(SOOTHE[(i + 1) % n_]) : ca;
+      const c2 = { W: ca.W.clone().lerp(cb.W, glide), n: ca.n.clone().lerp(cb.n, glide).normalize(), f: ca.f.clone().lerp(cb.f, glide).normalize() };
+      const a = st.t * 2.1, tang = new V3().crossVectors(c2.n, c2.f).normalize(), r = 0.03 * (1 - glide);
+      W = c2.W.clone().addScaledVector(c2.f, r * Math.cos(a)).addScaledVector(tang, r * Math.sin(a)).addScaledVector(c2.n, -0.004);
       handPose.n.lerp(c2.n, 0.25); handPose.f.lerp(c2.f, 0.25); cock = 0; curl = 0.06;
     }
     if (!st.soothe || sw) { handPose.n.lerp(c.n, 0.5); handPose.f.lerp(c.f, 0.5); }

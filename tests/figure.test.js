@@ -32,7 +32,7 @@ test('every skinned point’s weights sum to one', () => {
 test('the seat’s spots are on the outer surface, weighted to the pelvis and the cheek', () => {
   for (const sex of ['m', 'f']) for (const id of Crew.IDS) {
     const f = F.make(built(Crew.figureSpec(id, sex, 'uniform'))), g = f.body.geometry, si = g.attributes.skinIndex.array, sw = g.attributes.skinWeight.array, p = g.attributes.position;
-    for (const k of ['upperL', 'centreL', 'sitspotR', 'centreR']) {
+    for (const k of ['cheekL', 'sitspotR', 'cheekR', 'sitspotL']) {
       const sp = f.spot[k];
       // nothing of the body lies further back near it
       for (let i = 0; i < p.count; i++) if (Math.hypot(p.getX(i) - sp.bind.x, p.getY(i) - sp.bind.y) < 0.006) assert.ok(p.getZ(i) >= sp.bind.z - 0.006, `${id}/${sex} ${k}`);
@@ -115,7 +115,7 @@ test('the Blender-built seat’s spots are on its outer surface, in order down i
       const sp = f.spot[k];
       for (let i = 0; i < p.count; i++) if (Math.hypot(p.getX(i) - sp.bind.x, p.getY(i) - sp.bind.y) < 0.006) assert.ok(p.getZ(i) >= sp.bind.z - 0.006, `${sex} ${k}`);
     }
-    for (const s of ['L', 'R']) { const y = a => f.spot[a + s].bind.y; assert.ok(y('upper') > y('centre') && y('centre') > y('sitspot') && y('sitspot') > y('thighs'), sex + s); }
+    for (const s of ['L', 'R']) { const y = a => f.spot[a + s].bind.y; assert.ok(y('cheek') > y('sitspot') && y('sitspot') > y('thighs'), sex + s); }
   }
 });
 
