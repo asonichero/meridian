@@ -35,6 +35,7 @@ This is the first playable piece. It tests the control scheme, the models and th
   - **End turn** (**Enter**), and **cameras** (**C**, or the buttons).
 - **Consent:** each crew member has agreed a safe word (it's shown on screen). The player is the disciplinarian, so the trigger is the pain model's *too harsh* threshold. That bar is higher than redlessons' (1.8 against 1.5) and has to be held for 1.2 s, or overshot by a quarter, so corrections don't trend short. When it's crossed, the crew member calls their word and everything stops.
 - **Scripted responses** per character: as they're placed, at the first smack, as their distress reaches each band, now and then while it's hard, when soothed, the safe word, and at the end.
+- **On a phone,** upright or on its side: the controls are one row that scrolls sideways (with the run button kept at its start) under the dialogue, the set-up opens as a sheet over the view (☰), the crew member's name and agreed word sit compact at the top with the cameras in a row, touch targets are larger, and the view widens when upright and is centred in what the controls leave visible.
 - **After:** a conversation with each crew member in turn, seated side by side on the bench. Aftercare is delivered through what's said (reassure, say why it mattered, or ask how they are), followed by an instruction for the rest of the shift (rest detail, log reset, eat together, or back to station).
 
 ## The look
@@ -58,9 +59,9 @@ For every figure:
 
 ## Poses and animation
 
-- **Across the knee:** the crew member lies across the Captain's right thigh, back slightly arched, hands braced on the bench, toes on the deck past its end, the head turned to the room. The Captain sits leaning in over the lap, turned toward the seat, the left hand flat on the small of the back.
+- **Across the knee:** the Captain sits at the bench's end turned 45° to their right, so the lap points off its corner and nothing of the crew member's is over the bench. The crew member lies with the pelvis over the Captain's right thigh and the belly over the left, the back rounding down past it, the hands braced on the deck (or hanging, fingertips to it, where they don't reach), the legs down to the deck on the other side, the head turned to the room. Where they lie comes from where the Captain's lap actually is. The Captain leans in over them, the left hand resting on the far side of their waist with the forearm across the small of their back, the right resting on the seat between smacks.
 - **At the wall:** bent well forward from the hips with a long back, gripping the rail over the top (fingers wrapped round it), feet apart. The Captain stands close at their left side, knees bent and leaning over them, the left hand on their back.
-- **The strike:** the hand lifts up and out to the Captain's right with the wrist cocked back, the shoulder rising and the torso turning into it. It comes down with the wrist held back until the last moment, snaps flat onto the skin, gives a little coming off, and settles. The elbow lifts high while the hand is raised.
+- **The strike:** the forearm swings up from an elbow that stays low and a little back at the Captain's side, the hand rising to about shoulder height with the wrist cocked back, the torso turning a little into it. It comes down with the wrist held back until the last moment, snaps flat onto the skin, gives a little coming off, and settles.
 - **Reactions** are springs kicked by each smack:
   - **Across the knee:** the leg kicks on the side struck, the hips press down into the lap, the back arches, the head comes up, and the hands push and grip.
   - **At the wall:** they come up onto their toes, the hips drive toward the bulkhead, and a foot comes off the deck now and then.
@@ -68,6 +69,7 @@ For every figure:
 - **Everyone else** stands planted in contrapposto: witnesses with arms folded, at parade rest or hands clasped; whoever's waiting their turn with hands clasped, head down; those done in the corner, feet together, hands on head.
 - **Aftercare:** side by side on the bench, the crew member leaning in, hands in their lap, the Captain's arm round them.
 - **Fades:** a short fade covers each change of set-up (a new turn, a change of position, the aftercare), so nobody snaps into place.
+- **Nothing in the way:** whatever comes between the camera and the two in the middle (a fitting of the bay, someone watching) is hidden while it's there; it still casts its shadow.
 
 ## Files
 

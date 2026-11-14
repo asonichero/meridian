@@ -51,11 +51,19 @@ function create(view, opts) {
   const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.6, 0.92); composer.addPass(bloom);
   const grade = new THREE.ShaderPass(GRADE); composer.addPass(grade);
 
+  // On a tall screen (a phone held upright) the view widens so it takes in as much across as a square one would; and the picture is shifted up by
+  // half of what the controls cover at the bottom (setInsets), so what the camera looks at sits in the middle of what's left to see.
+  const fov0 = camera.fov, insets = { top: 0, bottom: 0 }, DEG = Math.PI / 180;
   function resize() {
-    const w = view.clientWidth || 800, h = view.clientHeight || 600;
-    renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+    const w = view.clientWidth || 800, h = view.clientHeight || 600, a = w / h;
+    renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = a;
+    camera.fov = a < 1 ? 2 * Math.atan(Math.tan(fov0 / 2 * DEG) / a) / DEG : fov0;
+    const dy = Math.round((insets.bottom - insets.top) / 2);
+    if (dy) camera.setViewOffset(w, h, 0, dy, w, h); else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
     const pr = renderer.getPixelRatio(); grade.uniforms.uRes.value.set(w * pr, h * pr);
   }
+  function setInsets(o) { const t = Math.round(o.top || 0), b = Math.round(o.bottom || 0); if (t !== insets.top || b !== insets.bottom) { insets.top = t; insets.bottom = b; resize(); } }
   root.addEventListener('resize', resize); resize();
 
   let tween = null;
@@ -76,7 +84,7 @@ function create(view, opts) {
     const loop = now => { if (!running) return; frame(now, each); requestAnimationFrame(loop); };
     requestAnimationFrame(loop);
   }
-  const api = { renderer, scene, camera, controls, composer, bloom, grade, resize, start, go, draw, step: (ms, each) => { last = performance.now() - ms; frame(performance.now(), each); }, get moving() { return !!tween; } };
+  const api = { renderer, scene, camera, controls, composer, bloom, grade, resize, setInsets, start, go, draw, step: (ms, each) => { last = performance.now() - ms; frame(performance.now(), each); }, get moving() { return !!tween; } };
   return api;
 }
 
