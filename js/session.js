@@ -30,7 +30,9 @@ const yawQ = yaw => new Q().setFromAxisAngle(UP, yaw);
 function create(stage, bay, opts) {
   const scene = stage.scene, C = root.Crew, S = root.Pain, L = root.Lines, A = root.GameAudio;
   const listeners = [], emit = (type, data) => listeners.forEach(f => f(type, data));
-  const st = { running: false, pace: 1, strength: 1, side: 'alt', nextSide: 'R', area: 'sitspot', soothe: false, position: opts.position || 'otk',
+  // (a position is 'otk', 'wall' or 'table'; across the knee may name another of the room's seats, 'otk:bed': `st.seat`)
+  const posOf = p => { const [k, sk] = String(p || 'otk').split(':'); return { position: k, seat: k === 'otk' ? sk || null : null }; };
+  const st = { running: false, pace: 1, strength: 1, side: 'alt', nextSide: 'R', area: 'sitspot', soothe: false, position: posOf(opts.position).position, seat: posOf(opts.position).seat,
     between: opts.between || 'corner', turn: -1, swing: null, ended: false, word: false, t: 0, sound: opts.sound !== false, cam: 0, phase: 'turn', results: [],
     act: null, actQ: [], ending: null };
 
@@ -202,14 +204,19 @@ function create(stage, bay, opts) {
   }
 
   // ── Positions ──
-  const bench = bay.spots.bench, wall = bay.spots.wall, table = bay.spots.table || null;
+  // (across the knee: the room's seat, or another it offers by name (bay.spots.seats, e.g. a bed beside the Captain's chair), the one in use)
+  const benchOf = k => (k && bay.spots.seats && bay.spots.seats[k]) || bay.spots.bench;
+  let bench = benchOf(st.seat);
+  const wall = bay.spots.wall, table = bay.spots.table || null;
   // (each room's own. Across the knee: the seat, the Captain at its end, the bench running on to their left. Standing: what they hold or lean
   // on, ahead of where they stand (rail: a grab rail; edge: a counter's edge, palms flat on its top; wall: palms flat on a wall), and how far
   // they bend to it. Over the table: where its end is, its height and width, and how they hold it (sides, or a desk's far edge). The
   // aftercare's seat: the Captain's place on it, theirs beside.)
   const sup = wall.support || { kind: 'rail', y: wall.rail.y, d: Math.abs(wall.rail.x - wall.at.x), bend: 0.72 };
-  const lineKind = sup.kind === 'wall' ? 'flat' : sup.kind;      // (the lines for each: palms on a bare wall are js/lines.js's 'flat')
-  const after = bay.spots.after || { at: bench.at, yaw: bench.yaw || 0, seatY: bench.seatY, beside: bench.beside };
+  const lineKind = sup.lines || (sup.kind === 'wall' ? 'flat' : sup.kind);      // (the lines for each: palms on a bare wall are js/lines.js's 'flat'; a room can name its own, a desk)
+  // (the aftercare's seat: the room's; or, after a correction across the knee on a seat that has its own (a bed), that one)
+  const afterOf = () => (st.position === 'otk' && bench.after) || bay.spots.after || { at: bench.at, yaw: bench.yaw || 0, seatY: bench.seatY, beside: bench.beside };
+  let after = afterOf();
   const inFrame = (at, yaw, x, y, z) => new V3(x, y, z).applyQuaternion(yawQ(yaw)).add(at);
   // (the posing helpers, js/poses.js; seated, on the bench)
   const { sc, H, ankleY, setRoot, local, toWorldDir, W_, reach, legTo, footFlat, stand, arms } = root.Poses;
@@ -221,7 +228,9 @@ function create(stage, bay, opts) {
   // The Captain sits at the bench's end turned 45° to their right, so their lap points off its corner and nothing of the subject's is over the
   // bench: the head end out to the Captain's left, the legs to their right. (A seat deep enough to sit square on, a bunk, says so with `turn`:
   // perched on its edge facing out, the subject lies along it in front, the legs off to the right along it.)
-  const OTK = { pitch: 0.0, yaw: 0, z: 0.3, seat: inFrame(bench.at, bench.yaw || 0, -0.08, 0, 0), seatYaw: (bench.yaw || 0) - (bench.turn != null ? bench.turn : Math.PI / 4) };
+  const OTK = { pitch: 0.0, yaw: 0, z: 0.3, seat: null, seatYaw: 0 };
+  const seatOTK = () => { OTK.seat = inFrame(bench.at, bench.yaw || 0, -0.08, 0, 0); OTK.seatYaw = (bench.yaw || 0) - (bench.turn != null ? bench.turn : Math.PI / 4); };
+  seatOTK();
   let otkQ = null, otkH = new V3(), otkU = new V3(1, 0, 0), otkX = new V3(0, 0, -1);
   // the top of the Captain's thighs at a point (world), between hip and knee
   function lapAt(P) {
@@ -785,6 +794,7 @@ function create(stage, bay, opts) {
   }
   function aftercare(id) {
     st.phase = 'after'; afterWith = people.find(p => p.id === id); cur = afterWith;
+    after = afterOf(); makeCams();
     afterWith.f.setClothes({ top: 'down', bottoms: 'up', under: 'up' }); emit('state');
   }
 
@@ -801,12 +811,16 @@ function create(stage, bay, opts) {
     after: [['Two-shot', [0.3, 1.0, 1.75], [0.3, 0.85, 0.0]], ['Close', [0.55, 1.05, 1.1], [0.3, 0.95, 0.0]]],
   };
   const BOUNDS = bay.bounds || { minX: -2.4, maxX: 2.4, minZ: -2.0, maxZ: 2.0 };
-  const FRAMES = { otk: [OTK.seat, OTK.seatYaw], wall: [wall.at, wall.yaw], table: table ? [table.at, table.yaw] : null, after: [after.at, after.yaw] };
   const CAMS = {};
-  for (const k in LOCAL_CAMS) {
-    if (!FRAMES[k]) continue; const [at, yaw] = FRAMES[k];
-    CAMS[k] = ((bay.cams && bay.cams[k]) || LOCAL_CAMS[k]).map(([n, p, l]) => [n, ...[p, l].map(v => { const w = inFrame(at, yaw, v[0], 0, v[2]); return [clamp(w.x, BOUNDS.minX, BOUNDS.maxX), v[1], clamp(w.z, BOUNDS.minZ, BOUNDS.maxZ)]; })]);
+  // (rebuilt when the seat across the knee changes, or the aftercare moves to another seat; a seat can give its own)
+  function makeCams() {
+    const FRAMES = { otk: [OTK.seat, OTK.seatYaw], wall: [wall.at, wall.yaw], table: table ? [table.at, table.yaw] : null, after: [after.at, after.yaw] };
+    for (const k in LOCAL_CAMS) {
+      if (!FRAMES[k]) continue; const [at, yaw] = FRAMES[k], own = (k === 'otk' && bench.cams) || (k === 'after' && after.cams) || (bay.cams && bay.cams[k]);
+      CAMS[k] = (own || LOCAL_CAMS[k]).map(([n, p, l]) => [n, ...[p, l].map(v => { const w = inFrame(at, yaw, v[0], 0, v[2]); return [clamp(w.x, BOUNDS.minX, BOUNDS.maxX), v[1], clamp(w.z, BOUNDS.minZ, BOUNDS.maxZ)]; })]);
+    }
   }
+  makeCams();
   function camera(i, ms) {
     const set = CAMS[st.phase === 'after' ? 'after' : st.position]; st.cam = ((i % set.length) + set.length) % set.length;
     const [, p, l] = set[st.cam]; stage.go(new V3(...p), new V3(...l), ms == null ? 900 : ms);
@@ -947,8 +961,11 @@ function create(stage, bay, opts) {
     set(o) { if (st.ending && 'soothe' in o) delete o.soothe; Object.assign(st, o); if (o.soothe) st.running = false; emit('state'); },
     get busy() { return !!(st.act || st.actQ.length || st.ending); },
     next, cared(id) { const r = st.results.find(x => x.id === id); if (r) r.cared = true; },
-    position(p) { if (st.position === p || (p === 'table' && !table)) return; st.position = p; st.swing = null; st.running = false; if (cur) { say('captain', L.place(cur.id, placeKey())); } camera(0); emit('state'); },
-    positions: ['otk', 'wall'].concat(table ? ['table'] : []), support: sup.kind,
+    position(p) { const q = posOf(p); if ((st.position === q.position && st.seat === q.seat) || (q.position === 'table' && !table)) return;
+      st.position = q.position; st.seat = q.seat; st.swing = null; st.running = false;
+      if (bench !== benchOf(st.seat)) { bench = benchOf(st.seat); seatOTK(); after = afterOf(); makeCams(); }
+      if (cur) { say('captain', L.place(cur.id, placeKey())); } camera(0); emit('state'); },
+    positions: ['otk', 'wall'].concat(table ? ['table'] : [], Object.keys(bay.spots.seats || {}).map(k => 'otk:' + k)), support: sup.kind,
     dress(o) { if (cur && st.phase === 'turn' && !st.ending) dressTo(o); },
     endTurn: () => endTurn('done'), callWord, camera, aftercare, update,
     distress: () => (cur ? cur.pain.distress() : 0), band: () => (cur ? BANDS[bandIndex()] : ''), harshAt: S.PAIN.TOO_HARSH,

@@ -304,5 +304,5 @@ function build(scene) {
     bounds: { minX: X0 + 0.15, maxX: X1 - 0.15, minZ: ZO + 0.15, maxZ: ZC - 0.15 }, get low() { return low; }, tick() {} };
 }
 
-root.Quarters = { build };
+root.Quarters = { build, kit: { wallTex, carpetTex, ceilTex, weave, rugTex, corkTex, viewTex, oakTex, sheetTex, blanketTex, screenTex } };
 })(typeof window !== 'undefined' ? window : globalThis);

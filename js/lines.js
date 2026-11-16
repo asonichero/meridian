@@ -8,12 +8,13 @@
 'use strict';
 const pick = a => (Array.isArray(a) ? a[Math.floor(Math.random() * a.length)] : a);
 
-// The Captain placing them, by position (standing, by what they hold: wall, a grab rail; edge, a counter; flat, a bare wall).
+// The Captain placing them, by position (standing, by what they hold: wall, a grab rail; edge, a counter; flat, a bare wall; desk, a desk).
 const PLACE = {
   otk: ['Across my knee, {name}.', 'Here. Over my lap.', 'You know where. Across my knee.'],
   wall: ['Hands on the rail, {name}. Feet apart.', 'Face the bulkhead. Grip the rail and hold it.', 'Rail. Both hands. Don’t let go of it.'],
   edge: ['Hands on the counter, {name}. Step back. Bend.', 'Palms flat on the island. Feet apart.', 'Over here. Hands on the counter and keep them there.'],
   flat: ['Hands on the wall, {name}. Step back.', 'Palms flat on the wall. Feet apart.', 'Face the wall. Hands on it, and keep them there.'],
+  desk: ['Hands on the desk, {name}. Step back. Bend.', 'Palms flat on the desk. Feet apart.', 'Over here. Both hands on the desk, and keep them there.'],
   table: ['Over the table, {name}.', 'Bend over the end of the table. Hold the edges.', 'Here. Chest down on the table.'],
 };
 // The Captain, when defiance gets in the way: a hand back over the seat (hands), the second time and he takes the wrist and holds it at the
@@ -25,6 +26,7 @@ const CAPTAIN = {
   rail: ['Back in position.', 'Hands on the rail. Bend.', 'Down, {name}. Hold the rail.'],
   edge: ['Hands back on the counter.', 'Down. Palms flat, {name}.', 'Back over the counter.'],
   flat: ['Hands back on the wall.', 'Back in position, {name}.', 'Palms on the wall. Stay there.'],
+  desk: ['Hands back on the desk.', 'Down. Palms flat, {name}.', 'Back over the desk.'],
   table: ['Back down on the table.', 'Chest down, {name}.', 'Stay down on the table.'],
 };
 
