@@ -4,7 +4,7 @@
 // bench each side down the middle, soft seating aft along the hull. The ship's bones (painted steel, a grating corridor, acoustic tiles) under the
 // crew's warmth: synthetic-wood floor, table and dado, amber pendants, a sofa with a throw, the clocks for ship's time and Earth's. Painted in code.
 //
-//   const mess = Mess.build(scene) → the same shape as SuitBay.build: { group, spots, bounds, cams, sideOf, sidesAt, setLow, tick, name }
+//   const mess = Mess.build(scene) → the same shape as SuitBay.build: { group, spots, bounds, cams, sideOf, sidesAt, setLow, setTime('day' | 'night'), tick, name }
 //   spots.bench: across the knee, the Captain at the fore end of the spine-side bench, facing the corridor (the bench running on to their left);
 //   spots.wall: standing at the island, palms flat on its top; spots.table: over the fore end of the crew table; spots.after: the sofa;
 //   watch: along the corridor; corner: facing the aft bulkhead.
@@ -25,8 +25,8 @@ const plankTex = K.canvasTex(512, 512, (c, w, h) => {
   speckle(c, w, h, 400, '#000', 0.06, 2);
 }, [5, 3]);
 const tileTex = K.canvasTex(256, 256, (c, w, h) => {
-  c.fillStyle = '#3c4044'; c.fillRect(0, 0, w, h); c.fillStyle = '#4a4f54';
-  for (let y = 0; y < h; y += 64) for (let x = 0; x < w; x += 64) { c.fillRect(x + 2, y + 2, 60, 60); c.fillStyle = 'rgba(0,0,0,0.25)'; for (let i = 0; i < 25; i++) { c.beginPath(); c.arc(x + 8 + (i % 5) * 12, y + 8 + Math.floor(i / 5) * 12, 1.6, 0, 7); c.fill(); } c.fillStyle = '#4a4f54'; }
+  c.fillStyle = '#6a665e'; c.fillRect(0, 0, w, h); c.fillStyle = '#7c776c';
+  for (let y = 0; y < h; y += 64) for (let x = 0; x < w; x += 64) { c.fillRect(x + 2, y + 2, 60, 60); c.fillStyle = 'rgba(0,0,0,0.25)'; for (let i = 0; i < 25; i++) { c.beginPath(); c.arc(x + 8 + (i % 5) * 12, y + 8 + Math.floor(i / 5) * 12, 1.6, 0, 7); c.fill(); } c.fillStyle = '#7c776c'; }
 }, [7, 3]);
 const backsplashTex = K.canvasTex(256, 128, (c, w, h) => {
   c.fillStyle = '#b8b09a'; c.fillRect(0, 0, w, h);
@@ -59,7 +59,7 @@ function build(scene) {
   const cyl = (r0, r1, h, m, x, y, z, rot, seg, det) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg || 16), m); c.position.set(x, y, z); if (rot) c.rotation.set(rot[0], rot[1], rot[2]); c.castShadow = true; c.receiveShadow = true; G.add(c); if (det) detail.push(c); return c; };
   const plane = (w, h, m, x, y, z, rx, ry) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); p.position.set(x, y, z); p.rotation.set(rx || 0, ry || 0, 0); p.receiveShadow = true; G.add(p); return p; };
 
-  const steel = std({ map: K.panelTex('#565a58', [1, 1]), roughness: 0.62, metalness: 0.3 });
+  const steel = std({ map: K.panelTex('#8a8272', [1, 1]), roughness: 0.7, metalness: 0.15 });      // (the mess's walls painted a warm stone, over the bare steel)
   const steelDark = std({ map: K.panelTex('#2a3034', [1, 1]), roughness: 0.6, metalness: 0.4 });
   const corridorWall = std({ map: K.panelTex('#3a454e', [1, 1]), roughness: 0.62, metalness: 0.35 });
   const wood = std({ map: K.woodTex, roughness: 0.55, metalness: 0 }), woodLight = std({ color: srgb('#a07a54'), map: K.woodTex, roughness: 0.55, metalness: 0 });
@@ -69,7 +69,8 @@ function build(scene) {
   const sofaM = std({ map: fabricTex('#8a4a2e', 'rgba(255,220,180,0.06)'), roughness: 0.95, metalness: 0 });
   const chairM = std({ map: fabricTex('#4a6a5a', 'rgba(255,255,255,0.05)'), roughness: 0.95, metalness: 0 });
   const glowA = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: srgb('#ffb05a'), emissiveIntensity: 5 });
-  const glowC = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: srgb('#7ab8d8'), emissiveIntensity: 3 });
+  const glowC = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: srgb('#e4ecff'), emissiveIntensity: 3.5 });      // (the corridor's strips: a harsh white)
+  const glowS = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: srgb('#ffd9a0'), emissiveIntensity: 4 });      // (the mess's: warm, straw)
   const glowF = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: srgb('#ffc880'), emissiveIntensity: 3.5 });
 
   // ── The shell: floors (wood in the mess, grating in the corridor), ceilings, the bulkheads; the open side's pillars and header ──
@@ -95,7 +96,7 @@ function build(scene) {
   for (const x of [X0, X1]) { box(0.14, HT, 0.14, steelDark, x, HT / 2, ZS); box(0.12, 0.12, ZC - ZS, steelDark, x, HT - 0.06, (ZS + ZC) / 2); }
   for (const x of [-2.3, 2.3]) box(0.18, HT, 0.18, steelDark, x, HT / 2, ZS);
   box(X1 - X0, 0.3, 0.2, steelDark, 0, HT - 0.15, ZS);
-  for (let x = X0 + 1.75; x < X1; x += 1.75) box(0.12, 0.12, ZS - ZO, steelDark, x, HT - 0.06, (ZO + ZS) / 2, { detail: false });
+  for (let x = X0 + 1.75; x < X1; x += 1.75) { box(0.12, 0.12, ZS - ZO, steelDark, x, HT - 0.06, (ZO + ZS) / 2); box(0.05, 0.016, ZS - ZO - 0.3, glowS, x, HT - 0.128, (ZO + ZS) / 2, { noCast: true }); }      // (the rafters, an LED strip under each)
   // (the string of little warm lights the crew hung along the open side)
   for (let x = X0 + 0.3; x < X1; x += 0.35) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), glowF); b.position.set(x, HT - 0.32 - 0.05 * Math.abs(Math.sin(x * 2.2)), ZS - 0.12); G.add(b); detail.push(b); }
 
@@ -184,7 +185,9 @@ function build(scene) {
   islandKey.castShadow = true; islandKey.shadow.mapSize.set(1024, 1024); islandKey.shadow.bias = -0.0005; islandKey.shadow.normalBias = 0.02; G.add(islandKey); G.add(islandKey.target);
   const galleyL = new THREE.PointLight(srgb('#ffb070'), 1.4, 3.5, 2); galleyL.position.set(-3.5, 1.4, ZO + 0.5); G.add(galleyL);
   const lampL = new THREE.PointLight(srgb('#ffb070'), 1.8, 4, 2); lampL.position.set(4.75, 1.45, ZO + 0.4); G.add(lampL);
-  const corrL = new THREE.PointLight(srgb('#8ab0d8'), 2.2, 7, 2); corrL.position.set(0, 2.2, (ZS + ZC) / 2); G.add(corrL);
+  const corrL = new THREE.PointLight(srgb('#dfe8ff'), 2.4, 7, 2); corrL.position.set(0, 2.2, (ZS + ZC) / 2); G.add(corrL);
+  // (the rafters' strips light the room by day, warm and even, from four points along it; at night they're turned right down)
+  const stripL = [-4.4, -1.5, 1.5, 4.4].map(x => { const l = new THREE.PointLight(srgb('#ffd9a0'), 5, 9, 2); l.position.set(x, HT - 0.35, 0); G.add(l); return l; });
   const sofaL = new THREE.PointLight(srgb('#ffc890'), 1.0, 4, 2); sofaL.position.set(2.6, 2.2, -1.6); G.add(sofaL);
 
   // ── Where things happen ──
@@ -200,24 +203,32 @@ function build(scene) {
   const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
     ['Their face', [-0.5, 1.15, 1.9], [0, 1.05, 0.6]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [1.05, 1.9, -2.95], [-0.15, 0.8, -0.15]]] };
 
-  // ── Low-CPU mode: the room's own shadows go (only the figures cast them, from the table's key, on a smaller map), the small lamps go (the
-  // fill up a little to make up), the small things aren't drawn. ──
+  // ── Day and night: by day the rafters' strips are up and the room is lit warm and even, like a comfortable room indoors; at night they're
+  // down and it's the pendants over the table and the lamps, low and amber. Low-CPU mode: the room's own shadows go (only the figures cast
+  // them, from the table's key, on a smaller map), the small lamps and the strips' lights go (the fill up to make up), the small things aren't
+  // drawn. ──
   const meshes = []; G.traverse(o => { if (o.isMesh) meshes.push(o); });
   const cast0 = new Map(meshes.map(m => [m, m.castShadow]));
-  let low = false;
-  function setLow(on) {
-    low = !!on;
+  let low = false, time = 'day';
+  function apply() {
+    const day = time === 'day';
     for (const m of meshes) m.castShadow = low ? false : cast0.get(m);
     for (const d of detail) d.visible = !low;
     for (const l of [galleyL, lampL, sofaL]) l.visible = !low;
-    hemi.intensity = low ? 1.0 : 0.75; corrL.intensity = low ? 2.8 : 2.2;
+    for (const l of stripL) l.visible = !low && day;
+    glowS.emissiveIntensity = day ? 6 : 0.35;
+    hemi.color.copy(srgb(day ? '#fff3dc' : '#c8b8a0')); hemi.intensity = (day ? 1.6 : 0.75) + (low ? (day ? 1.0 : 0.25) : 0);
+    amb.intensity = day ? 1.0 : 0.5; key.intensity = day ? 6 : 7.5; lampL.intensity = day ? 1.0 : 1.8; sofaL.intensity = day ? 0.6 : 1.0;
+    corrL.intensity = low ? 3.0 : 2.4;
     islandKey.castShadow = !low;
     const sz = low ? 1024 : 2048;
     if (key.shadow.mapSize.x !== sz) { key.shadow.mapSize.set(sz, sz); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
   }
+  const setLow = on => { low = !!on; apply(); }, setTime = t => { time = t === 'night' ? 'night' : 'day'; apply(); };
+  apply();
   const { sideOf, sidesAt } = K.roomSides(G, { minX: X0, maxX: X1, minZ: ZO, maxZ: ZC, ht: HT }, [floor, corridorFloor]);
   let t = 0;
-  return { group: G, spots, key, cams, setLow, sideOf, sidesAt, name: 'Galley & mess', bounds: { minX: X0 + 0.2, maxX: X1 - 0.2, minZ: ZO + 0.2, maxZ: ZC - 0.2 }, get low() { return low; },
+  return { group: G, spots, key, cams, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Galley & mess', bounds: { minX: X0 + 0.2, maxX: X1 - 0.2, minZ: ZO + 0.2, maxZ: ZC - 0.2 }, get low() { return low; },
     tick(dt) { t += dt; glowF.emissiveIntensity = 3.2 + 0.4 * Math.sin(t * 1.3); } };
 }
 

@@ -106,6 +106,8 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
   <p class="sub">Choose the room, who's corrected (in order), who witnesses, and how; then begin. The player runs it: runs of smacks on a toggle, pace, strength, where, and soothing between. If it goes too far, the crew member calls their agreed word and it stops.</p>
   <h2>Room</h2>
   <div class="row seg" id="room"><button data-v="suitbay" class="on">Suit bay</button><button data-v="mess">Galley &amp; mess</button></div>
+  <h2>Time of day</h2>
+  <div class="row seg" id="tod"><button data-v="day">Day</button><button data-v="night">Night</button></div>
   <h2>Position</h2>
   <div class="row seg" id="pos"></div>
   <h2>Crew <span style="text-transform:none;letter-spacing:0">(tap: corrected → witness → absent)</span></h2>
@@ -165,7 +167,7 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
 'use strict';
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
 const KEY = 'meridian:session:v1';
-const cfg = Object.assign({ room: 'suitbay', position: 'otk', between: 'corner', outfit: 'uniform', roles: { pilot: 'subject', engineer: 'witness' }, sex: { scientist: 'f', engineer: 'm', pilot: 'f', lifesupport: 'm', comms: 'f', medic: 'm' },
+const cfg = Object.assign({ room: 'suitbay', time: 'day', position: 'otk', between: 'corner', outfit: 'uniform', roles: { pilot: 'subject', engineer: 'witness' }, sex: { scientist: 'f', engineer: 'm', pilot: 'f', lifesupport: 'm', comms: 'f', medic: 'm' },
   order: ['pilot'], captain: { sex: 'm', skin: '#b88a6a', hair: '#3a2a20', hairStyle: 'crop', build: 'average', beard: true } }, (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } })());
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* no storage */ } };
 const seg = (id, val, fn) => { const el = $(id); el.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === val); b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); }; }); };
@@ -237,11 +239,15 @@ $('hide').onclick = () => $('setup').classList.toggle('closed');
 if (q.get('low')) cfg.graphics = q.get('low') === '0' ? 'full' : 'low';
 const stage = Stage.create($('view'), { keep: !!q.get('still'), low: cfg.graphics === 'low' });
 let bay = ROOMS[cfg.room].build(stage.scene);
-bay.setLow(cfg.graphics === 'low');
+bay.setLow(cfg.graphics === 'low'); if (bay.setTime) bay.setTime(cfg.time);
+// (the time of day: in rooms that light for it (the mess), day is bright and warm, night low and amber)
+if (q.get('time')) cfg.time = q.get('time') === 'night' ? 'night' : 'day';
+seg('tod', cfg.time, v => { cfg.time = v; save(); if (bay.setTime) bay.setTime(v); });
+if (bay.setTime) bay.setTime(cfg.time);
 // (another room: the old one taken down, the new one built, and a session in progress begun again there)
 seg('room', cfg.room, v => {
   if (v === cfg.room) return; cfg.room = v; save(); drawPos();
-  stage.scene.remove(bay.group); bay = ROOMS[v].build(stage.scene); bay.setLow(cfg.graphics === 'low');
+  stage.scene.remove(bay.group); bay = ROOMS[v].build(stage.scene); bay.setLow(cfg.graphics === 'low'); if (bay.setTime) bay.setTime(cfg.time);
   if (ses) { fade(); models.then(begin); }
 });
 seg('gfx', cfg.graphics || 'full', v => { cfg.graphics = v; save(); stage.setLow(v === 'low'); bay.setLow(v === 'low'); });
