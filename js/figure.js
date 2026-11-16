@@ -117,19 +117,19 @@ function paint(m, o) {
     uMarks: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9, 0, 0)) }, uMarkCol: { value: srgb(o.markCol || '#b8323a') },
     uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() }, uNape: { value: new THREE.Vector4() }, uFlush: { value: new THREE.Vector4() }, uFlushC: { value: new THREE.Vector4() } };
   m.userData.u = U;
-  const key = 'paint|' + [o.regions, o.marks, o.bindAttr].map(x => (x ? 1 : 0)).join('') + (o.pattern || '');
+  const key = 'paint|' + [o.regions, o.marks, o.bindAttr, o.tone].map(x => (x ? 1 : 0)).join('') + (o.pattern || '');
   m.customProgramCacheKey = () => key;
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
-attribute vec3 bind; ${o.regions || o.pattern ? 'attribute float region;' : ''} varying vec3 vBind; varying float vHide; varying float vPart; uniform float uHide;`)
+attribute vec3 bind; ${o.regions || o.pattern ? 'attribute float region;' : ''} ${o.tone ? 'attribute float tone;' : ''} varying vec3 vBind; varying float vHide; varying float vPart; varying float vTone; uniform float uHide;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vBind = ${o.bindAttr ? 'bind' : 'position'};
-${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'} ${o.pattern ? 'vPart = region;' : 'vPart = 0.0;'}`);
+${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'} ${o.pattern ? 'vPart = region;' : 'vPart = 0.0;'} ${o.tone ? 'vTone = tone;' : 'vTone = 0.0;'}`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uNape; uniform vec4 uFlush; uniform vec4 uFlushC; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
+varying vec3 vBind; varying float vHide; varying float vPart; varying float vTone; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uNape; uniform vec4 uFlush; uniform vec4 uFlushC; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
@@ -137,10 +137,12 @@ if (uNape.z > 0.5 && vBind.y > uNape.x + max(0.0, vBind.z - uNape.y) * uNape.w) 
 // (the body's response (F.setResponse): blood to the sex, a deeper, rosier tone there; his, the whole length as it hangs at rest, and the
 // scrotum; hers, the outer forms and the bottom of the mons)
 if (uFlush.x > 0.001) {
-  float lo = uFlush.y - (uFlush.w > 0.5 ? 0.125 : 0.042), hi = uFlush.y + (uFlush.w > 0.5 ? 0.06 : 0.034), wx = uFlush.w > 0.5 ? 0.042 : 0.032;
+  float lo = uFlush.y - (uFlush.w > 0.5 ? 0.125 : 0.042), hi = uFlush.y + (uFlush.w > 0.5 ? 0.06 : 0.04), wx = uFlush.w > 0.5 ? 0.042 : 0.026;
   float fw = (1.0 - smoothstep(wx - 0.022, wx, abs(vBind.x))) * smoothstep(lo, lo + 0.015, vBind.y) * (1.0 - smoothstep(hi - 0.02, hi, vBind.y)) * smoothstep(uFlush.z - 0.03, uFlush.z, vBind.z);
   diffuseColor.rgb *= mix(vec3(1.0), vec3(0.86, 0.54, 0.58), fw * uFlush.x);
 }
+// (her inner form, in the crease between the folds: a deeper rose always, deeper again with the response)
+if (vTone > 0.01) diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78, 0.47, 0.5), clamp(vTone, 0.0, 1.0) * (0.7 + 0.3 * uFlush.x));
 // (and with desire, the flush spreads up the chest to the throat: a blotchy warmth across the front)
 if (uFlushC.x > 0.001) {
   float cw = smoothstep(uFlushC.y, uFlushC.y + 0.05, vBind.y) * (1.0 - smoothstep(uFlushC.z - 0.03, uFlushC.z, vBind.y)) * (1.0 - smoothstep(0.08, 0.14, abs(vBind.x))) * smoothstep(-0.01, 0.03, vBind.z);
@@ -1145,6 +1147,8 @@ function prepare(sx, gltf, M) {
     g.setAttribute('bind', g.attributes.position.clone());
     const part = g.attributes._part;      // (the sex, all of it, is under the briefs, however far it hangs)
     if (name === 'Body') for (let i = 0; i < n; i++) reg[i] = part && part.getX(i) > 0.5 ? R.SEAT : bodyRegion([p.getX(i), p.getY(i), p.getZ(i)], dom[i], L, sx);
+    // (her inner form: its own tone, _PART 2)
+    if (name === 'Body') { const tn = new Float32Array(n); if (part) for (let i = 0; i < n; i++) tn[i] = part.getX(i) > 1.5 ? 1 : 0; g.setAttribute('tone', new THREE.Float32BufferAttribute(tn, 1)); }
     else if (/^(Tunic|Shirt)/.test(name)) for (let i = 0; i < n; i++) reg[i] = ARM_BONES.test(dom[i]) ? 1 : 0;
     g.setAttribute('region', new THREE.Float32BufferAttribute(reg, 1));
     g.userData.shared = true;
@@ -1207,7 +1211,7 @@ function makeGLB(spec, T) {
   F.keys = bodyKeys(spec);
   for (const k in T.mesh) T.mesh[k].geo.userData.keys = T.mesh[k].keys;
   // the body
-  const skinM = tmat(spec.skin, { skin: true, morph: true, regions: true, marks: true, bindAttr: true, unique: true, rim: '#6a5048', rimK: 0.5 });
+  const skinM = tmat(spec.skin, { skin: true, morph: true, regions: true, marks: true, bindAttr: true, tone: true, unique: true, rim: '#6a5048', rimK: 0.5 });
   F.body = skinned(F, T.mesh.Body.geo, skinM); F.body.castShadow = true; F.body.receiveShadow = false; F.skinMat = skinM;
   // (the nape, from just above the collar up under the skull, isn't drawn: the head's own skin is there, and the neck's would show through the
   // back of the head as it tips back; cut level behind, rising round the sides toward the jaw)

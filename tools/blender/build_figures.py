@@ -618,20 +618,43 @@ def his_root(torso, leg):
     s = ss(CROTCH_Y - 0.012, CROTCH_Y + 0.04, P[:, 1]); t = s * St.f(P) + (1 - s) * np.maximum(Sl[0].f(P), Sl[1].f(P))
     i = int(np.argmax(t < 0)); return P[i], u
 
-# her outer forms: either side of the middle at the front of the crotch, hanging a little below it between the thighs (centre, radii)
+# her outer forms: either side of the middle at the front of the crotch, hanging a little below it between the thighs (centre, radii: where
+# the briefs' gusset is shaped round them)
 LAB_C, LAB_R = np.array([0.0078, 0.001, 0.028]), np.array([0.0125, 0.024, 0.021])
+# Her outer folds, each a tube along a path (height above the crotch, depth): rising out of the front of the torso at the mons (just inside its
+# surface, so they blend into it), down round the front of the crotch, fullest low at the front, hanging a little below it between the thighs,
+# and back toward the perineum. Their radii along it; each side's middle set off the midline by a little under its radius, so the two meet in
+# a crease. Between them, set back in the crease, the inner form, seen only as they part.
+HER_PATH = np.array([[0.046, 0.086], [0.032, 0.086], [0.018, 0.0725], [0.005, 0.0515], [-0.006, 0.030], [-0.012, 0.010], [-0.010, -0.009]])
+HER_R = np.array([0.0045, 0.0072, 0.0094, 0.0106, 0.0106, 0.0094, 0.0068])
+INNER_PATH = np.array([[0.020, 0.062], [0.007, 0.043], [-0.004, 0.025], [-0.008, 0.009]]); INNER_R = np.array([0.0032, 0.0046, 0.0046, 0.0036])
+def tube(P, pts, rs):
+    """A tube along a path of points, its radius following rs: how far inside it each point is."""
+    best = np.full(len(P), -1.0)
+    for i in range(len(pts) - 1):
+        a, b = pts[i], pts[i + 1]; ab = b - a; t = np.clip(((P - a) @ ab) / (ab @ ab), 0.0, 1.0)
+        d = np.linalg.norm(P - (a[None, :] + t[:, None] * ab[None, :]), axis=1); best = np.maximum(best, rs[i] + t * (rs[i + 1] - rs[i]) - d)
+    return best
+def her_folds(k=(1.0, 1.0, 1.0)):
+    """Her outer folds and the inner form as fields; k: (fullness, parting, –), with her response: fuller along their length (never rounder
+    at one place: they stay folds), parting a little, the inner form fuller and a little forward."""
+    full = 1 + (k[0] - 1) * 0.9; part = (k[1] - 1) * 0.006
+    R_ = HER_R * full * ss(0.046, 0.02, HER_PATH[:, 0]) + HER_R * ss(0.02, 0.046, HER_PATH[:, 0])      # (fuller below; where they rise into the mons, as ever)
+    side = lambda sx: np.stack([sx * (0.92 * R_ + 0.0006 + part * ss(0.03, 0.0, HER_PATH[:, 0])), CROTCH_Y + HER_PATH[:, 0], HER_PATH[:, 1]], 1)
+    ip = np.stack([np.zeros(len(INNER_PATH)), CROTCH_Y + INNER_PATH[:, 0], INNER_PATH[:, 1] + 0.002 * (k[0] - 1) / 0.25], 1); ir = INNER_R * (1 + (k[0] - 1) * 0.6)
+    outer = lambda P: np.maximum(tube(P, side(1), R_), tube(P, side(-1), R_))
+    inner = lambda P: tube(P, ip, ir)
+    return outer, inner
 def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     """Hers: the two outer forms at the bottom of the mons, rounded, hanging a little below the crotch between the thighs (meeting them at a
     crease), the slit between them where they meet. His: the scrotum and penis, hanging, their roots well up
     in the body so they join it without a crease; k: (girth, length, scrotum) for the shape keys toward smaller or larger. Returns the forms
     to join to the body, a field to cut from it, and how softly they're joined. Simple, soft forms, as the rest is."""
     if sex == 'f':
-        # (k: fuller and parting, with her response: fuller forward and down, hardly at all sideways into the thighs, parting a millimetre)
-        C = LAB_C + np.array([(k[1] - 1) * 0.004, CROTCH_Y, 0.0]); R_ = LAB_R * np.array([1 + (k[0] - 1) * 0.3, k[0], k[0]])
-        def parts(P):
-            # (each its own rounded form, the two meeting in the middle in a narrow V: the slit between them is where they meet)
-            fl = [(1 - np.linalg.norm((P - C * np.array([sx, 1, 1])) / R_, axis=1)) * R_.min() for sx in (1, -1)]
-            return smax(fl[0], fl[1], 0.002)
+        # (the two folds meeting in a crease, the inner form in it; k with her response: see her_folds)
+        outer, inner = her_folds(k)
+        parts = lambda P: smax(outer(P), inner(P), 0.0015)
+        parts.inner = inner
         return parts, None, 0.007
 
     kg, kl, ks = k
@@ -779,7 +802,12 @@ def build(sex):
             Yv[ring, 0] = sg[ring] * np.maximum(Yv[ring, 0] * sg[ring], np.abs(X[ring, 0]))
         k = body.shape_key_add(name=v, from_mix=False); k.data.foreach_set('co', np.stack([Yv[:, 0], -Yv[:, 2], Yv[:, 1]], 1).ravel())
     ink_weights(body)
-    a = body.data.attributes.new('_PART', 'FLOAT', 'POINT'); a.data.foreach_set('value', (label == 'sex').astype(np.float32))
+    if sex == 'f':      # (a finer outline over her forms: the crease between the folds is narrow, and a full one scribbles across it)
+        ia = body.data.attributes['_INK']; iv = np.zeros(len(X), np.float32); ia.data.foreach_get('value', iv); iv[label == 'sex'] *= 0.45; ia.data.foreach_set('value', iv)
+    # (_PART: 1 on the sex; on hers, 2 on the inner form, for its own deeper tone)
+    pv = (label == 'sex').astype(np.float32)
+    if sex == 'f': pv[(label == 'sex') & (her_folds()[1](X) > -0.0016) & (np.abs(X[:, 0]) < 0.0045)] = 2.0
+    a = body.data.attributes.new('_PART', 'FLOAT', 'POINT'); a.data.foreach_set('value', pv)
     J = joints(sex, torso, leg, arm, None)
     rig = armature('Rig', J)
     bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); rig.select_set(True); bpy.context.view_layer.objects.active = rig
@@ -791,7 +819,8 @@ def build(sex):
 
 def sex_weights(body, X, label, sex, torso, leg):
     """His sex goes with the pelvis (the automatic weighting splits it between the thighs, which tears it as the legs part): on it all hips,
-    blending back to the automatic weights over a centimetre and a half round it. Hers goes each side with its own thigh. His penis, from where it leaves the body to the tip, then
+    blending back to the automatic weights over a centimetre and a half round it. Hers too, only the folds' lower outer edges sharing a little with
+    the thighs. His penis, from where it leaves the body to the tip, then
     goes onto its own bone for the lift, all of it from where it leaves the body (so it lifts straight)."""
     parts = sex_parts(sex, Surface(torso))[0]
     k = ss(-0.015, -0.002, parts(X))
@@ -809,9 +838,9 @@ def sex_weights(body, X, label, sex, torso, leg):
         tot = sum(gw.values()); gw = {gi: wt / tot for gi, wt in gw.items()} if tot > 0 else {hips: 1.0}
         gw = {gi: wt * (1 - k[i]) for gi, wt in gw.items()}
         if sex == 'f':
-            # (hers: each form with its own thigh, so they go together as the hips roll: mostly the thigh at the bottom, mostly the pelvis where they
-            # meet the mons; across the middle shared between the two thighs)
-            th = 0.2 + 0.72 * ss(CROTCH_Y + 0.02, CROTCH_Y - 0.015, X[i, 1]); lf = ss(-0.004, 0.004, X[i, 0])
+            # (hers: with the pelvis, so they stay together as the hips roll and the legs part; only the lower outer edges, where they meet the
+            # thighs, share a little with them, so a fold eases open as its thigh moves away; the inner form and the crease all pelvis)
+            th = 0.3 * ss(CROTCH_Y + 0.012, CROTCH_Y - 0.01, X[i, 1]) * ss(0.005, 0.014, abs(X[i, 0])); lf = 1.0 if X[i, 0] > 0 else 0.0
             for gi, wt in ((hips, 1 - th), (thL, th * lf), (thR, th * (1 - lf))): gw[gi] = gw.get(gi, 0.0) + k[i] * wt
         else: gw[hips] = gw.get(hips, 0.0) + k[i]
         member = {g.group for g in v.groups}
@@ -1013,10 +1042,11 @@ def garments(sex, torso, leg, arm, body, label, rig):
         zp = front_z(Surface(torso), CROTCH_Y + 0.025); PC = np.array([0.0, CROTCH_Y + 0.014, zp - 0.022]); PR = np.array([0.042, 0.056, 0.03])
         pouch = lambda P: (1 - np.linalg.norm((P - PC) / PR, axis=1)) * PR.min()
         briefs_f = (lambda b: lambda P: smax(b(P), pouch(P), 0.03))(briefs_f)
-    else:      # (hers: the gusset carried down round her forms, smooth over them)
-        GC = np.array([0.0, CROTCH_Y - 0.004, LAB_C[2]]); GR = np.array([0.026, 0.024, 0.026])
+    else:      # (hers: the gusset carried down round her forms and back under them, and the front smooth over the folds' length, at their fullest)
+        GC = np.array([0.0, CROTCH_Y - 0.006, 0.02]); GR = np.array([0.026, 0.026, 0.036])
         gus = lambda P: (1 - np.linalg.norm((P - GC) / GR, axis=1)) * GR.min()
-        briefs_f = (lambda b: lambda P: smax(b(P), gus(P), 0.014))(briefs_f)
+        folds_full = her_folds((1.25, 1.25, 1.0))[0]
+        briefs_f = (lambda b: lambda P: smax(smax(b(P), gus(P), 0.014), folds_full(P) + 0.0055, 0.012))(briefs_f)
     def pouch_keys(ob, base_f, gap):
         """The pouch's size with his: the garment's sexLarge and sexSmall keys, where the pouch is, moved out from its middle (or in)."""
         if pouch is None or not ob.data.shape_keys: return

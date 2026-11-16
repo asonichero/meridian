@@ -145,3 +145,19 @@ test('the arms, hanging a little out at rest, still reach where they’re sent',
     assert.ok(f.bone['hand' + s].getWorldPosition(new V()).distanceTo(W) < 0.002, s);
   }
 });
+
+test('her forms: folds with the pelvis (only their lower outer edges sharing with the thighs), and the inner form between them with its own tone', async () => {
+  await loaded;
+  const f = gfig('pilot', 'f'), g = f.body.geometry, part = g.attributes._part, tone = g.attributes.tone, p = g.attributes.position;
+  const w = g.attributes.skinWeight.array, j = g.attributes.skinIndex.array, hips = f.bones.indexOf(f.bone.hips);
+  let sex = 0, inner = 0, offMid = 0, onHips = 0;
+  for (let i = 0; i < part.count; i++) {
+    if (part.getX(i) < 0.5) continue; sex++;
+    let wh = 0; for (let k = 0; k < 4; k++) if (j[i * 4 + k] === hips) wh += w[i * 4 + k];
+    if (wh > 0.65) onHips++;
+    if (part.getX(i) > 1.5) { inner++; assert.equal(tone.getX(i), 1); if (Math.abs(p.getX(i)) > 0.006) offMid++; } else assert.equal(tone.getX(i), 0);
+  }
+  assert.ok(sex > 150 && inner > 5 && inner < sex / 3, `${sex} on the sex, ${inner} on the inner form`); assert.equal(offMid, 0, 'the inner form at the midline');
+  assert.ok(onHips / sex > 0.85, `mostly with the pelvis: ${onHips}/${sex}`);
+  const m = gfig('pilot', 'm'); for (let i = 0; i < m.body.geometry.attributes.tone.count; i++) assert.equal(m.body.geometry.attributes.tone.getX(i), 0);
+});
