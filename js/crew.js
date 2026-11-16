@@ -7,7 +7,9 @@
 (function (root) {
 'use strict';
 
-// meters (GDD §3.1): Stress, Wilfulness, Resentment, Compliance (not used by the correction test yet).
+// meters (GDD §3.1): Stress, Wilfulness, Resentment, Compliance. For now: wilfulness, each crew member's baseline (meters.wilfulness, 0–1:
+// how much defiance they bring to a correction, the set-up's starting point for it), and the Resentment and Compliance a correction leaves
+// (js/session.js). Stress isn't tracked yet.
 const METERS = ['stress', 'wilfulness', 'resentment', 'compliance'];
 
 // pain: how much they can take (tolerance) and how fast it fades (resilience), for js/pain.js.
@@ -17,42 +19,42 @@ const METERS = ['stress', 'wilfulness', 'resentment', 'compliance'];
 // everyone for now). dynamic.bond: the affection between them and the Captain, given and returned, 0–1 (not yet tracked by the game; the more
 // of it, the less he keeps his own response in check). dept: their department colour on the uniform.
 const ROSTER = {
-  scientist: { id: 'scientist', pain: { tolerance: 0.55, resilience: 0.5 }, name: 'Rowan Varga', short: 'Varga', title: 'Dr.', role: 'Mission Specialist (Chief Scientist)', age: 41,
+  scientist: { id: 'scientist', meters: { wilfulness: 0.3 }, pain: { tolerance: 0.55, resilience: 0.5 }, name: 'Rowan Varga', short: 'Varga', title: 'Dr.', role: 'Mission Specialist (Chief Scientist)', age: 41,
     domain: ['anomaly mapping', 'research logs', 'mission objectives'],
     profile: 'Brilliant, intellectualized, suffering from severe temporal dissociation. Hides unraveling behind detachment; requires grounded, physical discipline to reconnect to purpose.',
     dynamic: { romance: true, switch: true, bond: 0 },
     body: { type: 'tall and lean, long-limbed', h: { m: 1.86, f: 1.75 }, mass: 0.3, fat: 0.3, bust: 0.25, response: 1 },
     look: { skin: '#d6ad8e', hair: '#2e2420', hairStyle: { m: 'short', f: 'bun' }, eyes: '#5a6a58', beard: false },
     dept: '#3a9a9e', word: 'Parallax', base: 'calm' },
-  engineer: { id: 'engineer', pain: { tolerance: 0.75, resilience: 0.65 }, name: 'Sam Okafor', short: 'Okafor', role: 'Chief Engineer', age: 38,
+  engineer: { id: 'engineer', meters: { wilfulness: 0.15 }, pain: { tolerance: 0.75, resilience: 0.65 }, name: 'Sam Okafor', short: 'Okafor', role: 'Chief Engineer', age: 38,
     domain: ['fusion drive', 'thermal loops', 'hull integrity'],
     profile: 'Utilitarian, overworked, hyper-competent. Prone to hiding equipment fatigue to avoid "bothering" command (the classic exhaustion trap).',
     dynamic: { romance: true, switch: true, partner: 'pilot', bond: 0 },
     body: { type: 'broad and heavy, powerful', h: { m: 1.88, f: 1.76 }, mass: 0.88, fat: 0.5, bust: 0.7, response: 1 },
     look: { skin: '#5e3c2a', hair: '#161210', hairStyle: { m: 'crop', f: 'curls' }, eyes: '#2a1c14', beard: true },
     dept: '#c8641e', word: 'Scram', base: 'calm' },
-  pilot: { id: 'pilot', pain: { tolerance: 0.5, resilience: 0.6 }, name: 'Kit Ashdown', short: 'Ashdown', role: 'Flight Officer (Pilot)', age: 31,
+  pilot: { id: 'pilot', meters: { wilfulness: 0.75 }, pain: { tolerance: 0.5, resilience: 0.6 }, name: 'Kit Ashdown', short: 'Ashdown', role: 'Flight Officer (Pilot)', age: 31,
     domain: ['helm control', 'RCS thrusters', 'spatial maneuvers'],
     profile: 'High ego, high wilfulness. Translates deep-space anxiety into reckless shortcut-taking and protocol defiance.',
     dynamic: { romance: true, switch: true, partner: 'engineer', bond: 0 },
     body: { type: 'compact and athletic', h: { m: 1.77, f: 1.66 }, mass: 0.6, fat: 0.2, bust: 0.3, response: 1 },
     look: { skin: '#e4bc9a', hair: '#a8642e', hairStyle: { m: 'short', f: 'ponytail' }, eyes: '#3a6a8a', beard: false },
     dept: '#b8322e', word: 'Mayday', base: 'defiant' },
-  lifesupport: { id: 'lifesupport', pain: { tolerance: 0.42, resilience: 0.45 }, name: 'Noor Haddad', short: 'Haddad', role: 'Life Support Specialist', age: 29,
+  lifesupport: { id: 'lifesupport', meters: { wilfulness: 0.1 }, pain: { tolerance: 0.42, resilience: 0.45 }, name: 'Noor Haddad', short: 'Haddad', role: 'Life Support Specialist', age: 29,
     domain: ['hydroponics', 'atmospheric scrubbers', 'water reclamation'],
     profile: 'Highly sensitive, deeply attuned to ambient crew mood. Stress causes focus slips that directly threaten the food/air supply.',
     dynamic: { romance: true, switch: true, bond: 0 },
     body: { type: 'soft and rounded, average height', h: { m: 1.78, f: 1.67 }, mass: 0.4, fat: 0.7, bust: 1.0, response: 1 },
     look: { skin: '#b07e56', hair: '#22160e', hairStyle: { m: 'curls', f: 'bob' }, eyes: '#3a2414', beard: false },
     dept: '#5a9a48', word: 'Greenhouse', base: 'concerned' },
-  comms: { id: 'comms', pain: { tolerance: 0.62, resilience: 0.5 }, name: 'Sefa Lindqvist', short: 'Lindqvist', role: 'Communications & Sensor Officer', age: 35,
+  comms: { id: 'comms', meters: { wilfulness: 0.35 }, pain: { tolerance: 0.62, resilience: 0.5 }, name: 'Sefa Lindqvist', short: 'Lindqvist', role: 'Communications & Sensor Officer', age: 35,
     domain: ['deep-space telemetry', 'sensor array alignment', 'data logging'],
     profile: 'Obsessively focused on reinitiating contact with Earth. Tragically consumed by chasing dead signals.',
     dynamic: { romance: false, aromantic: true, asexual: true, basis: 'professional respect, operational trust, and mutual survival', bond: 0 },
     body: { type: 'slight and wiry', h: { m: 1.80, f: 1.70 }, mass: 0.32, fat: 0.15, bust: 0.06, response: 1 },
     look: { skin: '#e8cdb6', hair: '#d8d0c0', hairStyle: { m: 'shaved', f: 'crop' }, eyes: '#7a8aa0', beard: false },
     dept: '#8a62c0', word: 'Carrier', base: 'calm' },
-  medic: { id: 'medic', pain: { tolerance: 0.58, resilience: 0.62 }, name: 'Morgan Ruel', short: 'Ruel', title: 'Dr.', role: 'Systems Medic / Safety Warden', age: 47,
+  medic: { id: 'medic', meters: { wilfulness: 0.6 }, pain: { tolerance: 0.58, resilience: 0.62 }, name: 'Morgan Ruel', short: 'Ruel', title: 'Dr.', role: 'Systems Medic / Safety Warden', age: 47,
     domain: ['medical care', 'EVA safety enforcement', 'psychological baseline checks'],
     profile: 'Classically trained in modern corporate counseling. Begins as an ideological skeptic of archaic discipline, creating strong early-game friction before recognizing its survival necessity.',
     dynamic: { romance: true, switch: true, arc: 'hard-won trust', bond: 0 },

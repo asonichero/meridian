@@ -37,3 +37,16 @@ test('figure specs translate each baseline body to either sex', () => {
     assert.equal(s.sex, sex); assert.ok(s.height > 1.5 && s.height < 2.0); assert.ok(s.hairStyle);
   }
 });
+
+test('defiance: each crew member has back-talk, a breaking line and a guarded aftercare opening; the Captain has his', () => {
+  for (const id of Crew.IDS) {
+    const r = Crew.ROSTER[id], w = r.word;
+    assert.ok(r.meters.wilfulness >= 0 && r.meters.wilfulness <= 1, id);
+    for (const k of ['defy', 'yield']) { assert.ok(Lines.react(id, k), id + ' ' + k); for (const t of Lines.REACT[id][k]) assert.ok(!t.includes('{word}') && !t.includes(w), id + ' ' + k); }
+    const steps = Lines.after(id, 'done', 'unbroken'); assert.ok(Lines.AFTER[id].open.unbroken.includes(steps[0].text), id);
+    assert.ok(Lines.after(id, 'word', 'unbroken')[0].text, id);      // (a safe word's opening comes first all the same)
+  }
+  for (const k of ['hands', 'pin', 'down', 'rail']) assert.ok(Lines.captain(k, 'pilot') && !Lines.captain(k, 'pilot').includes('{'), k);
+  // (the pilot is the wilful one: high ego, high wilfulness)
+  assert.equal(Crew.IDS.reduce((a, id) => (Crew.ROSTER[id].meters.wilfulness > Crew.ROSTER[a].meters.wilfulness ? id : a)), 'pilot');
+});

@@ -83,7 +83,7 @@ let F = null, C = null, ses = null;      // (the crew member and the Captain; or
 const dressed = { top: 'down', bottoms: 'up', under: 'up' }, worn = () => ({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] });
 // (the asexual crew member has no desire to speak of: it stays at nothing for them, whatever the slider says)
 const asexual = () => !!Crew.ROSTER[cfg.who].dynamic.asexual, desire = () => asexual() ? 0 : cfg.rel.desire;
-const relFor = () => ({ submission: cfg.rel.submission, comfort: cfg.rel.comfort, desire: desire() });
+const relFor = () => ({ submission: cfg.rel.submission, comfort: cfg.rel.comfort, desire: desire(), defiance: cfg.rel.defiance });      // (across the knee and at the rail: how defiant they are coming to it; in the aftercare, what's left of it)
 function clear() {
   for (const G of [F, C]) if (G) scene.remove(G.root);
   if (ses) { for (const P of ses.people) scene.remove(P.f.root); scene.remove(ses.captain.root); }
@@ -136,8 +136,9 @@ function view(name) {
 const seg = (id, items, cur, fn) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const b = document.createElement('button'); b.textContent = label; b.className = v === cur ? 'on' : ''; b.onclick = () => fn(v); el.append(b); } };
 for (const id of Crew.IDS) { const o = document.createElement('option'); o.value = id; o.textContent = `${Crew.ROSTER[id].name} · ${Crew.ROSTER[id].role}`; $('who').append(o); }
 // where the crew member is with the Captain: defiance, submission, desire, comfort (the stance they take; across the knee and at the rail,
-// how they take it, desire flushing them as the body responds; in the aftercare, how close they sit and whether they lean in). Desire is
-// greyed out for the asexual crew member.
+// how they take it: defiant, the head up, looking back at the Captain, slow to settle; desire flushing them as the body responds; in the
+// aftercare, how close they sit and whether they lean in, or, defiance left, sit apart with their arms folded). Desire is greyed out for the
+// asexual crew member.
 function relSliders() {
   const el = $('rel'); el.innerHTML = '';
   for (const [k, nm] of [['defiance', 'Defiance'], ['submission', 'Submission'], ['desire', 'Desire'], ['comfort', 'Comfort']]) {

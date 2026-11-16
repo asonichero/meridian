@@ -20,15 +20,16 @@ const PAIN = {
   // What clothing takes off the sting (the sharp part; the deep ache goes through cloth untouched): by garment, stacking.
   CUSHION: {}, CUSHION_MAX: 0.7,   // PENDING: what's worn in a session isn't in the GDD; garments and how much each cushions are added once decided
   CAP: 70,                               // the capacity at tolerance 0.5 is CAP × (0.7 + 0.6 × tolerance)
-  // Distress at the edge of resistance, and where it's too harsh. Meridian raises redlessons' bar (1.5) and asks that it be held a moment
-  // (HARSH_HOLD seconds) before it counts, or overshot by a quarter, so a correction can run long without tripping it: since the player is the
-  // one who disciplines, this is what the crew member's safe word is called on (js/session.js).
-  EDGE: 1, TOO_HARSH: 1.8, HARSH_HOLD: 1.2, HARSH_SPIKE: 1.25,
+  // Distress at the edge of resistance, and where it's too harsh. Meridian raises redlessons' bar (1.5) to 2: past the edge they cry, steadily
+  // from CRYING on, and still at STILL (the player's tell to wind down); too harsh from TOO_HARSH, and the safe word called if it's held there
+  // a moment (HARSH_HOLD seconds) or goes on past it to TOO_HARSH × HARSH_SPIKE (2.05). Since the player is the one who disciplines, this is
+  // what the crew member's safe word is called on (js/session.js).
+  EDGE: 1, CRYING: 1.7, STILL: 1.8, TOO_HARSH: 2.0, HARSH_HOLD: 1.2, HARSH_SPIKE: 1.025,
   // Up to the edge, distress is the pain they hold against what they can take. Past it, it grows with the pain's logarithm: each step further
-  // takes more than the last, so the stretch from the edge to too harsh is far longer than the way to the edge (too harsh at HARSH_RAW times
-  // the edge's pain, rather than 1.8). A correction can settle well past the edge for a long while, the fight going out of them, without tipping.
-  HARSH_RAW: 4,
-  BANDS: [[0.3, 'composed'], [0.6, 'flinching'], [0.9, 'struggling'], [1, 'close to the edge of resistance'], [1.8, 'past the edge of resistance: most receptive'], [Infinity, 'too harsh']],
+  // takes more than the last, so the stretch from the edge to too harsh is longer than the way to the edge (too harsh at HARSH_RAW times the
+  // edge's pain, rather than twice it). A correction can settle well past the edge for a while, the fight going out of them, without tipping.
+  HARSH_RAW: 3,
+  BANDS: [[0.3, 'composed'], [0.6, 'flinching'], [0.9, 'struggling'], [1, 'close to the edge of resistance'], [2.0, 'past the edge of resistance: most receptive'], [Infinity, 'too harsh']],
 };
 
 // Distress from the pain held (as a share of capacity), and back.

@@ -121,7 +121,7 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
   <h2>Relationship</h2>
   <div class="row"><select id="relWho" class="pick"></select></div>
   <div class="vols" id="rel" style="margin-top:6px"></div>
-  <small class="note">Where each crew member is with you and the method, as the story goes (set here for now). Desire speeds their body's response and lets it go further; comfort lowers their inhibitions, so they wriggle more; all three bring them closer in the aftercare, and submission and desire have them lean into you.</small>
+  <small class="note">Where each crew member is with you and the method, as the story goes (set here for now). Desire speeds their body's response and lets it go further; comfort lowers their inhibitions, so they wriggle more; all three bring them closer in the aftercare, and submission and desire have them lean into you. Defiance is what they bring to the correction (their wilfulness to start with): it drains as it lands, into Compliance if you keep it proportionate, into Resentment if you go too far. Resentment carries over (half of it adds to their defiance next time) until aftercare clears it.</small>
   <h2>Sound</h2>
   <div class="vols" id="vols"></div>
   <h2>Graphics</h2>
@@ -202,13 +202,14 @@ drawCrew(); drawCaptain();
     r.oninput = () => { show(); if (window.GameAudio) GameAudio.setVol(k, r.value / 100); };
     el.append(l, r, out);
   } }
-// the relationship: each crew member's submission, desire and comfort (js/session.js), kept between visits; live in a session
+// the relationship: each crew member's submission, desire and comfort, the defiance they bring (their wilfulness, unless set) and the
+// resentment they carry (js/session.js), kept between visits; live in a session
 cfg.rel = cfg.rel || {};
 { const sel = $('relWho');
   for (const id of Crew.IDS) { const o = document.createElement('option'); o.value = id; o.textContent = Crew.ROSTER[id].name; sel.append(o); }
-  const draw = () => {
-    const id = sel.value, v = cfg.rel[id] = Object.assign({ submission: 0, desire: 0, comfort: 0 }, cfg.rel[id]), no = Crew.ROSTER[id].dynamic.asexual, el = $('rel'); el.innerHTML = '';
-    for (const [k, nm] of [['submission', 'Submission'], ['desire', 'Desire'], ['comfort', 'Comfort']]) {
+  const draw = window.drawRel = () => {
+    const id = sel.value, v = cfg.rel[id] = Object.assign({ submission: 0, desire: 0, comfort: 0, defiance: Crew.ROSTER[id].meters.wilfulness, resentment: 0 }, cfg.rel[id]), no = Crew.ROSTER[id].dynamic.asexual, el = $('rel'); el.innerHTML = '';
+    for (const [k, nm] of [['submission', 'Submission'], ['desire', 'Desire'], ['comfort', 'Comfort'], ['defiance', 'Defiance'], ['resentment', 'Resentment']]) {
       const l = document.createElement('label'); l.textContent = nm; const r = document.createElement('input'); r.type = 'range'; r.min = 0; r.max = 100; r.step = 1;
       const out = document.createElement('span'); out.className = 'pct'; const show = () => (out.textContent = r.value + '%');
       if (k === 'desire' && no) { r.disabled = true; r.value = 0; out.textContent = '—'; l.title = 'Asexual: no desire to speak of'; }
@@ -271,6 +272,8 @@ function fade() { const f = $('fade'); f.classList.add('on'); requestAnimationFr
 function onEvent(type, d) {
   if (type === 'turn') fade();
   if (type === 'say') sayQueue = sayQueue.then(() => showLine(d.who, d.id, d.text, 900));
+  // (what the correction left: its resentment carried till aftercare clears it)
+  if (type === 'turnEnd') { const v = cfg.rel[d.id] = Object.assign({ submission: 0, desire: 0, comfort: 0, defiance: Crew.ROSTER[d.id].meters.wilfulness, resentment: 0 }, cfg.rel[d.id]); v.resentment = Math.min(1, (v.resentment || 0) + d.resentment); save(); window.drawRel(); }
   if (type === 'word') { const w = $('word'); w.textContent = `${Crew.ROSTER[d.id].short} called their word: “${d.word}”. It stops.`; w.style.display = 'block'; setTimeout(() => (w.style.display = 'none'), 4200); }
   if (type === 'done') sayQueue = sayQueue.then(() => aftercareAll(d.results));
   // (a safe word: straight to their aftercare, then on with whoever's left)
@@ -288,14 +291,17 @@ async function aftercareOne(r) {
       await showLine(s.who, id, s.text, steps[steps.indexOf(s) + 1] && steps[steps.indexOf(s) + 1].choose ? 'choices' : 'click');
     }
   };
-  await run(Lines.after(r.id, r.outcome)); ses.cared(r.id);
+  await run(Lines.after(r.id, r.outcome, r.defiance && r.defiance.to > 0.45 ? 'unbroken' : null)); ses.cared(r.id);
+  // (aftercare clears resentment: half of what they carry)
+  const v = cfg.rel[r.id]; if (v) { v.resentment = Math.round(v.resentment * 50) / 100; save(); window.drawRel(); }
 }
+const pc = x => Math.round(x * 100) + '%';
 async function aftercareAll(results) {
   for (const r of results) await aftercareOne(r);
   results = ses.st.results;      // (the summary: everyone, cared for now or earlier)
   $('say').style.display = 'none';
   const S = $('summary'); S.style.display = 'block';
-  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${Crew.ROSTER[r.id].short}</td><td>${r.position === 'otk' ? 'across the knee' : 'at the wall'}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${Crew.ROSTER[r.id].word}”` : 'completed'}</td><td>peak: ${r.band}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
+  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${Crew.ROSTER[r.id].short}</td><td>${r.position === 'otk' ? 'across the knee' : 'at the wall'}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${Crew.ROSTER[r.id].word}”` : 'completed'}</td><td>peak: ${r.band}</td><td>defiance ${pc(r.defiance.from)} → ${pc(r.defiance.to)}</td><td>compliance +${pc(r.compliance)}</td><td>resentment +${pc(r.resentment)}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
 }
 
 // ── Live controls ──
@@ -336,9 +342,9 @@ function refresh() {
   if (c) { const r = c.r; $('whoNm').textContent = (r.title ? r.title + ' ' : '') + r.name; $('whoSub').textContent = r.role + (st.phase === 'after' ? ' · aftercare' : ''); $('whoWord').textContent = 'Agreed word: ' + r.word; }
 }
 // the meter: distress against the bar (the band ticks, and the safe-word bar in red)
-{ const tr = $('track'), max = 2.0; for (const v of [0.3, 0.6, 0.9, 1.0]) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (v / max * 100) + '%'; tr.append(t); } const h = document.createElement('div'); h.className = 'tick harsh'; h.style.left = (Pain.PAIN.TOO_HARSH / max * 100) + '%'; tr.append(h);
+{ const tr = $('track'), max = 2.2; for (const v of [0.3, 0.6, 0.9, 1.0, Pain.PAIN.CRYING, Pain.PAIN.STILL]) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (v / max * 100) + '%'; tr.append(t); } const h = document.createElement('div'); h.className = 'tick harsh'; h.style.left = (Pain.PAIN.TOO_HARSH / max * 100) + '%'; tr.append(h);
   window.__meter = () => { if (!ses) return; const c = ses.current, d = c ? c.pain.distress() : 0; $('fill').style.width = Math.min(100, d / max * 100) + '%';
-    $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}${ses.fight() < 0.3 ? ' · spent' : ''}${ses.st.ending ? ' · finishing' : ses.st.act || ses.st.actQ.length ? ' · dressing' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
+    $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}${c.def0 > 0.05 ? ` · defiance <b>${Math.round(ses.defiance() * 100)}%</b>` : ''}${ses.fight() < 0.3 ? ' · spent' : ''}${ses.st.ending ? ' · finishing' : ses.st.act || ses.st.actQ.length ? ' · dressing' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
 
 // ── Run ──
 const each = dt => { if (ses) ses.update(dt); bay.tick(dt); window.__meter(); };
