@@ -758,6 +758,10 @@ def build(sex):
         t_v = along(Fv, X, Nrm)
         dt = np.where(limb & ~np.isnan(t_v) & ~np.isnan(t_base), t_v - t_base, 0.0)
         if v == 'sexSwell': dt = np.where(label == 'sex', dt, np.clip(dt, -0.003, 0.003))      # (only the sex fills out; the skin by it barely moves)
+        # (a fuller build fills the cheeks out, and the cleft between them deepens: its floor and inner walls barely move, rather than being
+        # carried back with them into a ridge where the two sides meet)
+        clf = (np.abs(X[:, 0]) < 0.035) & (X[:, 2] < -0.02) & (X[:, 1] > CROTCH_Y - 0.07) & (X[:, 1] < CROTCH_Y + 0.22) & (label != 'sex')
+        dt = np.where(clf & (dt > 0), dt * (0.12 + 0.88 * ss(0.006, 0.032, np.abs(X[:, 0]))), dt)
         acc = np.zeros(len(X)); cnt = np.zeros(len(X))
         for _ in range(3):
             acc[:] = 0; cnt[:] = 0; np.add.at(acc, ed[:, 0], dt[ed[:, 1]]); np.add.at(acc, ed[:, 1], dt[ed[:, 0]]); np.add.at(cnt, ed.ravel(), 1)
