@@ -75,7 +75,7 @@ test('the Blender-built figures: the same skeleton, built from the models, each 
   await loaded;
   for (const sex of ['f', 'm']) {
     const f = gfig('pilot', sex);
-    assert.ok(f.model, 'made from the model'); assert.equal(f.bones.length, 43);
+    assert.ok(f.model, 'made from the model'); assert.equal(f.bones.length, sex === 'm' ? 44 : 43);      // (his: one more, for his lift)
     for (const s of ['L', 'R']) { for (const n of ['index', 'middle', 'ring', 'pinky', 'thumb']) assert.equal(f.bone[n + '2' + s].parent, f.bone[n + '1' + s]); assert.equal(f.bone['glute' + s].parent, f.bone.hips); }
     f.setClothes({ top: 'up', bottoms: 'down', under: 'down' }); f.setOutfit('offduty');
     for (const m of [f.body, ...Object.values(f.gm)]) {
@@ -94,6 +94,23 @@ test('each crew member’s build sets the body’s shape keys, and the clothes f
   assert.ok(inf(heavy, heavy.body, 'muscle') > 0.8 && inf(heavy, heavy.body, 'slight') === 0);
   assert.ok(inf(slight, slight.body, 'slight') > 0.2 && inf(slight, slight.body, 'muscle') === 0);
   for (const m of Object.values(heavy.gm)) assert.equal(inf(heavy, m, 'muscle'), inf(heavy, heavy.body, 'muscle'));
+});
+
+test('the body’s response: the sex fuller, his lifting on its own bone, a deeper tone there, and his pouch filling out', async () => {
+  await loaded;
+  for (const sex of ['f', 'm']) {
+    const f = gfig('pilot', sex), inf = m => m.morphTargetInfluences[m.geometry.userData.keys.sexSwell];
+    assert.ok('sexSwell' in f.body.geometry.userData.keys); assert.equal(inf(f.body), 0); assert.equal(f.skinMat.userData.u.uFlush.value.x, 0);
+    f.setResponse(0.5); for (let i = 0; i < 120; i++) f.tick(0.05);
+    assert.ok(inf(f.body) > 0.5, 'fuller'); assert.ok(f.skinMat.userData.u.uFlush.value.x > 0.4, 'flushed');
+    if (sex === 'm') {
+      assert.equal(f.bone.sex.parent, f.bone.hips);
+      assert.ok(f.bone.sex.rotation.x < -0.6 && f.bone.sex.rotation.x > -1.0, `lifting partway: ${f.bone.sex.rotation.x}`);
+      assert.ok(inf(f.gm.Briefs) > 0.5 && inf(f.gm.Trousers) > 0.5, 'the pouch follows');
+    } else assert.equal(f.bone.sex, undefined);
+    f.setResponse(0); for (let i = 0; i < 200; i++) f.tick(0.05);
+    assert.equal(inf(f.body), 0); if (sex === 'm') assert.ok(f.bone.sex.rotation.x > -0.01, 'and back down');
+  }
 });
 
 test('one of each layer is worn at a time, and the skin under it is hidden', async () => {
