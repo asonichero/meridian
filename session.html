@@ -140,7 +140,7 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
     <div class="grp g-pace"><span class="lab">Pace <kbd>[ ]</kbd></span><div class="row"><button data-k="pace" data-d="-0.25">−</button><span class="val" id="paceV">1×</span><button data-k="pace" data-d="0.25">+</button></div></div>
     <div class="grp g-str"><span class="lab">Strength <kbd>- =</kbd></span><div class="row"><button data-k="strength" data-d="-0.25">−</button><span class="val" id="strengthV">1×</span><button data-k="strength" data-d="0.25">+</button></div></div>
     <div class="grp g-side"><span class="lab">Side <kbd>D</kbd></span><div class="row seg" id="side"><button data-v="alt" class="on">Alt</button><button data-v="L">Left</button><button data-v="R">Right</button></div></div>
-    <div class="grp g-where"><span class="lab">Where <kbd>A</kbd></span><div class="row seg" id="area"><button data-v="cheek" class="on">Cheek</button><button data-v="sitspot">Sit spot</button><button data-v="thighs">Thighs</button></div></div>
+    <div class="grp g-where"><span class="lab">Where <kbd>A</kbd></span><div class="row seg" id="area"><button data-v="cheek">Cheek</button><button data-v="sitspot" class="on">Sit spot</button><button data-v="thighs">Thighs</button></div></div>
     <div class="grp g-soothe"><span class="lab">Soothe <kbd>S</kbd></span><button id="soothe">Soothe</button></div>
     <div class="grp g-clothes"><span class="lab">Clothes <kbd>T B U</kbd></span><div class="row"><button id="cTop">Top: down</button><button id="cBot">Trousers: up</button><button id="cUnd">Briefs: up</button></div></div>
     <div class="grp g-end"><span class="lab">Turn <kbd>Enter</kbd></span><button id="end">End turn</button></div>
@@ -304,7 +304,7 @@ const P0 = { pace: [0.5, 2], strength: [0.5, 1.5] }, STEP = 0.25, times = v => (
 document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => bump(b.dataset.k, +b.dataset.d));
 function bump(k, d) { if (!ses) return; ses.set({ [k]: Math.round(Math.min(P0[k][1], Math.max(P0[k][0], ses.st[k] + d)) / STEP) * STEP }); refresh(); }
 seg('side', 'alt', v => ses && ses.set({ side: v }));
-seg('area', 'cheek', v => ses && ses.set({ area: v }));
+seg('area', 'sitspot', v => ses && ses.set({ area: v }));
 $('run').onclick = () => { audioOn(); ses && ses.run(); };
 $('soothe').onclick = () => ses && ses.set({ soothe: !ses.st.soothe });
 $('end').onclick = () => ses && ses.endTurn();

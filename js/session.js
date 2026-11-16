@@ -29,7 +29,7 @@ const yawQ = yaw => new Q().setFromAxisAngle(UP, yaw);
 function create(stage, bay, opts) {
   const scene = stage.scene, C = root.Crew, S = root.Pain, L = root.Lines, A = root.GameAudio;
   const listeners = [], emit = (type, data) => listeners.forEach(f => f(type, data));
-  const st = { running: false, pace: 1, strength: 1, side: 'alt', nextSide: 'R', area: 'cheek', soothe: false, position: opts.position || 'otk',
+  const st = { running: false, pace: 1, strength: 1, side: 'alt', nextSide: 'R', area: 'sitspot', soothe: false, position: opts.position || 'otk',
     between: opts.between || 'corner', turn: -1, swing: null, ended: false, word: false, t: 0, sound: opts.sound !== false, cam: 0, phase: 'turn', results: [],
     act: null, actQ: [], ending: null };
 
