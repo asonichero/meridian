@@ -24,7 +24,14 @@ This is the first playable piece. It tests the control scheme, the models and th
 
 - **Setup:** choose the position (across the Captain's knee on the suit bench, or at the wall gripping the rail with feet apart), and who is corrected, in order. Choose who witnesses, and where each crew member waits between turns (the corner, hands on head, as redlessons does; or standing aside with the witnesses).
   - Each crew member's gender is a toggle. Their baseline body type is translated to male or female.
-  - The outfit is uniform or off duty.
+  - The outfit is uniform or off duty. Off duty, the Captain keeps the henley (sleeves pushed up), canvas trousers with a contrast seam, and boots; each crew member wears their own (`Crew.ROSTER[id].offduty`), their style but practical at home aboard (they never make landfall: soft indoor shoes over socks, never boots):
+    - **Lindqvist:** the simplest: base layers, comfort first: a heathered grey thermal (mock neck, ribbed cuffs and hem), loose joggers with ribbed ankle cuffs and a drawstring, soft felt shoes; the one colour a lilac thread at the left cuff.
+    - **Varga:** expressive, short of quirky: a bold botanical print (broad pale leaves on deep teal), the shirt worn open over a plain long-sleeved tee, olive chinos with slant and back pockets, navy canvas deck shoes.
+    - **Okafor:** a dark henley, sleeves pushed up, under a worn leather waistcoat with brass buttons; heavy work trousers with double knees, a rule pocket and rust stitching; soft-soled leather work shoes.
+    - **Ashdown:** a sunny yellow tee printed with small flowers, sleeves pushed up; faded red carpenter trousers with bellows pockets and a hammer loop; white trainers over yellow socks.
+    - **Haddad:** a high-collared cream blouse, a tailored deep green waistcoat with gold buttons, a soft scarf tied at the collar, pressed tapered trousers, neat flats.
+    - **Ruel:** a crisp collared shirt under a mustard cable-knit cardigan, pressed grey slacks, polished loafers.
+    The tops are the uniform's long-sleeved shape or the henley's pushed-up one; everything else (the layers, prints, pockets, collars and shoes) is drawn on them in the shaders, from each point's rest position, so it stays crisp and goes with the cloth.
   - Basic customisation for the Captain: gender, skin, hair colour and style, and build.
 - **Controls:**
   - Runs of smacks start and stop on a toggle (**Space**), not in counted runs.

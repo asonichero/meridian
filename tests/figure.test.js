@@ -161,3 +161,14 @@ test('her forms: folds with the pelvis (only their lower outer edges sharing wit
   assert.ok(onHips / sex > 0.85, `mostly with the pelvis: ${onHips}/${sex}`);
   const m = gfig('pilot', 'm'); for (let i = 0; i < m.body.geometry.attributes.tone.count; i++) assert.equal(m.body.geometry.attributes.tone.getX(i), 0);
 });
+
+test('off duty, each in their own: the top’s sleeves, the patterns, and soft shoes (the Captain’s boots as they were)', async () => {
+  await loaded;
+  const top = f => Object.keys(f.gm).find(k => /^(Tunic|Shirt)/.test(k) && f.gm[k].visible);
+  const kit = gfig('pilot', 'f'); kit.setOutfit('offduty'); assert.equal(top(kit), 'Shirt');      // (sleeves pushed up)
+  assert.equal(kit.gm.Shirt.material.userData.u.uL0.value.x, 6); assert.equal(kit.gm.Trousers.material.userData.u.uL0.value.z, 4); assert.equal(kit.gm.Boots.material.userData.u.uParam.value.x, 4);
+  const sefa = gfig('comms', 'f'); sefa.setOutfit('offduty'); assert.equal(top(sefa), 'Tunic');      // (long sleeves)
+  assert.equal(sefa.gm.Tunic.material.userData.u.uL0.value.x, 2); assert.ok(sefa.skinMat.userData.u.uHide.value & (1 << F.R.FOREARM));
+  const cap = F.make(Crew.captainSpec({ outfit: 'offduty' })); assert.equal(top(cap), 'Shirt');
+  assert.equal(cap.gm.Shirt.material.userData.u.uL0.value.x, 0); assert.equal(cap.gm.Boots.material.userData.u.uParam.value.x, 0);
+});

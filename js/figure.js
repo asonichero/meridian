@@ -88,11 +88,74 @@ PATTERNS.tunicG = `{
       float cuff = smoothstep(cuffY + 0.004, cuffY + 0.007, b.y) * (1.0 - smoothstep(cuffY + 0.022, cuffY + 0.025, b.y));
       diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, max(flash, cuff));
     }
-  } else if (vPart < 0.5) {
-    float fr = smoothstep(0.03, 0.05, b.z), pTop = nl - 0.03;
-    diffuseColor.rgb *= 1.0 - 0.3 * fr * (1.0 - smoothstep(0.009, 0.011, ax)) * smoothstep(pTop - 0.13, pTop - 0.127, b.y);
-    for (int i = 0; i < 3; i++) { float bd = length(vec2(b.x, b.y - (pTop - 0.025 - 0.035 * float(i)))); diffuseColor.rgb = mix(diffuseColor.rgb, uPat1, fr * (1.0 - smoothstep(0.0035, 0.0048, bd))); }
-    diffuseColor.rgb *= 1.0 - 0.22 * (1.0 - up) * (1.0 - smoothstep(hem + 0.009, hem + 0.012, b.y));
+  } else {
+    // Off duty. uL0.x: which: 0 the Captain's henley (bone buttons down the placket); 2 a thermal (heathered, ribbed cuffs and hem, a coloured
+    // thread at the left cuff); 3 a printed shirt open over a tee (the tee down the front between its edges and on the forearms below its
+    // short sleeves); 4 a waistcoat over a shirt (the shirt in the V, below the hem, in the armholes and on the sleeves; buttons; uL0.y: a
+    // scarf at the collar); 5 a cable-knit cardigan over a collared shirt (the shirt in the V and its collar above); 6 a printed tee.
+    // uPat0: accent, uPat1: the shirt beneath, uPat2: the print (or buttons).
+    float st = uL0.x, sl = vPart, fr = smoothstep(0.03, 0.05, b.z), sx = b.x >= 0.0 ? 1.0 : -1.0, gk = 1.0 + uGrain * (g - 0.5) * 2.0;
+    float axX = shX + (shY - b.y) * 0.23, elbow = mix(shY, cuffY, 0.5);
+    vec2 uv = sl > 0.5 ? vec2(atan(b.x - sx * axX, b.z + 0.005) * 0.045, b.y) : vec2(atan(b.x, b.z + 0.01) * 0.13, b.y);
+    vec3 under = uPat1 * gk;
+    if (st < 0.5) {
+      if (sl < 0.5) {
+        float pTop = nl - 0.03;
+        diffuseColor.rgb *= 1.0 - 0.3 * fr * (1.0 - smoothstep(0.009, 0.011, ax)) * smoothstep(pTop - 0.13, pTop - 0.127, b.y);
+        for (int i = 0; i < 3; i++) { float bd = length(vec2(b.x, b.y - (pTop - 0.025 - 0.035 * float(i)))); diffuseColor.rgb = mix(diffuseColor.rgb, uPat1, fr * (1.0 - smoothstep(0.0035, 0.0048, bd))); }
+      }
+    } else if (st < 2.5) {
+      diffuseColor.rgb *= 0.9 + 0.2 * fn3(b * 700.0);
+      if (sl > 0.5) {
+        float cuff = 1.0 - smoothstep(cuffY + 0.045, cuffY + 0.05, b.y), rib = 0.5 + 0.5 * sin(uv.x * 900.0);
+        diffuseColor.rgb *= 1.0 - 0.14 * cuff * rib;
+        diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, step(0.0, b.x) * seamAt(b.y - cuffY - 0.04, 0.003));
+      } else diffuseColor.rgb *= 1.0 - 0.12 * (1.0 - smoothstep(hem + 0.04, hem + 0.045, b.y)) * (0.5 + 0.5 * sin(uv.x * 900.0));
+    } else if (st < 3.5) {
+      float vein, lf = leafAt(uv, 15.0, vein);
+      vec3 shirt = mix(diffuseColor.rgb, uPat2 * gk, lf); shirt = mix(shirt, uPat0 * gk, vein * 0.85);
+      float w = 0.042 + 0.03 * smoothstep(collar - 0.13, collar - 0.03, b.y);      // (open down the front, the collar's points spread at the top)
+      float open = sl < 0.5 ? (1.0 - smoothstep(w - 0.001, w + 0.001, ax)) * smoothstep(0.0, 0.02, b.z) : 0.0;
+      float teeArm = sl > 0.5 ? 1.0 - smoothstep(elbow + 0.045, elbow + 0.05, b.y) : 0.0;
+      diffuseColor.rgb = mix(shirt, under, max(open, teeArm));
+      diffuseColor.rgb *= 1.0 - 0.45 * (sl < 0.5 ? seamAt(ax - w, 0.004) * smoothstep(0.0, 0.02, b.z) : seamAt(b.y - elbow - 0.0475, 0.004));
+    } else if (st < 4.5) {
+      // (the V from the collar's sides to a point on the chest, the hem a little below the waist, the armholes)
+      float vTop = collar - 0.02, vBot = pit - 0.055, vw = 0.07 * clamp((b.y - vBot) / (vTop - vBot), 0.0, 1.0);
+      float inV = (1.0 - smoothstep(vw - 0.001, vw + 0.001, ax)) * step(vBot, b.y) * smoothstep(0.0, 0.03, b.z);
+      float hemV = waist - 0.05 - 0.02 * smoothstep(0.03, 0.0, ax) * fr, below = 1.0 - smoothstep(hemV - 0.001, hemV + 0.001, b.y);
+      float hole = smoothstep(shX - 0.035, shX - 0.015, ax) * step(pit - 0.025, b.y);
+      float vest = sl < 0.5 ? (1.0 - inV) * (1.0 - below) * (1.0 - hole) : 0.0;
+      diffuseColor.rgb = mix(under, diffuseColor.rgb * (0.94 + 0.12 * fn3(b * 260.0)), vest);
+      for (int i = 0; i < 4; i++) { float by = vBot - 0.018 - 0.042 * float(i); diffuseColor.rgb = mix(diffuseColor.rgb, uPat2, vest * fr * step(hemV + 0.01, by) * (1.0 - smoothstep(0.004, 0.0055, length(vec2(b.x, b.y - by))))); }
+      if (sl < 0.5) diffuseColor.rgb *= 1.0 - 0.4 * max(seamAt(ax - vw, 0.004) * step(vBot, b.y) * fr, max(seamAt(b.y - hemV, 0.004), seamAt(ax - shX + 0.025, 0.004) * step(pit - 0.02, b.y))) * (1.0 - inV * 0.0);
+      if (uL0.y > 0.5 && sl < 0.5) {
+        float band = smoothstep(collar - 0.04, collar - 0.035, b.y);
+        float tail = fr * (1.0 - smoothstep(0.011, 0.015, abs(b.x - 0.014 - (collar - 0.04 - b.y) * 0.12))) * step(collar - 0.16, b.y) * (1.0 - step(collar - 0.04, b.y));
+        float knot = fr * (1.0 - smoothstep(0.012, 0.015, length(vec2(b.x - 0.012, b.y - collar + 0.045))));
+        diffuseColor.rgb = mix(diffuseColor.rgb, uPat0 * (0.9 + 0.2 * fn3(b * 180.0)), max(max(band, tail), knot));
+        diffuseColor.rgb *= 1.0 - 0.35 * fr * max(seamAt(length(vec2(b.x - 0.012, b.y - collar + 0.045)) - 0.0135, 0.003), seamAt(b.y - collar + 0.0375, 0.003));
+      }
+    } else if (st < 5.5) {
+      float vBot = pit - 0.08, ow = 0.012 + 0.045 * clamp((b.y - vBot) / (collar - vBot), 0.0, 1.0);
+      float open = sl < 0.5 ? (1.0 - smoothstep(ow - 0.001, ow + 0.001, ax)) * smoothstep(0.0, 0.02, b.z) * step(vBot, b.y) : 0.0;
+      float col = smoothstep(collar - 0.032, collar - 0.026, b.y);
+      float cable = sl < 0.5 ? 0.5 + 0.5 * sin(uv.x * 170.0 + 2.6 * sin(b.y * 95.0)) : 0.5 + 0.5 * sin(uv.x * 260.0);
+      diffuseColor.rgb *= 0.88 + 0.16 * cable;
+      float rib = sl > 0.5 ? 1.0 - smoothstep(cuffY + 0.05, cuffY + 0.055, b.y) : 1.0 - smoothstep(hem + 0.045, hem + 0.05, b.y);
+      diffuseColor.rgb *= 1.0 - 0.1 * rib * (0.5 + 0.5 * sin(uv.x * 900.0));
+      diffuseColor.rgb = mix(diffuseColor.rgb, under, max(open, col));
+      if (sl < 0.5) {
+        diffuseColor.rgb *= 1.0 - 0.4 * fr * max(seamAt(ax - ow, 0.004) * step(vBot, b.y), seamAt(b.x, 0.004) * step(b.y, vBot) * step(hem + 0.01, b.y));
+        for (int i = 0; i < 5; i++) { float by = vBot - 0.012 - 0.05 * float(i); diffuseColor.rgb = mix(diffuseColor.rgb, uPat2, fr * step(hem + 0.02, by) * (1.0 - smoothstep(0.0045, 0.006, length(vec2(b.x - 0.008, b.y - by))))); }
+        diffuseColor.rgb *= 1.0 - 0.4 * seamAt(b.y - collar + 0.029, 0.004);
+      }
+    } else {
+      float ctr, fl = flowerAt(uv, 36.0, ctr);
+      diffuseColor.rgb = mix(diffuseColor.rgb, uPat2 * gk, fl); diffuseColor.rgb = mix(diffuseColor.rgb, uPat0 * gk, ctr * fl);
+      if (sl < 0.5) diffuseColor.rgb *= 1.0 - 0.12 * smoothstep(nl - 0.02, nl - 0.012, b.y);
+    }
+    if (sl < 0.5) diffuseColor.rgb *= 1.0 - 0.22 * (1.0 - up) * (1.0 - smoothstep(hem + 0.009, hem + 0.012, b.y));
   }
 }`;
 PATTERNS.trousersG = `{
@@ -103,14 +166,112 @@ PATTERNS.trousersG = `{
     float seam = front * (1.0 - smoothstep(0.0008, 0.0022, min(abs(b.y - knee + 0.07), abs(b.y - knee - 0.13))));
     diffuseColor.rgb *= 1.0 + 0.4 * seam;
   }
-  if (uParam.w < 0.5 && b.y < top - 0.06) diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, (1.0 - smoothstep(0.0025, 0.0045, abs(b.z))) * step(uParam.z + 0.03, ax));
+  // Off duty. uL0.z: which: 0 the Captain's canvas trousers (a contrast seam down the outside); 1 joggers (heathered, a ribbed cuff at the
+  // ankle, a drawstring); 2 chinos (slant pockets, back pockets); 3 work trousers (double knees, a rule pocket, contrast stitching); 4 carpenter
+  // trousers (bellows pockets with flaps on the thighs, a hammer loop on the left, the knees seamed); 5 pressed (a sharp crease down each leg).
+  // uL0.w: the hem's height. uPat0: the accent (stitching, a cord). Drawn only as worn (lowered, they're bunched at the knees).
+  if (uParam.w < 0.5) {
+    float st = uL0.z, hemY = uL0.w, lx = uParam.z, sx = b.x >= 0.0 ? 1.0 : -1.0, dx = b.x - sx * lx, worn = 1.0 - uParam.y;
+    float fr = smoothstep(0.0, 0.025, b.z), bk = smoothstep(0.0, 0.025, -b.z), side = 1.0 - smoothstep(0.03, 0.05, abs(b.z));
+    float outer = smoothstep(0.035, 0.05, sx * dx), round_ = atan(dx, b.z) * 0.07, line = 0.0;
+    if (st < 0.5) { if (b.y < top - 0.06) diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, (1.0 - smoothstep(0.0025, 0.0045, abs(b.z))) * step(lx + 0.03, ax)); }
+    else if (worn > 0.5) {
+      if (st < 1.5) {
+        diffuseColor.rgb *= 0.92 + 0.16 * fn3(b * 600.0);
+        float cuff = 1.0 - smoothstep(hemY + 0.06, hemY + 0.065, b.y);
+        diffuseColor.rgb *= 1.0 - 0.14 * cuff * (0.5 + 0.5 * sin(round_ * 1200.0));
+        line = seamAt(b.y - hemY - 0.0625, 0.004);
+        float cord = fr * step(top - 0.12, b.y) * step(b.y, top - 0.03) * seamAt(ax - 0.014 - (top - 0.03 - b.y) * 0.05, 0.005);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, cord);
+      } else if (st < 2.5) {
+        float sl = (b.y - (top - 0.025)) + 0.9 * (ax - 0.075);      // (a slant pocket's mouth: down and out from the waist)
+        line = max(fr * step(top - 0.13, b.y) * step(ax, 0.16) * seamAt(sl, 0.004), bk * step(top - 0.16, b.y) * step(b.y, top - 0.055) * max(seamAt(ax - 0.035, 0.004) * step(ax, 0.1), seamAt(ax - 0.1, 0.004) * step(0.035, ax)) * step(0.035, ax) * step(ax, 0.1));
+        line = max(line, bk * step(0.035, ax) * step(ax, 0.1) * seamAt(b.y - top + 0.16, 0.004));
+        line = max(line, fr * seamAt(dx, 0.003) * step(hemY + 0.02, b.y) * step(b.y, top - 0.15) * 0.5);
+      } else if (st < 3.5) {
+        float kn = fr * smoothstep(knee - 0.09, knee - 0.086, b.y) * (1.0 - smoothstep(knee + 0.15, knee + 0.154, b.y));
+        diffuseColor.rgb *= 1.0 - 0.14 * kn;
+        float stitch = fr * max(seamAt(b.y - knee + 0.088, 0.003), seamAt(b.y - knee - 0.152, 0.003)) * step(0.5, fract(round_ * 160.0));
+        diffuseColor.rgb = mix(diffuseColor.rgb, uPat0, stitch);
+        float rp = step(sx, 0.0) * outer * step(knee + 0.12, b.y) * step(b.y, knee + 0.27) * (1.0 - smoothstep(0.03, 0.035, abs(b.z + 0.005)));
+        diffuseColor.rgb *= 1.0 - 0.1 * rp;
+        line = step(sx, 0.0) * outer * step(knee + 0.12, b.y) * step(b.y, knee + 0.27) * seamAt(abs(b.z + 0.005) - 0.0325, 0.004);
+        line = max(line, step(sx, 0.0) * outer * (1.0 - smoothstep(0.03, 0.035, abs(b.z + 0.005))) * max(seamAt(b.y - knee - 0.12, 0.004), seamAt(b.y - knee - 0.27, 0.004)));
+      } else if (st < 4.5) {
+        float py0 = knee + 0.085, py1 = knee + 0.255, pz = 0.042, inP = outer * step(py0, b.y) * step(b.y, py1) * (1.0 - smoothstep(pz - 0.002, pz + 0.002, abs(b.z)));
+        float flap = inP * step(py1 - 0.045, b.y);
+        diffuseColor.rgb *= 1.0 - 0.08 * inP - 0.1 * flap;
+        line = outer * step(py0, b.y) * step(b.y, py1) * seamAt(abs(b.z) - pz, 0.004);
+        line = max(line, outer * (1.0 - smoothstep(pz - 0.002, pz + 0.002, abs(b.z))) * max(max(seamAt(b.y - py0, 0.004), seamAt(b.y - py1, 0.004)), seamAt(b.y - py1 + 0.045, 0.004)));
+        float loopZ = -0.03, hl = step(0.0, sx) * outer * step(knee + 0.17, b.y) * step(b.y, top - 0.13) * (1.0 - smoothstep(0.007, 0.009, abs(b.z - loopZ)));
+        diffuseColor.rgb *= 1.0 - 0.12 * hl;
+        line = max(line, step(0.0, sx) * outer * step(knee + 0.17, b.y) * step(b.y, top - 0.13) * seamAt(abs(b.z - loopZ) - 0.008, 0.003));
+        line = max(line, fr * max(seamAt(b.y - knee + 0.03, 0.004), seamAt(b.y - knee - 0.05, 0.004)) * 0.7);
+        diffuseColor.rgb *= 0.95 + 0.1 * fn3(b * 90.0);      // (washed out, faded unevenly)
+      } else {
+        line = max(fr, bk) * seamAt(dx, 0.0028) * step(hemY + 0.005, b.y) * step(b.y, top - 0.08);
+        diffuseColor.rgb *= 1.0 + 0.18 * max(fr, bk) * seamAt(dx - 0.003, 0.004) * step(hemY + 0.005, b.y) * step(b.y, top - 0.08);
+      }
+      diffuseColor.rgb *= 1.0 - 0.42 * line;
+    }
+  }
   diffuseColor.rgb *= 1.0 - 0.18 * smoothstep(top - 0.032, top - 0.029, b.y) * (1.0 - uParam.y);
+}`;
+// Shoes, drawn over the boot's shape (uParam.x: which; 0 the boots as they are): off duty, aboard, everyone but the Captain wears soft indoor
+// shoes over socks: the shoe's top edge low at the instep, higher at the heel, the sock above it. uParam.y: the ankle's height. uPat0: the
+// sole, uPat1: trim (laces, a stripe, a strap, stitching), uPat2: the sock. 1 soft felt; 2 canvas deck shoes (a thick pale sole, laces);
+// 3 soft-soled leather work shoes (a stitched welt); 4 trainers (a thick sole, a stripe down the side); 5 flats (cut low, a trim at the
+// edge); 6 loafers (a strap across the instep).
+PATTERNS.shoeG = `{
+  vec3 b = vBind; float st = uParam.x, ank = uParam.y;
+  if (st > 0.5) {
+    float sx = b.x >= 0.0 ? 1.0 : -1.0, toe = smoothstep(0.0, 0.07, b.z), gk = 1.0 + uGrain * (g - 0.5) * 2.0;
+    float edge = ank + 0.016 - 0.034 * toe - (st > 4.5 && st < 5.5 ? 0.012 : 0.0), soleH = st > 1.5 && st < 2.5 || st > 3.5 && st < 4.5 ? 0.028 : 0.018;
+    float sock = smoothstep(edge, edge + 0.002, b.y), sole = 1.0 - smoothstep(soleH - 0.001, soleH + 0.001, b.y);
+    vec3 c = diffuseColor.rgb;
+    if (st < 1.5) c *= 0.92 + 0.16 * fn3(b * 500.0);
+    else if (st < 2.5) c = mix(c, uPat1, toe * step(0.03, b.z) * step(b.z, 0.1) * (1.0 - smoothstep(0.012, 0.016, abs(b.x - sx * 0.113))) * step(0.5, fract(b.z * 70.0)) * step(edge - 0.03, b.y));
+    else if (st < 3.5) c = mix(c, uPat1, seamAt(b.y - soleH - 0.005, 0.003) * step(0.5, fract(atan(b.x - sx * 0.113, b.z) * 9.0)));
+    else if (st < 4.5) c = mix(c, uPat1, (1.0 - smoothstep(0.006, 0.008, abs(b.y - 0.045 - 0.25 * (b.z + 0.02)))) * step(0.06, abs(b.x - sx * 0.113)) * step(-0.05, b.z) * step(b.z, 0.09));
+    else if (st < 5.5) c = mix(c, uPat1, seamAt(b.y - edge + 0.003, 0.004));
+    else c = mix(c, uPat1, toe * step(0.02, b.z) * step(b.z, 0.06) * step(edge - 0.035, b.y));
+    c = mix(c, uPat0 * gk, sole);
+    c *= 1.0 - 0.4 * max(seamAt(b.y - soleH, 0.003), seamAt(b.y - edge, 0.004));
+    diffuseColor.rgb = mix(c, uPat2 * gk * (0.94 + 0.12 * sin(atan(b.x - sx * 0.113, b.z) * 40.0)), sock);
+  }
 }`;
 const NOISE = `
 float fh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float fn3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
   return mix(mix(mix(fh(i), fh(i + vec3(1,0,0)), f.x), mix(fh(i + vec3(0,1,0)), fh(i + vec3(1,1,0)), f.x), f.y),
-             mix(mix(fh(i + vec3(0,0,1)), fh(i + vec3(1,0,1)), f.x), mix(fh(i + vec3(0,1,1)), fh(i + vec3(1,1,1)), f.x), f.y), f.z); }`;
+             mix(mix(fh(i + vec3(0,0,1)), fh(i + vec3(1,0,1)), f.x), mix(fh(i + vec3(0,1,1)), fh(i + vec3(1,1,1)), f.x), f.y), f.z); }
+// Prints, on a surface unrolled round a body part (u round it, v up it), in cells (each cell's own, checked with its neighbours so nothing is
+// cut off at a cell's edge): small five-petalled flowers (with their centres), or broad pointed leaves (with their middle veins).
+float flowerAt(vec2 p, float dens, out float ctr) {
+  vec2 g = p * dens; float best = 0.0; ctr = 0.0;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec2 c = floor(g) + vec2(float(i), float(j)); if (fh(vec3(c, 9.3)) < 0.18) continue;
+    vec2 q = g - c - 0.5 - (vec2(fh(vec3(c, 1.7)), fh(vec3(c, 2.3))) - 0.5) * 0.4;
+    float r = length(q), a = atan(q.y, q.x) + fh(vec3(c, 5.1)) * 6.283, sz = 0.24 + 0.08 * fh(vec3(c, 7.7));
+    float pet = sz * (0.6 + 0.4 * abs(cos(2.5 * a)));
+    float f = 1.0 - smoothstep(pet - 0.03, pet + 0.01, r); if (f > best) { best = f; ctr = 1.0 - smoothstep(0.06, 0.085, r); }
+  }
+  return best;
+}
+float leafAt(vec2 p, float dens, out float vein) {
+  vec2 g = p * dens; float best = 0.0; vein = 0.0;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec2 c = floor(g) + vec2(float(i), float(j)); if (fh(vec3(c, 4.4)) < 0.15) continue;
+    vec2 q = g - c - 0.5 - (vec2(fh(vec3(c, 1.1)), fh(vec3(c, 2.9))) - 0.5) * 0.3;
+    float th = fh(vec3(c, 6.6)) * 6.283; q = vec2(cos(th) * q.x + sin(th) * q.y, -sin(th) * q.x + cos(th) * q.y);
+    float L = 0.5 + 0.12 * fh(vec3(c, 8.2)), w = 0.17 * (1.0 - pow(clamp(abs(q.x) / L, 0.0, 1.0), 1.7));
+    float f = (1.0 - smoothstep(w - 0.018, w + 0.004, abs(q.y))) * step(abs(q.x), L);
+    if (f > best) { best = f; vein = f * (1.0 - smoothstep(0.006, 0.014, abs(q.y))) * step(-L * 0.85, q.x); }
+  }
+  return best;
+}
+// (where a garment's edge or seam lies: a thin dark line at distance d from it)
+float seamAt(float d, float w) { return 1.0 - smoothstep(w * 0.5, w, abs(d)); }`;
 function paint(m, o) {
   o = o || {};
   const U = { uRim: { value: srgb(o.rim || '#2a3440').multiplyScalar(o.rimK == null ? 1 : o.rimK) }, uGrain: { value: o.grain == null ? 0.03 : o.grain }, uGrainScale: { value: o.scale || 60 }, uHide: { value: 0 },
@@ -773,6 +934,11 @@ const OUTFITS = {
   // Off duty: a worn henley with the sleeves pushed up (bone buttons down its placket), canvas trousers with a contrast outer seam, brown boots (frontier-practical).
   offduty: { tunic: '#8a5a3c', trousers: '#5a4a38', pipe: '#3a2a1e', under: '#cfc6b4', sleeves: 'rolled', hem: 0.86, collar: false, edge: '#d8ccb0' },
 };
+// Off duty, a crew member wears their own (spec.off, from Crew: offduty), over the Captain's as the default; which top, legs and shoes, as the
+// patterns number them.
+const TOPS = { henley: 0, thermal: 2, open: 3, waistcoat: 4, cardigan: 5, tee: 6 }, LEGS = { canvas: 0, joggers: 1, chinos: 2, work: 3, combat: 4, pressed: 5 };
+const SHOES = { boots: 0, soft: 1, deck: 2, work: 3, sneakers: 4, flats: 5, loafers: 6 };
+function outfitOf(spec) { const O = OUTFITS[spec.outfit] || OUTFITS.uniform; return spec.outfit === 'offduty' && spec.off ? Object.assign({}, O, spec.off) : O; }
 function dress(F, spec, S, BI, w, torsoW, legW, armW) {
   for (const k in F.clothes) { const m = F.clothes[k]; for (const x of [m, m.userData.hull]) if (x) { x.parent.remove(x); x.geometry.dispose(); } }
   F.clothes = {};
@@ -1246,28 +1412,38 @@ function makeGLB(spec, T) {
 }
 function garmentGLB(F, name) {
   if (F.gm[name]) return F.gm[name];
-  const spec = F.spec, O = OUTFITS[spec.outfit] || OUTFITS.uniform, L = F.L, uni = spec.outfit === 'uniform' ? 1 : 0, geo = F.model.mesh[name].geo;
+  const spec = F.spec, O = outfitOf(spec), L = F.L, uni = spec.outfit === 'uniform' ? 1 : 0, geo = F.model.mesh[name].geo;
   let m;
   if (/^(Tunic|Shirt)/.test(name)) {
     m = tmat(O.tunic, { skin: true, morph: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6, pattern: 'tunicG', bindAttr: true, unique: true });
-    const U = m.userData.u; U.uPat0.value.copy(srgb(spec.dept)); U.uPat1.value.copy(srgb(O.edge || shade(O.tunic, -0.4))); U.uPat2.value.copy(srgb(O.belt || '#222'));
+    const U = m.userData.u, own = !uni && O.top;
+    U.uPat0.value.copy(srgb(own ? O.accent || spec.dept : spec.dept)); U.uPat1.value.copy(srgb(own ? O.shirt || shade(O.tunic, -0.3) : O.edge || shade(O.tunic, -0.4)));
+    U.uPat2.value.copy(srgb(own ? O.print || '#222' : O.belt || '#222'));
     const up = /Up$/.test(name);
     U.uParam.value.set(up ? L.hemUp : L.hem, up ? 1 : 0, L.shX, uni);
-    U.uL0.value.set(0, 0, L.collar, L.waist); U.uL1.value.set(L.shoulder, L.armpit, L.shoulder - L.cuffA * Math.cos(L.abd), L.neckline);
+    U.uL0.value.set(own ? TOPS[O.top] || 0 : 0, own && O.scarf ? 1 : 0, L.collar, L.waist); U.uL1.value.set(L.shoulder, L.armpit, L.shoulder - L.cuffA * Math.cos(L.abd), L.neckline);
   } else if (/^Trousers/.test(name)) {
     m = tmat(O.trousers, { skin: true, morph: true, side: THREE.DoubleSide, rim: '#2a3440', rimK: 0.6, pattern: 'trousersG', bindAttr: true, unique: true });
-    const U = m.userData.u; U.uPat0.value.copy(srgb(O.pipe || spec.dept)); U.uParam.value.set(0, /Down$/.test(name) ? 1 : 0, L.hipX, uni); U.uL0.value.set(L.knee, L.trouserTop, 0, 0);
+    const tg = F.model.mesh.Trousers.geo; if (!tg.boundingBox) tg.computeBoundingBox();      // (the hem: the bottom of the trousers as worn)
+    const U = m.userData.u; U.uPat0.value.copy(srgb(O.legAccent || O.pipe || spec.dept)); U.uParam.value.set(0, /Down$/.test(name) ? 1 : 0, L.hipX, uni);
+    U.uL0.value.set(L.knee, L.trouserTop, uni ? 0 : LEGS[O.legs] || 0, tg.boundingBox.min.y);
   } else if (/^Briefs/.test(name)) {
     F.underMat = F.underMat || tmat(O.under, { skin: true, morph: true, side: THREE.DoubleSide, marks: true, bindAttr: true, unique: true, markCol: shade(O.under, -0.2), rim: '#2a3440', rimK: 0.5 });
     m = F.underMat;
-  } else m = tmat(spec.outfit === 'offduty' ? '#4a3424' : '#1e2024', { skin: true, morph: true, rim: '#3a4048', rimK: 0.4 });
+  } else {
+    // (the boots; or, off duty, aboard, each crew member's own soft shoes over socks)
+    const sh = !uni && O.shoes ? SHOES[O.shoes] || 0 : 0;
+    m = tmat(sh ? O.shoe : spec.outfit === 'offduty' ? '#4a3424' : '#1e2024', { skin: true, morph: true, rim: '#3a4048', rimK: 0.4, pattern: 'shoeG', bindAttr: true, unique: true });
+    const U = m.userData.u; U.uParam.value.set(sh, F.H.ankle, 0, 0);
+    if (sh) { U.uPat0.value.copy(srgb(O.sole || '#222')); U.uPat1.value.copy(srgb(O.trim || O.sole || '#222')); U.uPat2.value.copy(srgb(O.sock || '#555')); }
+  }
   const depth = /^Briefs/.test(name) ? 2 : /^Trousers/.test(name) ? 1 : 0;
   if (depth) { m.polygonOffset = true; m.polygonOffsetFactor = depth; m.polygonOffsetUnits = 2 * depth; }
   const sm = skinned(F, geo, m); sm.castShadow = true; sm.receiveShadow = false; ink(sm, INK_W, F, null, HEM_R);
   F.gm[name] = sm; return sm;
 }
 function dressGLB(F) {
-  const st = F.state, tops = F.spec.outfit === 'offduty' ? ['Shirt', 'ShirtUp'] : ['Tunic', 'TunicUp'];
+  const st = F.state, O = outfitOf(F.spec), longS = F.spec.outfit !== 'offduty' || O.sleeves === 'long', tops = longS ? ['Tunic', 'TunicUp'] : ['Shirt', 'ShirtUp'];
   const want = { top: tops[st.top === 'up' ? 1 : 0], bottoms: st.bottoms === 'down' ? 'TrousersDown' : 'Trousers', under: st.under === 'down' ? 'BriefsDown' : 'Briefs', boots: 'Boots' };
   const on = new Set(Object.values(want));
   for (const k of Object.values(want)) garmentGLB(F, k);
@@ -1275,7 +1451,7 @@ function dressGLB(F) {
   F.clothes = { top: F.gm[want.top], bottoms: F.gm[want.bottoms], under: F.gm[want.under] }; F.bootL = F.bootR = F.gm.Boots;
   // the skin under each garment hidden (so nothing pokes through as they move)
   let hide = 1 << R.FOOT; const H = r => { hide |= 1 << r; };
-  H(R.CHEST); H(R.UPARM); H(R.WAIST_HI); if (F.spec.outfit !== 'offduty') H(R.FOREARM); if (st.top !== 'up') H(R.WAIST);
+  H(R.CHEST); H(R.UPARM); H(R.WAIST_HI); if (longS) H(R.FOREARM); if (st.top !== 'up') H(R.WAIST);
   if (st.bottoms !== 'down') { H(R.HIPS); H(R.HIPS_LO); H(R.SEAT); H(R.THIGH); H(R.KNEE); H(R.SHIN); } else H(R.SHIN);
   if (st.under !== 'down') { H(R.SEAT); H(R.HIPS_LO); }
   F.skinMat.userData.u.uHide.value = hide;

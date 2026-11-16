@@ -50,3 +50,15 @@ test('defiance: each crew member has back-talk, a breaking line and a guarded af
   // (the pilot is the wilful one: high ego, high wilfulness)
   assert.equal(Crew.IDS.reduce((a, id) => (Crew.ROSTER[id].meters.wilfulness > Crew.ROSTER[a].meters.wilfulness ? id : a)), 'pilot');
 });
+
+test('off duty: each crew member has their own, practical aboard (soft shoes, never boots); the Captain keeps the henley', () => {
+  const TOPS = ['thermal', 'open', 'waistcoat', 'cardigan', 'tee'], LEGS = ['joggers', 'chinos', 'work', 'combat', 'pressed'], SHOES = ['soft', 'deck', 'work', 'sneakers', 'flats', 'loafers'];
+  for (const id of Crew.IDS) {
+    const o = Crew.ROSTER[id].offduty; assert.ok(o, id);
+    assert.ok(TOPS.includes(o.top) && LEGS.includes(o.legs) && SHOES.includes(o.shoes), id); assert.ok(['long', 'rolled'].includes(o.sleeves), id);
+    for (const k of ['tunic', 'trousers', 'shoe', 'sole', 'sock']) assert.match(o[k], /^#[0-9a-f]{6}$/, id + ' ' + k);
+    assert.equal(Crew.figureSpec(id, 'f', 'offduty').off, o);
+  }
+  assert.equal(Crew.ROSTER.pilot.offduty.legs, 'combat');      // (carpenter trousers, not coveralls)
+  assert.equal(Crew.captainSpec({ outfit: 'offduty' }).off, undefined);
+});

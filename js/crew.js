@@ -62,6 +62,31 @@ const ROSTER = {
     look: { skin: '#e2b896', hair: '#7a726a', hairStyle: { m: 'crop', f: 'bob' }, eyes: '#4a3a2a', beard: true },
     dept: '#d8d4cc', word: 'Triage', base: 'stern' },
 };
+// Off duty: each their own (the Captain keeps the henley, canvas trousers and boots). They never make landfall, so it's what they'd wear about
+// the ship: their own style, practical at home, soft indoor shoes over socks rather than boots. top: thermal | open (a printed shirt open over
+// a tee) | waistcoat (over a shirt: shirt, its colour; scarf, a scarf at the collar) | cardigan (over a collared shirt) | tee (printed);
+// sleeves: long, or rolled (pushed up); tunic: the top's main colour; shirt: what's under it; print, accent: its print's colours (or buttons,
+// stitching, a scarf, a thread); legs: joggers | chinos | work | combat | pressed, in trousers, with legAccent; shoes: soft | deck | work |
+// sneakers | flats | loafers, in shoe, on sole, with trim, over sock.
+const OFFDUTY = {
+  // Sefa: the simplest: base layers, comfort first: a fitted thermal and loose joggers in heathered grey, no prints, seams kept flat; the one
+  // colour a lilac thread at a cuff. Soft felt shoes.
+  comms: { top: 'thermal', sleeves: 'long', tunic: '#8f8e8c', accent: '#a48ad0', trousers: '#5e5e62', legs: 'joggers', legAccent: '#7a7a7e', shoes: 'soft', shoe: '#6c6c70', sole: '#46464a', sock: '#8f8e8c' },
+  // Rowan: expressive, short of quirky: a bold botanical print, a shirt worn open over a plain long-sleeved tee, olive chinos, canvas deck shoes.
+  scientist: { top: 'open', sleeves: 'long', tunic: '#24575a', shirt: '#d9d2c2', print: '#e0d2a6', accent: '#7fa05c', trousers: '#66663f', legs: 'chinos', legAccent: '#4e4e30', shoes: 'deck', shoe: '#2e3a4a', sole: '#ebe5d8', trim: '#ebe5d8', sock: '#8a7a5a' },
+  // Sam: quiet, steady, comfortable but with a style of their own: a dark henley, sleeves pushed up, under a worn leather waistcoat; heavy
+  // work trousers with double knees and rust stitching; soft-soled leather work shoes.
+  engineer: { top: 'waistcoat', sleeves: 'rolled', tunic: '#6a4630', shirt: '#3a3d42', print: '#b08a4a', accent: '#a4562a', trousers: '#3e3a34', legs: 'work', legAccent: '#a4562a', shoes: 'work', shoe: '#5a3e2a', sole: '#2a2420', trim: '#a4562a', sock: '#4a4a4e' },
+  // Kit: bright and cheerful: a sunny printed tee (small flowers), sleeves pushed up, faded red carpenter trousers with bellows pockets and a
+  // hammer loop, canvas trainers.
+  pilot: { top: 'tee', sleeves: 'rolled', tunic: '#e0b64a', print: '#f4efe2', accent: '#d0604a', trousers: '#9a4a3e', legs: 'combat', legAccent: '#6e3028', shoes: 'sneakers', shoe: '#ece9e0', sole: '#f6f4ee', trim: '#d0604a', sock: '#e0b64a' },
+  // Noor: well presented: a high-collared cream blouse, a tailored deep green waistcoat with gold buttons, a soft scarf at the collar, pressed
+  // tapered trousers, neat flats.
+  lifesupport: { top: 'waistcoat', sleeves: 'long', scarf: true, tunic: '#2f5a44', shirt: '#ece4d2', print: '#c8a45a', accent: '#c88a6a', trousers: '#2a2e3a', legs: 'pressed', legAccent: '#3a3f4e', shoes: 'flats', shoe: '#1e2a22', sole: '#141414', trim: '#c8a45a', sock: '#2a2e3a' },
+  // Morgan: straight-laced but warm: a crisp collared shirt under a mustard cable-knit cardigan, pressed grey slacks, polished loafers.
+  medic: { top: 'cardigan', sleeves: 'long', tunic: '#b8892e', shirt: '#eeeae2', print: '#4a3a2a', accent: '#8a6420', trousers: '#4e4f55', legs: 'pressed', legAccent: '#5e5f66', shoes: 'loafers', shoe: '#5a3424', sole: '#2a1a14', trim: '#3a2218', sock: '#3a3a40' },
+};
+for (const id in OFFDUTY) ROSTER[id].offduty = OFFDUTY[id];
 const IDS = Object.keys(ROSTER);
 // How much they squirm under a correction, 0 (stoic) – 1 (the most wriggly): the smaller they are the more (their height in that translation
 // against the crew's, and their mass), and the more pain they can take, a little the less. body.wriggle, where given, overrides it.
@@ -80,11 +105,11 @@ const PROCTOR = { id: 'proctor', name: 'The Proctor', role: 'Ship’s AI', onlyD
 
 const PRONOUNS = { m: { they: 'he', them: 'him', their: 'his', They: 'He' }, f: { they: 'she', them: 'her', their: 'her', They: 'She' } };
 const pronouns = sex => PRONOUNS[sex] || PRONOUNS.f;
-// A crew member as a figure: their body type in the chosen sex, their look, and an outfit ('uniform' or 'offduty').
+// A crew member as a figure: their body type in the chosen sex, their look, and an outfit ('uniform' or 'offduty': their own, `off`).
 function figureSpec(id, sex, outfit) {
   const r = ROSTER[id], L = r.look;
   return { sex, height: r.body.h[sex], mass: r.body.mass, fat: r.body.fat, skin: L.skin, hair: L.hair, hairStyle: L.hairStyle[sex], eyes: L.eyes,
-    beard: sex === 'm' && L.beard, outfit: outfit || 'uniform', dept: r.dept, bust: r.body.bust };
+    beard: sex === 'm' && L.beard, outfit: outfit || 'uniform', dept: r.dept, bust: r.body.bust, off: r.offduty || null };
 }
 function captainSpec(c) {
   c = Object.assign({ sex: 'm', skin: '#b88a6a', hair: '#3a2a20', hairStyle: 'crop', build: 'average', beard: true }, c || {});
