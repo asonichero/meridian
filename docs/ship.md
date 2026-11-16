@@ -28,7 +28,7 @@ One corridor: the **spine**, bow to stern. Every room opens onto it.
 |---|---|---|---|---|
 | Suit bay | the suit bench | the grab rail | | the suit bench |
 | Galley and mess | the end of a crew bench | hands on the island | the end of the crew table | the soft seating at the edge |
-| Crew quarters | the edge of the bunk | hands flat on the wall | | the edge of the bunk |
+| Crew quarters (private: no witnesses) | the edge of the bunk | hands flat on the wall | | the edge of the bunk |
 | Reactor | a parts crate | the guard rail round the core | | taken elsewhere (hydroponics, or their quarters) |
 | Med bay | the edge of the recovery cot | hands on the exam table | over the exam table, set to their hip height | the cot |
 | Hydroponics | the garden bench | the edge of the potting bench | | the garden bench |
@@ -36,4 +36,5 @@ One corridor: the **spine**, bow to stern. Every room opens onto it.
 
 - **The bridge is never used for corrections.** When the crew are gathered there it's mission-critical; once that phase has passed, the Captain takes anyone who needs one into the Ready Room.
 - **Aftercare** happens in the room by default; the Captain can take them to the garden bench in hydroponics, or to their own quarters.
-- Rooms are built one at a time (the galley and mess first), each its own scene for now, sized and doored to the plan so they can join into the walkable deck for patrols.
+- **Crew quarters are private.** A correction in a cabin happens in the subject's own, with nobody watching: witnesses, and anyone waiting their turn, stay outside.
+- Rooms are built one at a time (the galley and mess first, then the crew quarters), each its own scene for now, sized and doored to the plan so they can join into the walkable deck for patrols.

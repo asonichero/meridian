@@ -105,7 +105,8 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
   <h1>Correction test</h1>
   <p class="sub">Choose the room, who's corrected (in order), who witnesses, and how; then begin. The player runs it: runs of smacks on a toggle, pace, strength, where, and soothing between. If it goes too far, the crew member calls their agreed word and it stops.</p>
   <h2>Room</h2>
-  <div class="row seg" id="room"><button data-v="suitbay" class="on">Suit bay</button><button data-v="mess">Galley &amp; mess</button></div>
+  <div class="row seg" id="room"><button data-v="suitbay" class="on">Suit bay</button><button data-v="mess">Galley &amp; mess</button><button data-v="quarters">Crew quarters</button></div>
+  <p class="sub" id="privateNote" style="display:none;margin:6px 0 0">Their own cabin: nobody watches here. Witnesses stay outside, and so does anyone waiting their turn.</p>
   <h2>Time of day</h2>
   <div class="row seg" id="tod"><button data-v="day">Day</button><button data-v="night">Night</button></div>
   <h2>Position</h2>
@@ -162,7 +163,7 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
 
 <script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script><script src="vendor/GLTFLoader.js"></script>
 <script src="js/pain.js"></script><script src="js/audio.js"></script><script src="js/crew.js"></script><script src="js/lines.js"></script>
-<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/session.js"></script>
+<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/session.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
@@ -195,11 +196,13 @@ function drawCaptain() {
 }
 // the rooms, and the positions each offers (standing: at what's there to hold; over the table where there's a table)
 const ROOMS = { suitbay: { build: sc => SuitBay.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the rail']] },
-  mess: { build: sc => Mess.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the island'], ['table', 'Over the table']] } };
+  mess: { build: sc => Mess.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the island'], ['table', 'Over the table']] },
+  quarters: { build: sc => Quarters.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the wall']], private: true } };
 if (q.get('room') && ROOMS[q.get('room')]) cfg.room = q.get('room');
 if (!ROOMS[cfg.room]) cfg.room = 'suitbay';
 function drawPos() {
   const el = $('pos'); el.innerHTML = ''; const list = ROOMS[cfg.room].pos;
+  $('privateNote').style.display = ROOMS[cfg.room].private ? '' : 'none';
   for (const [v, nm] of list) { const b = document.createElement('button'); b.dataset.v = v; b.textContent = nm; el.append(b); }
   if (!list.some(x => x[0] === cfg.position)) cfg.position = 'otk';
   seg('pos', cfg.position, v => { cfg.position = v; save(); if (ses) { fade(); ses.position(v); } drawCams(); });

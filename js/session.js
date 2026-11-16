@@ -164,7 +164,7 @@ function create(stage, bay, opts) {
     // up out of position, till they're put back (as they're placed, the defiant are slow to settle: up from the start)
     if (R.up) {
       const u = R.up; u.t += dt;
-      if (!u.said && u.t > (u.start ? u.dur - 0.5 : 0.45)) { u.said = true; say('captain', L.captain(otk ? 'down' : st.position === 'table' ? 'table' : sup.kind === 'rail' ? 'rail' : sup.kind, P.id)); }
+      if (!u.said && u.t > (u.start ? u.dur - 0.5 : 0.45)) { u.said = true; say('captain', L.captain(otk ? 'down' : st.position === 'table' ? 'table' : sup.kind === 'rail' ? 'rail' : lineKind, P.id)); }
       if (u.t >= u.dur) { R.up = null; R.cool = 2.5; }
     }
     if (st.ending || st.phase !== 'turn') R.pinOn = false;      // (let go once it's over)
@@ -208,6 +208,7 @@ function create(stage, bay, opts) {
   // they bend to it. Over the table: where its end is, its height and width, and how they hold it (sides, or a desk's far edge). The
   // aftercare's seat: the Captain's place on it, theirs beside.)
   const sup = wall.support || { kind: 'rail', y: wall.rail.y, d: Math.abs(wall.rail.x - wall.at.x), bend: 0.72 };
+  const lineKind = sup.kind === 'wall' ? 'flat' : sup.kind;      // (the lines for each: palms on a bare wall are js/lines.js's 'flat')
   const after = bay.spots.after || { at: bench.at, yaw: bench.yaw || 0, seatY: bench.seatY, beside: bench.beside };
   const inFrame = (at, yaw, x, y, z) => new V3(x, y, z).applyQuaternion(yawQ(yaw)).add(at);
   // (the posing helpers, js/poses.js; seated, on the bench)
@@ -218,8 +219,9 @@ function create(stage, bay, opts) {
   // The pelvis over the Captain's right thigh toward the knee, the belly over the left, the chest bending down past it and the hands braced on the
   // deck: in front of the bench, not over it (the body turned a little out into the room, head end first, so the arms hang clear of it).
   // The Captain sits at the bench's end turned 45° to their right, so their lap points off its corner and nothing of the subject's is over the
-  // bench: the head end out to the Captain's left, the legs to their right.
-  const OTK = { pitch: 0.0, yaw: 0, z: 0.3, seat: inFrame(bench.at, bench.yaw || 0, -0.08, 0, 0), seatYaw: (bench.yaw || 0) - Math.PI / 4 };
+  // bench: the head end out to the Captain's left, the legs to their right. (A seat deep enough to sit square on, a bunk, says so with `turn`:
+  // perched on its edge facing out, the subject lies along it in front, the legs off to the right along it.)
+  const OTK = { pitch: 0.0, yaw: 0, z: 0.3, seat: inFrame(bench.at, bench.yaw || 0, -0.08, 0, 0), seatYaw: (bench.yaw || 0) - (bench.turn != null ? bench.turn : Math.PI / 4) };
   let otkQ = null, otkH = new V3(), otkU = new V3(1, 0, 0), otkX = new V3(0, 0, -1);
   // the top of the Captain's thighs at a point (world), between hip and knee
   function lapAt(P) {
@@ -271,8 +273,10 @@ function create(stage, bay, opts) {
   function poseOthers(t) {
     let w = 0;
     for (const P of people) {
-      if (P === cur && (st.phase === 'turn' || st.phase === 'closing')) continue;      // (the one in the scene stays in it till the cut)
-      if (st.phase === 'after' && P === afterWith) continue;
+      // (a private room (crew quarters): nobody watches; whoever isn't in the scene is outside it)
+      const inScene = (P === cur && (st.phase === 'turn' || st.phase === 'closing')) || (st.phase === 'after' && P === afterWith);
+      P.f.root.visible = inScene || !bay.private;
+      if (inScene || bay.private) continue;      // (the one in the scene stays in it till the cut)
       const F = P.f, i = people.indexOf(P);
       if (P.done && st.between === 'corner' && st.phase === 'turn') {
         // the first in the corner; any after, along the east bulkhead, facing it; feet together, hands on the head, the head bowed
@@ -634,7 +638,7 @@ function create(stage, bay, opts) {
 
   // ── Turns ──
   let afterWith = null;
-  const placeKey = () => (st.position === 'wall' ? (sup.kind === 'rail' ? 'wall' : sup.kind) : st.position);      // (what the Captain says to place them)
+  const placeKey = () => (st.position === 'wall' ? (sup.kind === 'rail' ? 'wall' : lineKind) : st.position);      // (what the Captain says to place them)
   function beginTurn(i) {
     st.turn = i; cur = queue[i]; st.word = false; st.swing = null; st.running = false; st.soothe = false; st.phase = 'turn';
     J.kick = 0; J.stamp = 0; for (const k in sp) { sp[k].x = 0; sp[k].v = 0; }
