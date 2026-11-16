@@ -41,6 +41,25 @@ const rugTex = canvasTex(256, 256, (c, w, h) => {
 });
 const drapeTex = canvasTex(128, 256, (c, w, h) => { const g = c.createLinearGradient(0, 0, w, 0); for (let i = 0; i <= 8; i++) g.addColorStop(i / 8, i % 2 ? '#6a3a4a' : '#7e4a58'); c.fillStyle = g; c.fillRect(0, 0, w, h); c.fillStyle = '#c89a52'; c.fillRect(0, h - 14, w, 5); speckle(c, w, h, 300, '#000', 0.1, 2); });
 
+// Which wall (or the ceiling) each thing in a room belongs to: the nearest wall within reach of its middle, else the ceiling if it hangs from
+// it; and which sides the camera is in or beyond (within a little of a wall, or up by the ceiling). When the camera comes through a wall, or is in
+// among what's on it, that whole side is hidden: the wall, its ribs, pipes, lockers, cupboards. b: the room's walls (minX, maxX, minZ, maxZ)
+// and its height; the sides are W, E (x), N, S (z), C.
+function roomSides(G, b, skip) {
+  const REACH = 0.75, sideOf = new Map(), _bx = new THREE.Box3(), _c = new V3();
+  for (const o of G.children) {
+    if (o.isLight || (skip && skip.includes(o))) continue;
+    _bx.setFromObject(o); if (_bx.isEmpty()) continue; _bx.getCenter(_c);
+    const d = { N: _c.z - b.minZ, S: b.maxZ - _c.z, W: _c.x - b.minX, E: b.maxX - _c.x }; let best = null;
+    for (const k in d) if (d[k] < REACH && (!best || d[k] < d[best])) best = k;
+    if (!best && b.ht - _c.y < REACH) best = 'C';
+    if (best) sideOf.set(o, best);
+  }
+  const IN = 0.45;
+  const sidesAt = p => { const s = new Set(); if (p.z < b.minZ + IN) s.add('N'); if (p.z > b.maxZ - IN) s.add('S'); if (p.x < b.minX + IN) s.add('W'); if (p.x > b.maxX - IN) s.add('E'); if (p.y > b.ht - 0.3) s.add('C'); return s; };
+  return { sideOf, sidesAt };
+}
+
 // Several meshes made one (each in the group's frame), by material: what the low-CPU mode draws in place of a wall's many panels.
 function merged(meshes) {
   const byM = new Map(); for (const m of meshes) { if (!byM.has(m.material)) byM.set(m.material, []); byM.get(m.material).push(m); }
@@ -191,7 +210,7 @@ function build(scene) {
 
   const spots = {
     bench: { at: new V3(benchAt.x, 0, benchAt.z), yaw: 0, seatY, beside: new V3(benchAt.x + 0.62, 0, benchAt.z) },
-    wall: { at: new V3(-W + 0.95, 0, railZ), yaw: -Math.PI / 2, rail: { x: -W + 0.12, y: railY, z: railZ, hi: railY + 0.32 } },
+    wall: { at: new V3(-W + 0.95, 0, railZ), yaw: -Math.PI / 2, rail: { x: -W + 0.12, y: railY, z: railZ, hi: railY + 0.32 }, support: { kind: 'rail', y: railY, d: 0.83, bend: 0.72 } },
     watch: [{ at: new V3(1.55, 0, -1.2), yaw: -2.4 }, { at: new V3(-0.9, 0, -1.35), yaw: 2.6 }, { at: new V3(1.85, 0, 0.9), yaw: -1.9 }, { at: new V3(0.6, 0, -1.55), yaw: 3.0 }],
     corner: { at: new V3(W - 0.34, 0, D - 0.34), yaw: Math.PI / 4 },
   };
@@ -213,23 +232,11 @@ function build(scene) {
     const sz = low ? 1024 : 2048;
     if (key.shadow.mapSize.x !== sz) { key.shadow.mapSize.set(sz, sz); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
   }
-  // ── Which wall (or the ceiling) each thing belongs to: the nearest wall within reach of its middle, else the ceiling if it hangs from it. When
-  // the camera comes through a wall (or is in among what's on it), that whole side is hidden: the wall, its ribs, pipes, lockers, alcoves. ──
-  const REACH = 0.75, sideOf = new Map(), _bx = new THREE.Box3(), _c = new V3();
-  for (const o of G.children) {
-    if (o.isLight || o === deck) continue;
-    _bx.setFromObject(o); if (_bx.isEmpty()) continue; _bx.getCenter(_c);
-    const d = { N: _c.z + D, S: D - _c.z, W: _c.x + W, E: W - _c.x }; let best = null;
-    for (const k in d) if (d[k] < REACH && (!best || d[k] < d[best])) best = k;
-    if (!best && HT - _c.y < REACH) best = 'C';
-    if (best) sideOf.set(o, best);
-  }
-  // (the sides the camera's in or beyond: within a little of a wall, or up by the ceiling)
-  const IN = 0.45;
-  const sidesAt = p => { const s = new Set(); if (p.z < -D + IN) s.add('N'); if (p.z > D - IN) s.add('S'); if (p.x < -W + IN) s.add('W'); if (p.x > W - IN) s.add('E'); if (p.y > HT - 0.3) s.add('C'); return s; };
+  // (each thing's wall, for hiding a whole side as the camera comes through it)
+  const { sideOf, sidesAt } = roomSides(G, { minX: -W, maxX: W, minZ: -D, maxZ: D, ht: HT }, [deck]);
   let t = 0;
-  return { group: G, spots, key, setLow, sideOf, sidesAt, get low() { return low; }, tick(dt) { t += dt; glowR.emissiveIntensity = 3 + 1.5 * Math.sin(t * 2.2); G.userData.hatch.userData.red.intensity = 1.6 + 0.8 * Math.sin(t * 2.2); } };
+  return { group: G, spots, key, setLow, sideOf, sidesAt, name: 'Suit bay', bounds: { minX: -2.4, maxX: 2.4, minZ: -2.0, maxZ: 2.0 }, get low() { return low; }, tick(dt) { t += dt; glowR.emissiveIntensity = 3 + 1.5 * Math.sin(t * 2.2); G.userData.hatch.userData.red.intensity = 1.6 + 0.8 * Math.sin(t * 2.2); } };
 }
 
-root.SuitBay = { build };
+root.SuitBay = { build, kit: { canvasTex, rnd, speckle, panelTex, gratingTex, woodTex, rugTex, drapeTex, merged, roomSides } };
 })(typeof window !== 'undefined' ? window : globalThis);

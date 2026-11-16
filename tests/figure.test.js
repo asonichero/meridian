@@ -75,7 +75,7 @@ test('the Blender-built figures: the same skeleton, built from the models, each 
   await loaded;
   for (const sex of ['f', 'm']) {
     const f = gfig('pilot', sex);
-    assert.ok(f.model, 'made from the model'); assert.equal(f.bones.length, sex === 'm' ? 44 : 43);      // (his: one more, for his lift)
+    assert.ok(f.model, 'made from the model'); assert.equal(f.bones.length, sex === 'm' ? 45 : 43);      // (his: two more, for his lift and his scrotum's own swing)
     for (const s of ['L', 'R']) { for (const n of ['index', 'middle', 'ring', 'pinky', 'thumb']) assert.equal(f.bone[n + '2' + s].parent, f.bone[n + '1' + s]); assert.equal(f.bone['glute' + s].parent, f.bone.hips); }
     f.setClothes({ top: 'up', bottoms: 'down', under: 'down' }); f.setOutfit('offduty');
     for (const m of [f.body, ...Object.values(f.gm)]) {
@@ -102,7 +102,7 @@ test('the body’s response: the sex fuller, his lifting on its own bone, a deep
     const f = gfig('pilot', sex), inf = m => m.morphTargetInfluences[m.geometry.userData.keys.sexSwell];
     assert.ok('sexSwell' in f.body.geometry.userData.keys); assert.equal(inf(f.body), 0); assert.equal(f.skinMat.userData.u.uFlush.value.x, 0);
     f.setResponse(0.5); for (let i = 0; i < 120; i++) f.tick(0.05);
-    assert.ok(inf(f.body) > 0.4, 'fuller'); assert.ok(f.skinMat.userData.u.uFlush.value.x > 0.8, 'flushed');
+    assert.ok(inf(f.body) > 0.4, 'fuller'); if (sex === 'f') assert.ok(f.skinMat.userData.u.uFlush.value.x > 0.8, 'flushed'); else assert.equal(f.skinMat.userData.u.uFlush.value.x, 0, 'his: no tint');
     if (sex === 'm') {
       assert.equal(f.bone.sex.parent, f.bone.hips);
       assert.ok(f.bone.sex.rotation.x < -0.6 && f.bone.sex.rotation.x > -1.0, `lifting partway: ${f.bone.sex.rotation.x}`);

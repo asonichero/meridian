@@ -103,9 +103,11 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
 
 <div id="setup" class="panel">
   <h1>Correction test</h1>
-  <p class="sub">The suit bay. Choose who's corrected (in order), who witnesses, and how; then begin. The player runs it: runs of smacks on a toggle, pace, strength, where, and soothing between. If it goes too far, the crew member calls their agreed word and it stops.</p>
+  <p class="sub">Choose the room, who's corrected (in order), who witnesses, and how; then begin. The player runs it: runs of smacks on a toggle, pace, strength, where, and soothing between. If it goes too far, the crew member calls their agreed word and it stops.</p>
+  <h2>Room</h2>
+  <div class="row seg" id="room"><button data-v="suitbay" class="on">Suit bay</button><button data-v="mess">Galley &amp; mess</button></div>
   <h2>Position</h2>
-  <div class="row seg" id="pos"><button data-v="otk" class="on">Across the knee</button><button data-v="wall">At the wall</button></div>
+  <div class="row seg" id="pos"></div>
   <h2>Crew <span style="text-transform:none;letter-spacing:0">(tap: corrected → witness → absent)</span></h2>
   <div class="crew" id="crew"></div>
   <h2>Between turns</h2>
@@ -158,12 +160,12 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
 
 <script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script><script src="vendor/GLTFLoader.js"></script>
 <script src="js/pain.js"></script><script src="js/audio.js"></script><script src="js/crew.js"></script><script src="js/lines.js"></script>
-<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/session.js"></script>
+<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/session.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
 const KEY = 'meridian:session:v1';
-const cfg = Object.assign({ position: 'otk', between: 'corner', outfit: 'uniform', roles: { pilot: 'subject', engineer: 'witness' }, sex: { scientist: 'f', engineer: 'm', pilot: 'f', lifesupport: 'm', comms: 'f', medic: 'm' },
+const cfg = Object.assign({ room: 'suitbay', position: 'otk', between: 'corner', outfit: 'uniform', roles: { pilot: 'subject', engineer: 'witness' }, sex: { scientist: 'f', engineer: 'm', pilot: 'f', lifesupport: 'm', comms: 'f', medic: 'm' },
   order: ['pilot'], captain: { sex: 'm', skin: '#b88a6a', hair: '#3a2a20', hairStyle: 'crop', build: 'average', beard: true } }, (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } })());
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* no storage */ } };
 const seg = (id, val, fn) => { const el = $(id); el.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === val); b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); }; }); };
@@ -189,7 +191,18 @@ function drawCaptain() {
   const el = $('cstyle'); el.innerHTML = ''; for (const s of O.hairStyle[C.sex]) { const b = document.createElement('button'); b.textContent = s; b.className = C.hairStyle === s ? 'on' : ''; b.onclick = () => { C.hairStyle = s; save(); drawCaptain(); }; el.append(b); }
   seg('cbuild', C.build, v => { C.build = v; save(); });
 }
-seg('pos', cfg.position, v => { cfg.position = v; save(); if (ses) { fade(); ses.position(v); } drawCams(); });
+// the rooms, and the positions each offers (standing: at what's there to hold; over the table where there's a table)
+const ROOMS = { suitbay: { build: sc => SuitBay.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the rail']] },
+  mess: { build: sc => Mess.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the island'], ['table', 'Over the table']] } };
+if (q.get('room') && ROOMS[q.get('room')]) cfg.room = q.get('room');
+if (!ROOMS[cfg.room]) cfg.room = 'suitbay';
+function drawPos() {
+  const el = $('pos'); el.innerHTML = ''; const list = ROOMS[cfg.room].pos;
+  for (const [v, nm] of list) { const b = document.createElement('button'); b.dataset.v = v; b.textContent = nm; el.append(b); }
+  if (!list.some(x => x[0] === cfg.position)) cfg.position = 'otk';
+  seg('pos', cfg.position, v => { cfg.position = v; save(); if (ses) { fade(); ses.position(v); } drawCams(); });
+}
+drawPos();
 seg('between', cfg.between, v => { cfg.between = v; save(); if (ses) ses.st.between = v; });
 seg('outfit', cfg.outfit, v => { cfg.outfit = v; save(); });
 drawCrew(); drawCaptain();
@@ -222,8 +235,15 @@ $('hide').onclick = () => $('setup').classList.toggle('closed');
 
 // ── The stage ──
 if (q.get('low')) cfg.graphics = q.get('low') === '0' ? 'full' : 'low';
-const stage = Stage.create($('view'), { keep: !!q.get('still'), low: cfg.graphics === 'low' }), bay = SuitBay.build(stage.scene);
+const stage = Stage.create($('view'), { keep: !!q.get('still'), low: cfg.graphics === 'low' });
+let bay = ROOMS[cfg.room].build(stage.scene);
 bay.setLow(cfg.graphics === 'low');
+// (another room: the old one taken down, the new one built, and a session in progress begun again there)
+seg('room', cfg.room, v => {
+  if (v === cfg.room) return; cfg.room = v; save(); drawPos();
+  stage.scene.remove(bay.group); bay = ROOMS[v].build(stage.scene); bay.setLow(cfg.graphics === 'low');
+  if (ses) { fade(); models.then(begin); }
+});
 seg('gfx', cfg.graphics || 'full', v => { cfg.graphics = v; save(); stage.setLow(v === 'low'); bay.setLow(v === 'low'); });
 let ses = null;
 function begin() {
@@ -301,7 +321,7 @@ async function aftercareAll(results) {
   results = ses.st.results;      // (the summary: everyone, cared for now or earlier)
   $('say').style.display = 'none';
   const S = $('summary'); S.style.display = 'block';
-  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${Crew.ROSTER[r.id].short}</td><td>${r.position === 'otk' ? 'across the knee' : 'at the wall'}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${Crew.ROSTER[r.id].word}”` : 'completed'}</td><td>peak: ${r.band}</td><td>defiance ${pc(r.defiance.from)} → ${pc(r.defiance.to)}</td><td>compliance +${pc(r.compliance)}</td><td>resentment +${pc(r.resentment)}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
+  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${Crew.ROSTER[r.id].short}</td><td>${{ otk: 'across the knee', wall: 'standing', table: 'over the table' }[r.position] || r.position}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${Crew.ROSTER[r.id].word}”` : 'completed'}</td><td>peak: ${r.band}</td><td>defiance ${pc(r.defiance.from)} → ${pc(r.defiance.to)}</td><td>compliance +${pc(r.compliance)}</td><td>resentment +${pc(r.resentment)}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
 }
 
 // ── Live controls ──
