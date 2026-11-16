@@ -260,21 +260,26 @@ function onEvent(type, d) {
   if (type === 'say') sayQueue = sayQueue.then(() => showLine(d.who, d.id, d.text, 900));
   if (type === 'word') { const w = $('word'); w.textContent = `${Crew.ROSTER[d.id].short} called their word: “${d.word}”. It stops.`; w.style.display = 'block'; setTimeout(() => (w.style.display = 'none'), 4200); }
   if (type === 'done') sayQueue = sayQueue.then(() => aftercareAll(d.results));
+  // (a safe word: straight to their aftercare, then on with whoever's left)
+  if (type === 'aftercareNow') sayQueue = sayQueue.then(async () => { await aftercareOne(d.result); fade(); ses.next(); });
   refresh();
 }
+// One crew member's aftercare: the cut to the two of them on the bench, and the conversation.
+async function aftercareOne(r) {
+  fade(); ses.aftercare(r.id); ses.camera(0, 0); refresh();
+  const P = ses.people.find(p => p.id === r.id);
+  const run = async steps => {
+    for (const s of steps) {
+      if (s.choose) { const o = await choose(s.choose); r.choice = r.choice || []; r.choice.push(o.order || o.label); await run(o.then); continue; }
+      const id = s.who === 'captain' ? 'captain' : r.id; if (s.expr && P) P.f.setExpr(s.expr);
+      await showLine(s.who, id, s.text, s.who === 'captain' ? 600 : 1100);
+    }
+  };
+  await run(Lines.after(r.id, r.outcome)); ses.cared(r.id);
+}
 async function aftercareAll(results) {
-  for (const r of results) {
-    fade(); ses.aftercare(r.id); ses.camera(0, 0); refresh();
-    const P = ses.people.find(p => p.id === r.id);
-    const run = async steps => {
-      for (const s of steps) {
-        if (s.choose) { const o = await choose(s.choose); r.choice = r.choice || []; r.choice.push(o.order || o.label); await run(o.then); continue; }
-        const id = s.who === 'captain' ? 'captain' : r.id; if (s.expr && P) P.f.setExpr(s.expr);
-        await showLine(s.who, id, s.text, s.who === 'captain' ? 600 : 1100);
-      }
-    };
-    await run(Lines.after(r.id, r.outcome));
-  }
+  for (const r of results) await aftercareOne(r);
+  results = ses.st.results;      // (the summary: everyone, cared for now or earlier)
   $('say').style.display = 'none';
   const S = $('summary'); S.style.display = 'block';
   S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${Crew.ROSTER[r.id].short}</td><td>${r.position === 'otk' ? 'across the knee' : 'at the wall'}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${Crew.ROSTER[r.id].word}”` : 'completed'}</td><td>peak: ${r.band}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
@@ -308,7 +313,9 @@ addEventListener('keydown', e => {
 function drawCams() { const el = $('cams'); el.innerHTML = ''; if (!ses) return; const set = ses.CAMS[ses.st.phase === 'after' ? 'after' : ses.st.position]; set.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = ses.st.cam === i ? 'on' : ''; b.onclick = () => { ses.camera(i); drawCams(); }; el.append(b); }); }
 function refresh() {
   if (!ses) return; const st = ses.st, c = ses.current;
-  $('run').textContent = st.running ? 'Stop run' : 'Start run'; $('run').classList.toggle('on', st.running); $('run').disabled = !c || st.phase !== 'turn';
+  $('run').textContent = st.running ? 'Stop run' : 'Start run'; $('run').classList.toggle('on', st.running); $('run').disabled = !c || st.phase !== 'turn' || ses.busy;
+  // (while the Captain's dressing them, or finishing, the controls wait for it)
+  for (const id of ['cTop', 'cBot', 'cUnd', 'soothe', 'end']) $(id).disabled = !c || st.phase !== 'turn' || !!st.ending || (id === 'soothe' && ses.busy);
   $('soothe').classList.toggle('on', st.soothe); $('paceV').textContent = times(st.pace); $('strengthV').textContent = times(st.strength);
   if (c && c.f) { const s = c.f.state; $('cTop').textContent = 'Top: ' + (s.top === 'up' ? 'raised' : 'down'); $('cBot').textContent = 'Trousers: ' + (s.bottoms === 'up' ? 'up' : 'lowered'); $('cUnd').textContent = 'Briefs: ' + (s.under === 'up' ? 'up' : 'lowered'); }
   if (c) { const r = c.r; $('whoNm').textContent = (r.title ? r.title + ' ' : '') + r.name; $('whoSub').textContent = r.role + (st.phase === 'after' ? ' · aftercare' : ''); $('whoWord').textContent = 'Agreed word: ' + r.word; }
@@ -316,7 +323,7 @@ function refresh() {
 // the meter: distress against the bar (the band ticks, and the safe-word bar in red)
 { const tr = $('track'), max = 2.0; for (const v of [0.3, 0.6, 0.9, 1.0]) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (v / max * 100) + '%'; tr.append(t); } const h = document.createElement('div'); h.className = 'tick harsh'; h.style.left = (Pain.PAIN.TOO_HARSH / max * 100) + '%'; tr.append(h);
   window.__meter = () => { if (!ses) return; const c = ses.current, d = c ? c.pain.distress() : 0; $('fill').style.width = Math.min(100, d / max * 100) + '%';
-    $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}${ses.fight() < 0.3 ? ' · spent' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
+    $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}${ses.fight() < 0.3 ? ' · spent' : ''}${ses.st.ending ? ' · finishing' : ses.st.act || ses.st.actQ.length ? ' · dressing' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
 
 // ── Run ──
 const each = dt => { if (ses) ses.update(dt); bay.tick(dt); window.__meter(); };

@@ -115,7 +115,7 @@ function paint(m, o) {
   o = o || {};
   const U = { uRim: { value: srgb(o.rim || '#2a3440').multiplyScalar(o.rimK == null ? 1 : o.rimK) }, uGrain: { value: o.grain == null ? 0.03 : o.grain }, uGrainScale: { value: o.scale || 60 }, uHide: { value: 0 },
     uMarks: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9, 0, 0)) }, uMarkCol: { value: srgb(o.markCol || '#b8323a') },
-    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() }, uNape: { value: new THREE.Vector4() }, uFlush: { value: new THREE.Vector4() } };
+    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() }, uNape: { value: new THREE.Vector4() }, uFlush: { value: new THREE.Vector4() }, uFlushC: { value: new THREE.Vector4() } };
   m.userData.u = U;
   const key = 'paint|' + [o.regions, o.marks, o.bindAttr].map(x => (x ? 1 : 0)).join('') + (o.pattern || '');
   m.customProgramCacheKey = () => key;
@@ -129,7 +129,7 @@ vBind = ${o.bindAttr ? 'bind' : 'position'};
 ${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'} ${o.pattern ? 'vPart = region;' : 'vPart = 0.0;'}`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uNape; uniform vec4 uFlush; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
+varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uNape; uniform vec4 uFlush; uniform vec4 uFlushC; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
@@ -140,6 +140,12 @@ if (uFlush.x > 0.001) {
   float lo = uFlush.y - (uFlush.w > 0.5 ? 0.125 : 0.042), hi = uFlush.y + (uFlush.w > 0.5 ? 0.06 : 0.034), wx = uFlush.w > 0.5 ? 0.042 : 0.032;
   float fw = (1.0 - smoothstep(wx - 0.022, wx, abs(vBind.x))) * smoothstep(lo, lo + 0.015, vBind.y) * (1.0 - smoothstep(hi - 0.02, hi, vBind.y)) * smoothstep(uFlush.z - 0.03, uFlush.z, vBind.z);
   diffuseColor.rgb *= mix(vec3(1.0), vec3(0.86, 0.54, 0.58), fw * uFlush.x);
+}
+// (and with desire, the flush spreads up the chest to the throat: a blotchy warmth across the front)
+if (uFlushC.x > 0.001) {
+  float cw = smoothstep(uFlushC.y, uFlushC.y + 0.05, vBind.y) * (1.0 - smoothstep(uFlushC.z - 0.03, uFlushC.z, vBind.y)) * (1.0 - smoothstep(0.08, 0.14, abs(vBind.x))) * smoothstep(-0.01, 0.03, vBind.z);
+  cw *= 0.75 + 0.25 * fn3(vBind * 28.0);
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.93, 0.74, 0.74), cw * uFlushC.x);
 }
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
 diffuseColor.rgb *= 1.0 + uGrain * (g - 0.5) * 2.0;
@@ -1212,6 +1218,7 @@ function makeGLB(spec, T) {
     F.resp.r = r; F.resp.lift = 2.0 * u * u * (3 - 2 * u);
     if (Math.abs((F.keys.sexSwell || 0) - swell) > 0.004) { F.keys.sexSwell = swell; F.root.traverse(m => { if (m.isSkinnedMesh && m.morphTargetInfluences) setKeys(m, F.keys); }); }
     skinM.userData.u.uFlush.value.set(clamp(r * 1.7, 0, 1), T.L.crotch, 0.0, spec.sex === 'm' ? 1 : 0);
+    skinM.userData.u.uFlushC.value.set(clamp((o.chest || 0) * 1.8, 0, 1), T.L.armpit - 0.07, T.L.neck + 0.015, 1);
     F.blushAdd = o.blush || 0;
   };
   { const hm = dqs(paint(new THREE.MeshBasicMaterial(Object.assign({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }, HULL_OFS)), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; hm.userData.u.uNape = skinM.userData.u.uNape; ink(F.body, INK_W, F, hm); }

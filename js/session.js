@@ -30,7 +30,8 @@ function create(stage, bay, opts) {
   const scene = stage.scene, C = root.Crew, S = root.Pain, L = root.Lines, A = root.GameAudio;
   const listeners = [], emit = (type, data) => listeners.forEach(f => f(type, data));
   const st = { running: false, pace: 1, strength: 1, side: 'alt', nextSide: 'R', area: 'cheek', soothe: false, position: opts.position || 'otk',
-    between: opts.between || 'corner', turn: -1, swing: null, ended: false, word: false, t: 0, sound: opts.sound !== false, cam: 0, phase: 'turn', results: [] };
+    between: opts.between || 'corner', turn: -1, swing: null, ended: false, word: false, t: 0, sound: opts.sound !== false, cam: 0, phase: 'turn', results: [],
+    act: null, actQ: [], ending: null };
 
   // ── The cast ──
   const captain = Fg.make(C.captainSpec(opts.captain)); scene.add(captain.root);
@@ -71,10 +72,10 @@ function create(stage, bay, opts) {
   function responses(dt) {
     if (cur && st.phase === 'turn') {
       let warm = 0; for (const a of AREAS) for (const sd of ['L', 'R']) warm += cur.f.spot[a + sd].mark / (AREAS.length * 2);
-      respond(cur, (RESP.warm * warm + (st.soothe && !st.swing ? RESP.soothe : 0)) * dt);
+      respond(cur, (RESP.warm * warm + (st.soothe && !st.swing ? RESP.soothe * (1 + 2 * cur.rel.desire) : 0)) * dt);
     }
     const fade = Math.exp(-dt / RESP.tau);
-    for (const P of people) { P.resp *= fade; P.f.setResponse(P.resp); }
+    for (const P of people) { P.resp *= fade; P.f.setResponse(P.resp, { blush: Math.min(0.9, 1.4 * P.resp * P.rel.desire), chest: P.resp * P.rel.desire }); }
     capResp *= fade;
     // (his guard eases as the affection's returned: their desire, or the bond between them once the story keeps it)
     const W = cur || afterWith, bond = W ? Math.max(W.r.dynamic && W.r.dynamic.bond || 0, W.rel.desire) : 0;
@@ -102,8 +103,10 @@ function create(stage, bay, opts) {
   // a shift of the weight, a heel coming up.
   function react(dt) {
     const P = cur, R = P.rx, D = P.pain.distress(), under = st.running || !!st.swing, otk = st.position === 'otk';
-    const E = S.PAIN.EDGE, Hh = S.PAIN.TOO_HARSH, tgt = 1 - sm(E + 0.3 * (Hh - E), E + 0.625 * (Hh - E), D);
-    R.fight += (tgt - R.fight) * (tgt < R.fight ? 1 - Math.exp(-dt * 2) : dt / 45);      // (going: as fast as distress rises; coming back: slowly)
+    // (the more submissive, the sooner they still; the more comfortable, the sooner the fight comes back)
+    const E = S.PAIN.EDGE, Hh = S.PAIN.TOO_HARSH, sub = P.rel.submission, com = P.rel.comfort;
+    const tgt = 1 - sm(E + (0.3 - 0.15 * sub) * (Hh - E), E + (0.625 - 0.2 * sub) * (Hh - E), D);
+    R.fight += (tgt - R.fight) * (tgt < R.fight ? 1 - Math.exp(-dt * 2) : dt * (1 + 2 * com) / 45);      // (going: as fast as distress rises; coming back: slowly)
     R.fight = clamp(R.fight, 0, 1); R.ff = R.fight;
     R.A = sm(0.15, 0.95, D) * lerp(0.05, 1, R.ff);
     const A = R.A, Wg = P.wrig, act = under ? 1 : 0.3;
@@ -115,10 +118,11 @@ function create(stage, bay, opts) {
       // a light kick now and then, one leg flicking up
       if (Math.random() < dt * 0.6 * A * (0.05 + 0.95 * Wg) * act) { kickSp(Math.random() < 0.5 ? 'lkL' : 'lkR', (4 + 5 * Math.random()) * (0.4 + 0.6 * A)); R.n.kicks++; }
       // and, at its worst, a buck
-      if (Math.random() < dt * 0.015 * A * A * Wg * act) { kickSp('buck', 5 + 4 * A); R.n.bucks++; }
-      // a hand that won't stay put: off the deck a moment, or starting back toward the seat before they stop it
-      if (Math.random() < dt * 0.25 * A * (0.3 + 0.7 * Wg) * act) kickSp(Math.random() < 0.5 ? 'armL' : 'armR', 3 + 3 * Math.random());
-      if (A > 0.5 && Math.random() < dt * 0.08 * A * Wg * act) { kickSp(Math.random() < 0.5 ? 'rbL' : 'rbR', 4 + 2 * A); R.n.reaches++; }
+      if (Math.random() < dt * 0.015 * A * A * Wg * act * (1 - 0.6 * sub)) { kickSp('buck', 5 + 4 * A); R.n.bucks++; }
+      // a hand that won't stay put: off the deck a moment, or starting back toward the seat before they stop it (the more submissive, the
+      // better they hold their position)
+      if (Math.random() < dt * 0.25 * A * (0.3 + 0.7 * Wg) * act * (1 - 0.7 * sub)) kickSp(Math.random() < 0.5 ? 'armL' : 'armR', 3 + 3 * Math.random());
+      if (A > 0.5 && Math.random() < dt * 0.08 * A * Wg * act * (1 - 0.85 * sub)) { kickSp(Math.random() < 0.5 ? 'rbL' : 'rbR', 4 + 2 * A); R.n.reaches++; }
     } else if (A > 0.4 && Math.random() < dt * 0.05 * A * act) kickSp(Math.random() < 0.5 ? 'armL' : 'armR', 3 + 2 * Math.random());      // (at the rail: a hand lets go and grips again)
   }
 
@@ -229,6 +233,9 @@ function create(stage, bay, opts) {
     const hd = sp.head.to(0.15 * dd * R.ff - 0.3 * dd * spent, dt);
     const g = sp.grip.to((0.25 + 0.75 * dd) * (0.35 + 0.65 * R.ff), dt);
     const pedal = R.step;      // (stepping, in bouts: −1…1, a foot at a time)
+    // (the more submissive: the head bowed rather than turned to the room, and at the end they stay down till they're told; the less, they
+    // start to come up as soon as it's over)
+    const sub = P.rel.submission, rise = (st.ending || st.phase === 'closing') ? sm(0, 1, (st.ending ? st.ending.t : 3) / 1.5) * (1 - sub) : 0;
     F.resetPose();
     if (otk) {
       placeOTK(P, fl);
@@ -238,7 +245,8 @@ function create(stage, bay, opts) {
       F.bone.hips.rotation.set(0.04 - 0.05 * ar - 0.16 * bk, 0.26 * wrig + 0.14 * shift + 0.3 * aw, 0.07 * wrig + 0.09 * shift + 0.04 * fl * (J.side === 'L' ? 1 : -1));
       F.bone.spine.rotation.set(0.04 - 0.08 * ar + 0.12 * bk, -0.1 * wrig + 0.1 * twist - 0.12 * aw, 0.03 * wrig + 0.05 * twist);
       F.bone.chest.rotation.set(0.85 - 0.14 * ar + 0.06 * bk + 0.12 * spent * dd, 0.04 * twist, 0);
-      F.bone.neck.rotation.set(-0.7 - 0.4 * hd - 0.2 * ar - 0.15 * bk, -0.7 + (0.1 * dd * R.ff + 0.12 * sq) * Math.sin(t * 1.7 + ph[1]), -0.1);
+      F.bone.neck.rotation.set(-0.7 + 0.4 * sub - 0.4 * hd - 0.2 * ar - 0.15 * bk - 0.35 * rise, -0.7 * (1 - 0.75 * sub) + (0.1 * dd * R.ff + 0.12 * sq) * Math.sin(t * 1.7 + ph[1]), -0.1);
+      F.bone.chest.rotation.x -= 0.2 * rise;
       F.bone.clavL.rotation.z += 0.1 * Math.max(0, shr); F.bone.clavR.rotation.z -= 0.1 * Math.max(0, shr);
       F.root.updateMatrixWorld(true);
       // legs: the toes on the deck beyond the bench's end, knees soft; a kick bends the knee, the foot leaving the deck (the side struck on a
@@ -276,7 +284,8 @@ function create(stage, bay, opts) {
       F.bone.hips.position.set(0, H(F).hips - 0.05 + 0.04 * toe, -0.1 + 0.07 * fwd);
       F.bone.hips.rotation.set(0.72 - 0.35 * fwd - 0.15 * ar, 0, 0);
       F.bone.spine.rotation.set(0.12 - 0.06 * ar, 0, 0); F.bone.chest.rotation.set(0.06 - 0.08 * ar + 0.06 * spent * dd, 0, 0);
-      F.bone.neck.rotation.set(0.25 - 0.7 * hd - 0.15 * ar, 0.06 * Math.sin(t * 1.3 + ph[0]) * dd * R.ff, 0);
+      F.bone.neck.rotation.set(0.25 + 0.25 * sub - 0.7 * hd - 0.15 * ar - 0.4 * rise, 0.06 * Math.sin(t * 1.3 + ph[0]) * dd * R.ff, 0);
+      F.bone.hips.rotation.x -= 0.25 * rise;
       F.root.updateMatrixWorld(true);
       const stamp = sp.stamp.to(0, dt);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
@@ -294,11 +303,11 @@ function create(stage, bay, opts) {
         const off = clamp(armUp[side], 0, 1);
         const Wt = G.clone().addScaledVector(fdir, -0.07 * hk - 0.03 * off).addScaledVector(UP, 0.036 + 0.05 * off);
         reach(F, side, Wt, toWorldDir(F, sx * 1, -0.6, -0.2).normalize(), UP.clone().negate().addScaledVector(toWall, 0.25).normalize(), fdir);
-        F.grip(side, clamp(0.72 + 0.2 * g - 0.7 * off, 0.1, 1), 0.05, 0.7);
+        F.grip(side, clamp((0.72 + 0.2 * g) * (1 - 0.3 * P.rel.comfort) - 0.7 * off, 0.1, 1), 0.05, 0.7);      // (the more at ease, the looser)
         F.bone['clav' + side].rotation.z += sx * 0.12 * Math.max(0, shr);
       }
     }
-    F.breath = 0.3 + 0.7 * dd;
+    F.breath = 0.3 + 0.7 * dd + 0.4 * P.resp * P.rel.desire;      // (desire quickens it)
     F.root.updateMatrixWorld(true);
   }
 
@@ -359,8 +368,16 @@ function create(stage, bay, opts) {
       const a = st.t * 2.1, tang = new V3().crossVectors(c2.n, c2.f).normalize(), r = 0.03 * (1 - glide);
       W = c2.W.clone().addScaledVector(c2.f, r * Math.cos(a)).addScaledVector(tang, r * Math.sin(a)).addScaledVector(c2.n, -0.004);
       handPose.n.lerp(c2.n, 0.25); handPose.f.lerp(c2.f, 0.25); cock = 0; curl = 0.06;
+    } else if (st.act && cur) {
+      // dressing: to the garment's edge (the first quarter), a grip, the edge carried along them (arcing out over the seat), let go, and back
+      const a = st.act, u = clamp(a.t / a.dur, 0, 1), pth = dressPath(a), go = pth.to.clone().sub(pth.from).normalize(), carry = ease(clamp((u - 0.32) / 0.5, 0, 1));
+      const at = pth.from.clone().lerp(pth.to, carry).addScaledVector(pth.bn, 0.07 * sc(cur.f) * Math.sin(Math.PI * carry));
+      const nn = pth.bn.clone(), ff = go.clone().addScaledVector(nn, -go.dot(nn)).normalize();
+      const k = u < 0.25 ? ease(u / 0.25) : u > 0.86 ? 1 - ease((u - 0.86) / 0.14) : 1;
+      W = rest.clone().lerp(at.clone().addScaledVector(nn, 0.014).addScaledVector(ff, -0.07 * cs), k);
+      handPose.n.lerp(nn, 0.3); handPose.f.lerp(ff, 0.3); cock = 0.1; curl = u > 0.25 && u < 0.86 ? 0.55 : 0.12;
     }
-    if (!st.soothe || sw) { handPose.n.lerp(c.n, 0.5); handPose.f.lerp(c.f, 0.5); }
+    if ((!st.soothe || sw) && !st.act) { handPose.n.lerp(c.n, 0.5); handPose.f.lerp(c.f, 0.5); }
     handPose.cock = lerp(handPose.cock, cock, sw ? 1 : 0.15);
     // the hand's frame: fingers along the skin, cocked back toward the normal by the wrist
     const n = handPose.n.clone().normalize(), f = handPose.f.clone().addScaledVector(n, -handPose.f.dot(n)).normalize(), a = handPose.cock;
@@ -372,13 +389,14 @@ function create(stage, bay, opts) {
   }
 
   // ── Smacks ──
-  const canStrike = () => cur && st.phase === 'turn' && !st.word && !cur.pain.tooHarsh;
+  const canStrike = () => cur && st.phase === 'turn' && !st.word && !cur.pain.tooHarsh && !st.act && !st.actQ.length && !st.ending;
   function pickSide() { const s = st.side === 'alt' ? st.nextSide : st.side; if (st.side === 'alt') st.nextSide = st.nextSide === 'R' ? 'L' : 'R'; return s; }
   function startSwing() { if (!canStrike() || st.swing) return false; st.swing = { phase: 'lift', t: 0, side: pickSide(), waited: 0 }; return true; }
   const cushion = () => { const S_ = cur.f.state, c = S.PAIN.CUSHION; let left = 1; if (S_.bottoms === 'up') left *= 1 - (c.trousers || 0.4); if (S_.under === 'up' && st.area !== 'thighs') left *= 1 - (c.briefs || 0.12); return 1 - left; };
   function impact(sw) {
     const P = cur, key = spotOf(sw.side, st.area), tender = P.f.spot[key].mark;
-    const hit = P.pain.hit({ implement: 'hand', strength: st.strength, speed: st.pace, raised: sw.waited, tender, cushion: cushion() });
+    // (the more comfortable they are with it, the less they dread the hand waiting raised)
+    const hit = P.pain.hit({ implement: 'hand', strength: st.strength, speed: st.pace, raised: sw.waited * (1 - 0.6 * P.rel.comfort), tender, cushion: cushion() });
     P.f.mark(key, 0.032 * st.strength * (1 - 0.6 * cushion())); for (const a of AREAS) if (a !== st.area) P.f.mark(a + sw.side, 0.005 * st.strength);
     respond(P, RESP.hit * st.strength * (1 - 0.5 * cushion()));
     P.hits++; P.peak = Math.max(P.peak, P.pain.distress());
@@ -391,10 +409,10 @@ function create(stage, bay, opts) {
     kickSp('toe', 5 * r * lerp(0.5, 1, R.ff)); kickSp('rebound', 6); kickSp('grip', 3 * rm);
     // (and, until they've stilled, the involuntary: the hips pulling away from the side struck, a hand coming up, the shoulders hunching)
     kickSp('away', away * 7 * rm * (0.4 + 0.6 * P.wrig) * R.ff); kickSp('shrug', 5 * rm);
-    for (const sd of ['L', 'R']) if (Math.random() < 0.5) kickSp('arm' + sd, 3.5 * rm * R.ff * Math.random());
-    if (st.position === 'otk') { if (r > 0.5 && Math.random() < 0.045 * R.A * R.A * P.wrig) { kickSp('buck', 6 + 5 * R.A); R.n.bucks++; } }
+    for (const sd of ['L', 'R']) if (Math.random() < 0.5) kickSp('arm' + sd, 3.5 * rm * R.ff * Math.random() * (1 - 0.7 * P.rel.submission));
+    if (st.position === 'otk') { if (r > 0.5 && Math.random() < 0.045 * R.A * R.A * P.wrig * (1 - 0.6 * P.rel.submission)) { kickSp('buck', 6 + 5 * R.A); R.n.bucks++; } }
     else if (P.sex !== 'm' && r > 0.5 && Math.random() < 0.28 * R.A * (0.35 + 0.65 * P.wrig)) { kickSp('stamp', 9 * r); R.n.stamps++; }      // (the men don't stamp)
-    if (st.sound && A && A.ctx) { A.thwack(hit.reaction, cushion() > 0.3); if (Math.random() < lerp(0.45, 1, R.ff)) A.voice(hit.reaction * lerp(0.55, 1, R.ff), bandIndex(), false, 0.9, P.pitch); }
+    if (st.sound && A && A.ctx) { A.thwack(hit.reaction, cushion() > 0.3); if (Math.random() < lerp(0.45, 1, R.ff) + 0.3 * P.rel.comfort) A.voice(hit.reaction * lerp(0.55, 1, R.ff), bandIndex(), false, 0.9, P.pitch); }
     emit('hit', { hit, side: sw.side, area: st.area, distress: P.pain.distress(), band: BANDS[bandIndex()], hits: P.hits });
     scripted();
   }
@@ -434,7 +452,9 @@ function create(stage, bay, opts) {
     if (b > P.bandSeen && b <= 4) { P.bandSeen = b; if (keys[b] && !P.said[keys[b]]) { P.said[keys[b]] = 1; say('subject', L.react(P.id, keys[b]), P); return; } }
     // (as the fight goes out of them they say less, and less in words: past halfway to stillness, now and then a breath or a fragment)
     if (P.rx.ff < 0.5) { if (sayCool <= 0 && Math.random() < 0.05) say('subject', L.react(P.id, 'spent'), P); return; }
-    if (b >= 2 && sayCool <= 0 && Math.random() < 0.12 * (0.4 + 0.6 * P.rx.ff)) say('subject', L.react(P.id, 'plead'), P);
+    const rl = P.rel, often = 0.12 * (0.4 + 0.6 * P.rx.ff) * (1 + rl.comfort);
+    if (!P.said.flushed && rl.desire > 0.3 && P.resp > 0.25 && sayCool <= 0) { P.said.flushed = 1; const ln = L.react(P.id, 'flushed'); if (ln) { say('subject', ln, P); return; } }
+    if (b >= 2 && sayCool <= 0 && Math.random() < often) say('subject', L.react(P.id, Math.random() < 0.7 * rl.submission ? 'accept' : 'plead'), P);
   }
 
   // ── Turns ──
@@ -447,19 +467,66 @@ function create(stage, bay, opts) {
     emit('turn', { i, id: cur.id }); emit('state');
     setTimeout(() => { say('captain', L.place(cur.id, st.position)); setTimeout(() => say('subject', L.react(cur.id, 'start'), cur), 1600); }, 300);
   }
+  // ── The end of a turn: the player's (the Captain soothes them a little, then dresses them, then on), or their safe word (straight to their
+  // aftercare). They stay where they are until the cut. ──
   function endTurn(outcome) {
-    if (!cur || st.phase !== 'turn') return;
-    const P = cur; st.running = false; st.soothe = false;
+    if (!cur || st.phase !== 'turn' || st.ending) return;
+    st.running = false; st.actQ = [];
+    if (outcome === 'word') return finishTurn('word');
+    st.ending = { t: 0, stage: 'soothe' }; st.soothe = true; emit('state');
+  }
+  function ending(dt) {
+    const E = st.ending; E.t += dt;
+    if (E.stage === 'soothe' && E.t > 2.8 && !st.swing) { st.soothe = false; E.stage = 'dress'; dressTo({ under: 'up', bottoms: 'up', top: 'down' }); emit('state'); }
+    else if (E.stage === 'dress' && !st.act && !st.actQ.length) { st.ending = null; finishTurn('done'); }
+  }
+  function finishTurn(outcome) {
+    const P = cur; st.running = false; st.soothe = false; st.act = null; st.actQ = [];
     P.outcome = outcome || 'done'; P.done = true;
     if (P.outcome === 'done') say('subject', L.react(P.id, 'end'), P);
     const res = { id: P.id, outcome: P.outcome, hits: P.hits, peak: P.peak, band: BANDS[Math.min(5, P.peak < 0.3 ? 0 : P.peak < 0.6 ? 1 : P.peak < 0.9 ? 2 : P.peak < 1 ? 3 : P.peak < S.PAIN.TOO_HARSH ? 4 : 5)], position: st.position };
     st.results.push(res); emit('turnEnd', res);
-    st.phase = 'between';
-    setTimeout(() => {
-      P.f.setClothes({ top: 'down', bottoms: 'up', under: 'up' });
-      const next = queue.findIndex(x => !x.done);
-      if (next >= 0) beginTurn(next); else { cur = null; st.phase = 'over'; emit('done', { results: st.results }); emit('state'); }
-    }, outcome === 'word' ? 3200 : 2400);
+    st.phase = 'closing';      // (held where they are till the cut)
+    if (outcome === 'word') { emit('aftercareNow', { id: P.id, result: res }); emit('state'); return; }
+    setTimeout(next, 900);
+  }
+  // on to the next in the queue, or, all done, to the aftercare (for those not yet cared for)
+  function next() {
+    if (cur && st.phase !== 'after') cur.f.setClothes({ top: 'down', bottoms: 'up', under: 'up' });
+    const n = queue.findIndex(x => !x.done);
+    if (n >= 0) beginTurn(n); else { st.phase = 'over'; emit('done', { results: st.results.filter(r => !r.cared) }); emit('state'); }
+  }
+
+  // ── Dressing and undressing: the Captain's right hand to the garment's edge, a grip, and the edge carried along them (the waistband down
+  // the back of the thighs to the knees, or to mid-thigh for the briefs; the top's hem pushed up their back), and the reverse; the garment
+  // changes over midway, so the hand ends where the cloth now is. A change stops a run; another can't start until it's done. ──
+  const ORDER = { up: ['under', 'bottoms', 'top'], down: ['top', 'bottoms', 'under'] };
+  function dressTo(o) {
+    if (!cur) return;
+    st.running = false;
+    const want = Object.assign({}, cur.f.state, ...st.actQ.map(a => ({ [a.key]: a.to }))), restoring = (o.under || o.bottoms) === 'up' || o.top === 'down';
+    for (const k of ORDER[restoring ? 'up' : 'down']) if (o[k] && o[k] !== want[k]) st.actQ.push({ key: k, to: o[k] });
+    emit('state');
+  }
+  function dressing(dt) {
+    if (!st.act && st.actQ.length && !st.swing) st.act = Object.assign(st.actQ.shift(), { t: 0, dur: 2.0, swapped: false });
+    const a = st.act; if (!a) return;
+    a.t += dt; const u = a.t / a.dur;
+    if (!a.swapped && u >= 0.55) { a.swapped = true; cur.f.setClothes({ [a.key]: a.to }); emit('state'); }
+    if (u >= 1) { st.act = null; emit('state'); }
+  }
+  // where the hand goes for each: the edge's path along their back, from where it is to where it's going
+  function dressPath(a) {
+    const F = cur.f, s = sc(F), bn = toWorldDir(F, 0, 0, -1).normalize(), down = W_(F, 'hips').sub(W_(F, 'spine')).normalize();
+    const waist = F.surface('back', null, 0.01).p, knees = W_(F, 'shinL').lerp(W_(F, 'shinR'), 0.5).addScaledVector(bn, 0.075 * s);
+    const thighs = W_(F, 'thighL').lerp(W_(F, 'thighR'), 0.5).lerp(knees, 0.42).addScaledVector(bn, 0.09 * s);
+    const seat = F.surface('cheekL', null, 0.02).p.lerp(F.surface('cheekR', null, 0.02).p, 0.5);
+    let A_, B_;
+    if (a.key === 'top') { A_ = seat.clone().lerp(waist, 0.55); B_ = waist.clone().addScaledVector(down, -0.1 * s); }
+    else if (a.key === 'bottoms') { A_ = waist.clone(); B_ = knees; }
+    else { A_ = waist.clone().addScaledVector(down, 0.1 * s); B_ = thighs; }
+    const lowering = a.key === 'top' ? a.to === 'up' : a.to === 'down';
+    return lowering ? { from: A_, to: B_, bn, over: seat } : { from: B_, to: A_, bn, over: seat };
   }
   function callWord() {
     if (!cur || st.word) return;
@@ -494,9 +561,10 @@ function create(stage, bay, opts) {
   function update(dt) {
     st.t += dt; sayCool -= dt;
     if (cur && st.phase === 'turn') {
+      dressing(dt); if (st.ending) ending(dt);
       advance(dt);
       const onSkin = st.swing && st.swing.phase === 'contact';
-      cur.pain.update(dt, onSkin); if (st.soothe && !st.swing) cur.pain.soothe(dt);
+      cur.pain.update(dt, onSkin); if (st.soothe && !st.swing) cur.pain.soothe(dt * (1 + cur.rel.comfort));
       react(dt);
       if (cur.pain.tooHarsh && !st.word) callWord();
       // the face: their band, flickering one on as a smack lands
@@ -504,7 +572,7 @@ function create(stage, bay, opts) {
       if (!st.word) {
         let e = b === 0 ? (cur.r.base || 'calm') : FACE[Math.min(3, b - 1)];
         if (J.flick > 0) e = FACE[Math.min(3, b)];
-        if (st.soothe && !st.swing && b <= 2) e = b === 0 ? 'shy' : 'teary';
+        if (st.soothe && !st.swing && b <= 2) e = b === 0 || cur.rel.desire > 0.35 ? 'shy' : 'teary';
         if (b >= 3 && cur.rx.ff < 0.35) e = J.flick > 0 ? 'wince' : 'teary';      // (spent: quiet tears, a wince as each lands)
         cur.f.setExpr(e);
       }
@@ -573,9 +641,11 @@ function create(stage, bay, opts) {
     on: fn => listeners.push(fn),
     start() { beginTurn(0); camera(0, 0); },
     run(on) { if (!canStrike()) { st.running = false; emit('state'); return; } st.running = on == null ? !st.running : !!on; if (st.running) st.soothe = false; emit('state'); },
-    set(o) { Object.assign(st, o); if (o.soothe) st.running = false; emit('state'); },
+    set(o) { if (st.ending && 'soothe' in o) delete o.soothe; Object.assign(st, o); if (o.soothe) st.running = false; emit('state'); },
+    get busy() { return !!(st.act || st.actQ.length || st.ending); },
+    next, cared(id) { const r = st.results.find(x => x.id === id); if (r) r.cared = true; },
     position(p) { if (st.position === p) return; st.position = p; st.swing = null; st.running = false; if (cur) { say('captain', L.place(cur.id, p)); } camera(0); emit('state'); },
-    dress(o) { if (cur) { cur.f.setClothes(o); emit('state'); } },
+    dress(o) { if (cur && st.phase === 'turn' && !st.ending) dressTo(o); },
     endTurn: () => endTurn('done'), callWord, camera, aftercare, update,
     distress: () => (cur ? cur.pain.distress() : 0), band: () => (cur ? BANDS[bandIndex()] : ''), harshAt: S.PAIN.TOO_HARSH,
     fight: () => (cur ? cur.rx.fight : 1), agitation: () => (cur ? cur.rx.A : 0),

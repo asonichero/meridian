@@ -15,8 +15,9 @@ const PLACE = {
 };
 
 // During: start (as they're placed), first (the first smack), flinching, struggling, edge, past (each the first time it's reached), plead
-// (now and then while it's hard), spent (now and then, rarely, once the fight's gone out of them: hardly words), soothe (the palm on them,
-// between), word (the safe word, called), end (when the Captain stops).
+// (now and then while it's hard), spent (now and then, rarely, once the fight's gone out of them: hardly words), accept (in place of a plea,
+// the more submissive they are), flushed (once, when desire shows in their body: embarrassment; not for the asexual crew member), soothe (the
+// palm on them, between), word (the safe word, called), end (when the Captain stops).
 const REACT = {
   scientist: {
     start: ['Understood. I— yes. Proceeding.', 'This is… a grounding protocol. I know. I agreed to it.'],
@@ -27,6 +28,8 @@ const REACT = {
     past: ['I’m sorry— I’m sorry, I was so far away—'],
     plead: ['Captain—', 'Mm— please—'],
     spent: ['…', 'Mm…', '…here.'],
+    accept: ['Yes. I know.', 'I’m here. I understand.'],
+    flushed: ['That’s— my body is being very… unscientific about this.', 'Don’t— please don’t look at that.'],
     soothe: ['…oh.', 'That’s— thank you.'],
     word: '{word}. {word}— stop, please.',
     end: ['…I’m still here. That’s… strange to say.'],
@@ -40,6 +43,8 @@ const REACT = {
     past: ['I can put it down. I can put it down now.'],
     plead: ['Captain—', 'Please—'],
     spent: ['…', 'Hff…', 'Mm.'],
+    accept: ['Yes, Captain.', 'I know. I needed this.'],
+    flushed: ['That’s— ignore that. Mechanical.', 'Hff— don’t say anything. Please.'],
     soothe: ['…Thanks.', 'Mm.'],
     word: '{word}. That’s— {word}. I need it to stop.',
     end: ['…Copy. Thank you.'],
@@ -53,6 +58,8 @@ const REACT = {
     past: ['I don’t want to be the one who gets us killed—'],
     plead: ['Captain, please—', 'C’mon—'],
     spent: ['…', 'Hh…', '…okay.'],
+    accept: ['Yes, Captain.', 'Okay. Okay. I hear you.'],
+    flushed: ['Oh, that’s— that’s not fair—', 'Don’t you dare notice that—'],
     soothe: ['…Okay. Okay.', 'That’s… not fair, being nice now.'],
     word: '{word}! {word}— stop, that’s too much—',
     end: ['…Yeah. Yes, Captain.'],
@@ -66,6 +73,8 @@ const REACT = {
     past: ['It’s quiet. It’s gone quiet.'],
     plead: ['Please—', 'Captain—'],
     spent: ['…', 'Mm…', '(a shaky breath)'],
+    accept: ['I know. Thank you.', 'Yes— I’ll be good.'],
+    flushed: ['I’m— I’m so warm, I’m sorry—', 'Oh no— please don’t look—'],
     soothe: ['Oh— thank you.', '…That helps.'],
     word: '{word}— {word}, please, stop—',
     end: ['…Thank you. I mean it.'],
@@ -79,6 +88,7 @@ const REACT = {
     past: ['…They can’t hear me. You can. All right.'],
     plead: ['Captain.', 'Please.'],
     spent: ['…', '…quiet.', 'Mm.'],
+    accept: ['Acknowledged.', 'Understood, Captain.'],
     soothe: ['…Acknowledged.', 'Thank you.'],
     word: '{word}. {word}. Stop.',
     end: ['…Signal received.'],
@@ -92,6 +102,8 @@ const REACT = {
     past: ['…It does help. Damn it. It helps.'],
     plead: ['Captain—', 'Please—'],
     spent: ['…', 'Mm.', '…noted.'],
+    accept: ['Noted. Go on.', 'I understand why.'],
+    flushed: ['Physiological. Purely. Moving on.', 'That’s a normal response. Don’t— don’t comment.'],
     soothe: ['…Clinically, that’s very good technique.', 'Mm. Thank you.'],
     word: '{word}. I’m calling it. {word}.',
     end: ['…I’ll need to revise some notes.'],
