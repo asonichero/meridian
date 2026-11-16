@@ -53,6 +53,7 @@ button:hover { border-color: #56687a; } button.on { background: #4a3a22; border-
 #summary { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 18px 22px; display: none; min-width: min(360px, calc(100% - 32px)); max-width: calc(100% - 32px); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; z-index: 6; }
 #summary table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; } #summary td { padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
 kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
+select.pick { width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line, #3a4048); background: rgba(255,255,255,0.04); color: inherit; font: inherit; font-size: 13px; }
 small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.4; margin-top: 6px; }
 .vols { display: grid; grid-template-columns: auto 1fr 40px; gap: 6px 10px; align-items: center; font-size: 13px; } .vols input { width: 100%; accent-color: var(--amber); } .vols .pct { color: var(--dim); font-size: 12px; text-align: right; }
 /* Phones and small windows: the HUD's parts placed on their own. The set-up a sheet over the whole view (☰), the crew member's name and word
@@ -114,6 +115,10 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
   <div class="row" id="chair" style="margin-top:6px"></div>
   <div class="row" id="cstyle" style="margin-top:6px"></div>
   <div class="row seg" id="cbuild" style="margin-top:6px"><button data-v="lean">Lean</button><button data-v="average" class="on">Average</button><button data-v="heavy">Heavy</button></div>
+  <h2>Relationship</h2>
+  <div class="row"><select id="relWho" class="pick"></select></div>
+  <div class="vols" id="rel" style="margin-top:6px"></div>
+  <small class="note">Where each crew member is with you and the method, as the story goes (set here for now). Desire speeds their body's response and lets it go further; comfort lowers their inhibitions, so they wriggle more; all three bring them closer in the aftercare, and submission and desire have them lean into you.</small>
   <h2>Sound</h2>
   <div class="vols" id="vols"></div>
   <h2>Graphics</h2>
@@ -194,6 +199,21 @@ drawCrew(); drawCaptain();
     r.oninput = () => { show(); if (window.GameAudio) GameAudio.setVol(k, r.value / 100); };
     el.append(l, r, out);
   } }
+// the relationship: each crew member's submission, desire and comfort (js/session.js), kept between visits; live in a session
+cfg.rel = cfg.rel || {};
+{ const sel = $('relWho');
+  for (const id of Crew.IDS) { const o = document.createElement('option'); o.value = id; o.textContent = Crew.ROSTER[id].name; sel.append(o); }
+  const draw = () => {
+    const id = sel.value, v = cfg.rel[id] = Object.assign({ submission: 0, desire: 0, comfort: 0 }, cfg.rel[id]), no = Crew.ROSTER[id].dynamic.asexual, el = $('rel'); el.innerHTML = '';
+    for (const [k, nm] of [['submission', 'Submission'], ['desire', 'Desire'], ['comfort', 'Comfort']]) {
+      const l = document.createElement('label'); l.textContent = nm; const r = document.createElement('input'); r.type = 'range'; r.min = 0; r.max = 100; r.step = 1;
+      const out = document.createElement('span'); out.className = 'pct'; const show = () => (out.textContent = r.value + '%');
+      if (k === 'desire' && no) { r.disabled = true; r.value = 0; out.textContent = '—'; l.title = 'Asexual: no desire to speak of'; }
+      else { r.value = Math.round(v[k] * 100); show(); r.oninput = () => { v[k] = r.value / 100; show(); save(); if (ses) ses.setRel(id, v); }; }
+      el.append(l, r, out);
+    }
+  };
+  sel.onchange = draw; draw(); }
 $('hide').onclick = () => $('setup').classList.toggle('closed');
 
 // ── The stage ──
@@ -206,7 +226,7 @@ function begin() {
   if (!cfg.order.length) { alert('Choose at least one crew member to be corrected.'); return; }
   if (ses) { for (const P of ses.people) stage.scene.remove(P.f.root); stage.scene.remove(ses.captain.root); }
   const p = id => ({ id, sex: cfg.sex[id] || 'f', outfit: cfg.outfit });
-  ses = Session.create(stage, bay, { captain: cfg.captain, position: cfg.position, between: cfg.between, queue: cfg.order.map(p), witnesses: Crew.IDS.filter(id => cfg.roles[id] === 'witness').map(p), sound: !q.get('still') });
+  ses = Session.create(stage, bay, { captain: cfg.captain, position: cfg.position, between: cfg.between, queue: cfg.order.map(p), rel: cfg.rel, witnesses: Crew.IDS.filter(id => cfg.roles[id] === 'witness').map(p), sound: !q.get('still') });
   ses.on(onEvent); ses.start(); drawCams(); refresh();
   $('summary').style.display = 'none'; $('word').style.display = 'none';
   if (innerWidth < 900) $('setup').classList.add('closed');

@@ -39,9 +39,19 @@ function create(stage, bay, opts) {
     const f = Fg.make(C.figureSpec(p.id, p.sex, p.outfit)); scene.add(f.root);
     const r = C.ROSTER[p.id], pain = S.createPain(r.pain || {});
     const P = { id: p.id, sex: p.sex, f, role, pain, r, done: false, outcome: null, hits: 0, peak: 0, marks: 0, said: {}, bandSeen: 0, pitch: C.pitch(p.id, p.sex), spot: null, resp: 0,
-      wrig: C.wriggle(p.id, p.sex), rx: freshReact() };
+      wrig0: C.wriggle(p.id, p.sex), rx: freshReact() };
+    setRel(P, (opts.rel || {})[p.id]);
     people.push(P); return P;
   };
+  // Where they are with the Captain and the new method, 0–1 (through the story; the set-up's sliders for now): submission, desire, comfort.
+  // Desire speeds their body's response and lets it go further; comfort lowers their inhibitions, so they wriggle more; all three bring them
+  // closer in the aftercare, and submission and desire have them lean into the Captain, his hand rubbing between their shoulder blades. (The
+  // asexual crew member has no desire to speak of: it stays at nothing for them.)
+  function setRel(P, v) {
+    v = v || {}; const no = P.r.dynamic && P.r.dynamic.asexual;
+    P.rel = { submission: clamp(+v.submission || 0, 0, 1), desire: no ? 0 : clamp(+v.desire || 0, 0, 1), comfort: clamp(+v.comfort || 0, 0, 1) };
+    P.wrig = P.wrig0 + (1 - P.wrig0) * 0.5 * P.rel.comfort;
+  }
   const queue = (opts.queue || []).map(p => addPerson(p, 'subject'));
   const witnesses = (opts.witnesses || []).map(p => addPerson(p, 'witness'));
   let cur = null;      // the one across the lap / at the rail now
@@ -54,8 +64,8 @@ function create(stage, bay, opts) {
   const RESP = { hit: 0.005, soothe: 0.006, warm: 0.003, tau: 150, captain: 0.6, cap: opts.desire ? 1 : 0.5 };
   let capResp = 0;
   const respond = (P, amt) => {
-    const k = P.r.body && P.r.body.response != null ? P.r.body.response : 1;
-    P.resp = Math.min(RESP.cap, P.resp + amt * k * Math.max(0, 1 - P.resp / RESP.cap));
+    const k = (P.r.body && P.r.body.response != null ? P.r.body.response : 1) * (1 + 1.5 * P.rel.desire), cap = Math.max(RESP.cap, 0.5 + 0.5 * P.rel.desire);
+    P.resp = Math.min(cap, P.resp + amt * k * Math.max(0, 1 - P.resp / cap));
     capResp = Math.min(RESP.cap, capResp + amt * RESP.captain * Math.max(0, 1 - capResp / RESP.cap));
   };
   function responses(dt) {
@@ -66,7 +76,8 @@ function create(stage, bay, opts) {
     const fade = Math.exp(-dt / RESP.tau);
     for (const P of people) { P.resp *= fade; P.f.setResponse(P.resp); }
     capResp *= fade;
-    const W = cur || afterWith, bond = W && W.r.dynamic && W.r.dynamic.bond != null ? W.r.dynamic.bond : 0;
+    // (his guard eases as the affection's returned: their desire, or the bond between them once the story keeps it)
+    const W = cur || afterWith, bond = W ? Math.max(W.r.dynamic && W.r.dynamic.bond || 0, W.rel.desire) : 0;
     captain.setResponse(capResp * (0.3 + 0.7 * bond), { blush: Math.min(0.45, capResp * 0.7) });
   }
 
@@ -503,13 +514,23 @@ function create(stage, bay, opts) {
     else if (st.phase === 'after' && afterWith) {
       // sat side by side: they lean in, the head toward the Captain's shoulder, hands in their lap; the Captain's arm round them, the hand on
       // their far shoulder, the other hand on their own knee
-      const G = afterWith.f;
-      seat(captain, bench.at, 0, { look: 0.18, headYaw: 0.3, roll: -0.03, lean: 0.02 });
-      seat(G, bench.beside.clone().add(new V3(-0.06, 0, 0.02)), -0.3, { look: 0.3, lean: 0.1, roll: 0.14, headRoll: 0.18, headYaw: -0.2, spread: -0.03 });
+      // (closer the more of all three there is between them; leaning in, their head to his shoulder and his to theirs, with submission and desire)
+      const G = afterWith.f, Rl = afterWith.rel, close = 1 - (1 - 0.7 * Rl.comfort) * (1 - 0.6 * Rl.submission) * (1 - 0.7 * Rl.desire), lean = Math.max(Rl.submission, Rl.desire);
+      seat(captain, bench.at, 0, { look: 0.18 + 0.06 * lean, headYaw: 0.3 + 0.1 * lean, roll: -0.03 - 0.05 * lean, headRoll: -0.18 * lean, lean: 0.02 });
+      seat(G, bench.beside.clone().add(new V3(-0.06 - 0.15 * close, 0, 0.02 - 0.03 * close)), -0.3 - 0.15 * close,
+        { look: 0.3 + 0.12 * lean, lean: 0.1 + 0.05 * lean, roll: 0.14 + 0.16 * lean, headRoll: 0.18 + 0.32 * lean, headYaw: -0.2 - 0.2 * lean, spread: -0.03 });
       for (const [sd, sx] of [['L', 1], ['R', -1]]) { const T = local(G, sx * 0.05, bench.seatY + 0.16, 0.24); reach(G, sd, T, toWorldDir(G, sx, -0.3, -0.4).normalize(), UP.clone().negate(), toWorldDir(G, -sx * 0.6, 0, 1).normalize()); G.grip(sd, 0.4, 0, 0.4); }
-      const far = W_(G, 'clavL').add(toWorldDir(G, 0.06, 0.05, -0.02));
-      reach(captain, 'L', far, new V3(0.1, 0.3, -1).normalize(), toWorldDir(G, 0.3, -1, 0).normalize(), toWorldDir(G, 0, 0, 1)); captain.grip('L', 0.35, 0.1, 0.3);
-      reach(captain, 'R', local(captain, -0.13, bench.seatY + 0.17, 0.33), new V3(-1, 0, -0.3).normalize(), UP.clone().negate(), new V3(0, 0, 1)); captain.grip('R', 0.3, 0.1, 0.3);
+      // the Captain's arm round them: the hand resting on their far shoulder, the elbow low behind their back; with submission and desire it
+      // moves to between their shoulder blades and rubs there, slow circles. His other hand on his own knee. (Each hand on the skin: the palm on
+      // the place, the wrist a hand's length back along the fingers.)
+      const s = sc(captain), on = (F, k, fingers, lift) => { const c = F.surface(k, null, lift); const f = fingers.addScaledVector(c.n, -fingers.dot(c.n)).normalize(); return { W: c.p.clone().addScaledVector(c.n, 0.012).addScaledVector(f, -0.085 * s), n: c.n, f }; };
+      const rub = sm(0.3, 0.75, lean), sh = on(G, 'shoulderL', toWorldDir(G, 0.2, -0.3, 1).normalize(), 0.004);
+      const bl = on(G, 'blades', toWorldDir(G, 0.35, 1, 0).normalize(), 0.004), ph = st.t * 1.6;
+      bl.W.addScaledVector(toWorldDir(G, 0, 1, 0), 0.022 * Math.sin(ph) * s).addScaledVector(toWorldDir(G, 1, 0, 0), 0.016 * Math.cos(ph) * s);
+      const L_ = { W: sh.W.clone().lerp(bl.W, rub), n: sh.n.clone().lerp(bl.n, rub).normalize(), f: sh.f.clone().lerp(bl.f, rub).normalize() };
+      reach(captain, 'L', L_.W, toWorldDir(G, 0.4, -0.7, -1).normalize(), L_.n.clone().negate(), L_.f); captain.grip('L', 0.25 - 0.1 * rub, 0.12, 0.25);
+      const knee = W_(captain, 'shinR').addScaledVector(UP, 0.05 * s), kf = toWorldDir(captain, -0.15, -0.2, 1).normalize();
+      reach(captain, 'R', knee.clone().addScaledVector(UP, 0.012).addScaledVector(kf, -0.085 * s), new V3(-1, -0.4, -0.5).normalize(), UP.clone().negate(), kf); captain.grip('R', 0.3, 0.1, 0.3);
       captain.setExpr('soft');
     } else { stand(captain, bench.at.clone().add(new V3(0.3, 0, 0.6)), 0, {}); }
     poseOthers(st.t);
@@ -547,6 +568,7 @@ function create(stage, bay, opts) {
 
   const api = {
     st, captain, people, queue, witnesses, BANDS, AREAS, CAMS, bench, RESP, get captainResponse() { return capResp; },
+    setRel(id, v) { const P = people.find(p => p.id === id); if (P) setRel(P, v); },
     get current() { return cur; },
     on: fn => listeners.push(fn),
     start() { beginTurn(0); camera(0, 0); },
