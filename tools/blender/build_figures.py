@@ -756,6 +756,7 @@ def build(sex):
         Fv = body_field(fns['torsoP'](torso) if 'torsoP' in fns else scaled(torso, fns['torso']), scaled(leg, fns['leg']), scaled(arm, fns['arm']), sex, sk)
         t_v = along(Fv, X, Nrm)
         dt = np.where(limb & ~np.isnan(t_v) & ~np.isnan(t_base), t_v - t_base, 0.0)
+        if v == 'sexSwell': dt = np.where(label == 'sex', dt, np.clip(dt, -0.003, 0.003))      # (only the sex fills out; the skin by it barely moves)
         acc = np.zeros(len(X)); cnt = np.zeros(len(X))
         for _ in range(3):
             acc[:] = 0; cnt[:] = 0; np.add.at(acc, ed[:, 0], dt[ed[:, 1]]); np.add.at(acc, ed[:, 1], dt[ed[:, 0]]); np.add.at(cnt, ed.ravel(), 1)
@@ -778,26 +779,35 @@ def build(sex):
     rig = armature('Rig', J)
     bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); rig.select_set(True); bpy.context.view_layer.objects.active = rig
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
-    if sex == 'm': lift_weights(body, X, label, torso, leg)
+    sex_weights(body, X, label, sex, torso, leg)
     print(sex, 'groups', len(body.vertex_groups))
     return body, rig, J, (torso, leg, arm, label)
 
 
-def lift_weights(body, X, label, torso, leg):
-    """His lift: the penis, from where it leaves the body to the tip, on its own bone (none of it at the root, all of it 2 cm out), the scrotum
-    and everything else as the automatic weighting left it (less whatever it gave the new bone)."""
-    E, u = his_root(torso, leg); S0, R0, A, tip = his_axis(Surface(torso))
-    cap = capsule(X, A, tip, 0.016, 0.0148); scr = (1 - np.linalg.norm((X - S0) / R0, axis=1)) * R0.min()
-    w = ss(-0.003, 0.003, cap - scr) * ss(-0.004, 0.022, (X - E) @ u) * (label == 'sex')
-    vg = body.vertex_groups; gs = vg['sex']; hips = vg['hips'].index
+def sex_weights(body, X, label, sex, torso, leg):
+    """The sex goes with the pelvis (the automatic weighting splits it between the thighs, which tears it as the legs part): on it all hips,
+    blending back to the automatic weights over a centimetre and a half round it. His penis, from where it leaves the body to the tip, then
+    goes onto its own bone for the lift (none of it at the root, all of it 2 cm out)."""
+    parts = sex_parts(sex, Surface(torso))[0]
+    k = ss(-0.015, -0.002, parts(X))
+    w = np.zeros(len(X)); vg = body.vertex_groups; hips = vg['hips'].index; gs = vg.get('sex')
+    if sex == 'm':
+        E, u = his_root(torso, leg); S0, R0, A, tip = his_axis(Surface(torso))
+        cap = capsule(X, A, tip, 0.016, 0.0148); scr = (1 - np.linalg.norm((X - S0) / R0, axis=1)) * R0.min()
+        w = ss(-0.003, 0.003, cap - scr) * ss(-0.004, 0.022, (X - E) @ u) * (label == 'sex')
     for v in body.data.vertices:
-        i = v.index; gw = {g.group: g.weight for g in v.groups if g.group != gs.index}
-        if gs.index in [g.group for g in v.groups]: gs.remove([i])
-        tot = sum(gw.values())
-        if tot <= 0: gw = {hips: 1.0}; tot = 1.0
-        for gi, wt in gw.items(): vg[gi].add([i], float(wt / tot * (1 - w[i])), 'REPLACE')
+        i = v.index; own = gs.index if gs else -1
+        if k[i] <= 0 and w[i] <= 0 and not (gs and any(g.group == own for g in v.groups)): continue
+        gw = {g.group: g.weight for g in v.groups if g.group != own}
+        if gs and any(g.group == own for g in v.groups): gs.remove([i])
+        tot = sum(gw.values()); gw = {gi: wt / tot for gi, wt in gw.items()} if tot > 0 else {hips: 1.0}
+        gw = {gi: wt * (1 - k[i]) for gi, wt in gw.items()}; gw[hips] = gw.get(hips, 0.0) + k[i]
+        member = {g.group for g in v.groups}
+        for gi, wt in gw.items():
+            if wt * (1 - w[i]) > 1e-5: vg[gi].add([i], float(wt * (1 - w[i])), 'REPLACE')
+            elif gi in member: vg[gi].remove([i])
         if w[i] > 1e-4: gs.add([i], float(w[i]), 'REPLACE')
-    print('lift: on its bone', int((w > 0.5).sum()), 'points; pivot', np.round(E, 3))
+    print(sex, 'sex weights: with the pelvis', int((k > 0.5).sum()), 'points;', ('lift on its bone %d points' % int((w > 0.5).sum())) if sex == 'm' else '')
 
 def ink_weights(ob, reach=0.016):
     """How far each point's outline may stand out: where the skin faces more of itself close across a crease (the cleft, between the thighs,

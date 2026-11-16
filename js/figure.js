@@ -137,8 +137,8 @@ if (uNape.z > 0.5 && vBind.y > uNape.x + max(0.0, vBind.z - uNape.y) * uNape.w) 
 // (the body's response (F.setResponse): blood to the sex, a deeper, rosier tone there; his, the whole length as it hangs at rest, and the
 // scrotum; hers, the outer forms and the bottom of the mons)
 if (uFlush.x > 0.001) {
-  float lo = uFlush.y - (uFlush.w > 0.5 ? 0.125 : 0.04), hi = uFlush.y + (uFlush.w > 0.5 ? 0.06 : 0.04);
-  float fw = (1.0 - smoothstep(0.014, 0.042, abs(vBind.x))) * smoothstep(lo, lo + 0.02, vBind.y) * (1.0 - smoothstep(hi - 0.025, hi, vBind.y)) * smoothstep(uFlush.z - 0.03, uFlush.z, vBind.z);
+  float lo = uFlush.y - (uFlush.w > 0.5 ? 0.125 : 0.035), hi = uFlush.y + (uFlush.w > 0.5 ? 0.06 : 0.022), wx = uFlush.w > 0.5 ? 0.042 : 0.03;
+  float fw = (1.0 - smoothstep(wx - 0.022, wx, abs(vBind.x))) * smoothstep(lo, lo + 0.015, vBind.y) * (1.0 - smoothstep(hi - 0.02, hi, vBind.y)) * smoothstep(uFlush.z - 0.03, uFlush.z, vBind.z);
   diffuseColor.rgb *= mix(vec3(1.0), vec3(0.9, 0.7, 0.72), fw * uFlush.x);
 }
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
