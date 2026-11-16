@@ -13,16 +13,19 @@ button, select { font: inherit; color: var(--ink); background: #fff; border: 1px
 select { width: 100%; padding: 6px 8px; } button:hover { border-color: #a89e90; } button.on { background: #f3e2c6; border-color: var(--amber); color: #5a3a10; }
 #hide { position: fixed; top: calc(12px + env(safe-area-inset-top)); left: calc(324px + env(safe-area-inset-left)); } #panel.closed { display: none; }
 a { color: var(--dim); }
+.rel { display: grid; grid-template-columns: auto 1fr 34px; gap: 4px 8px; align-items: center; font-size: 12px; } .rel input { width: 100%; accent-color: var(--amber); } .rel span { color: var(--dim); text-align: right; }
 @media (max-width: 640px) { #panel { width: auto; right: 12px; max-height: 46%; top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); } #hide { left: auto; right: 12px; } }
 </style></head>
 <body><div id="view"></div>
 <div id="panel">
   <h1>Figures</h1>
-  <h2>Who</h2><select id="who"></select>
+  <h2>Crew member</h2><select id="who"></select>
   <h2>Translated as</h2><div class="row" id="sex"><button data-v="f">Female</button><button data-v="m">Male</button></div>
   <h2>Outfit</h2><div class="row" id="outfit"><button data-v="uniform">Uniform</button><button data-v="offduty">Off duty</button></div>
   <h2>Clothes</h2><div class="row"><button id="cTop"></button><button id="cBot"></button><button id="cUnd"></button></div>
+  <h2>The Captain</h2><div class="row" id="csex"></div><div class="row" id="coutfit" style="margin-top:5px"></div>
   <h2>Pose</h2><div class="row" id="pose"></div>
+  <h2>Where they are</h2><div class="rel" id="rel"></div>
   <h2>Expression</h2><select id="expr"></select>
   <h2>Response</h2><div class="row" style="align-items:center;gap:8px"><input type="range" id="resp" min="0" max="100" step="1" style="flex:1;accent-color:var(--amber, #c89a3a)"><span id="respV" style="font-size:12px;color:var(--dim);width:34px;text-align:right"></span></div>
   <h2>View</h2><div class="row" id="views"></div><div class="row" style="margin-top:5px"><button id="spin">Turntable</button></div>
@@ -30,14 +33,18 @@ a { color: var(--dim); }
 </div>
 <button id="hide">☰</button>
 <script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/GLTFLoader.js"></script>
-<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/crew.js"></script>
+<script src="js/pain.js"></script><script src="js/crew.js"></script><script src="js/lines.js"></script><script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/session.js"></script>
 <script>
 'use strict';
-// One figure at a time, in a plain, well-lit space: any crew member (or the Captain) in either translation, either outfit, the clothes as worn
-// or lowered, a choice of poses and expressions. ?who=pilot&sex=f&outfit=uniform&clothes=down,up,up&pose=stand&expr=calm&view=front&spin=1
+// A crew member and the Captain, in a plain, well-lit space: either translation and outfit for each (the Captain always fully dressed; the clothes
+// toggles are the crew member's), the two of them placed for a choice of situations, and where the crew member is with the Captain (defiance,
+// submission, comfort). Across the knee, at the rail and in the aftercare, the correction's own posing does it (js/session.js), with a block for
+// the bench and a rail. ?who=pilot&sex=f&outfit=uniform&clothes=down,up,up&csex=m&coutfit=uniform&pose=rest&def=0&sub=0&com=0&expr=calm&resp=0&view=three&spin=1
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search), V3 = THREE.Vector3;
-const cfg = { who: q.get('who') || 'pilot', sex: q.get('sex') || 'f', outfit: q.get('outfit') || 'uniform', pose: q.get('pose') || 'stand', expr: q.get('expr') || 'calm', resp: +(q.get('resp') || 0),
-  view: q.get('view') || 'three', spin: !!q.get('spin'), clothes: (q.get('clothes') || 'down,up,up').split(',') };
+const cfg = { who: q.get('who') || 'pilot', sex: q.get('sex') || 'f', outfit: q.get('outfit') || 'uniform', pose: q.get('pose') || 'rest', expr: q.get('expr') || 'calm', resp: +(q.get('resp') || 0),
+  view: q.get('view') || 'three', spin: !!q.get('spin'), clothes: (q.get('clothes') || 'down,up,up').split(','),
+  cap: { sex: q.get('csex') || 'm', outfit: q.get('coutfit') || 'uniform' }, rel: { defiance: +(q.get('def') || 0), submission: +(q.get('sub') || 0), comfort: +(q.get('com') || 0) } };
+if (!Crew.ROSTER[cfg.who]) cfg.who = 'pilot';
 
 // ── The space: a soft backdrop and floor, lit from three sides ──
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -54,43 +61,70 @@ const fill = new THREE.DirectionalLight(0xe4ecff, 0.26); fill.position.set(-3, 2
 const rim = new THREE.DirectionalLight(0xffffff, 0.3); rim.position.set(0.5, 3, -4); scene.add(rim);
 const floor = new THREE.Mesh(new THREE.CircleGeometry(12, 64), new THREE.MeshStandardMaterial({ color: '#cbc6be', roughness: 0.95 }));
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-// (props, for the poses that need them: a plain block to sit on, a rail to hold)
+// (props, for the poses that need them: a bench to sit on, a rail to hold; where the correction expects them, relative to its spots)
 const props = new THREE.Group(); scene.add(props);
-const propM = new THREE.MeshStandardMaterial({ color: '#b9b1a5', roughness: 0.8 });
-const block = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.46, 0.44), propM); block.position.set(0, 0.23, -0.12); block.castShadow = block.receiveShadow = true; props.add(block);
+const propM = new THREE.MeshStandardMaterial({ color: '#b9b1a5', roughness: 0.8 }), brass = new THREE.MeshStandardMaterial({ color: '#a8803e', roughness: 0.4, metalness: 0.4 });
+const SEAT_Y = 0.46, BENCH = new V3(0, 0, 0), WALL = { at: new V3(0.35, 0, 0), rail: { x: -0.48, y: 1.12, z: 0, hi: 1.44 } };
+const bench = new THREE.Mesh(new THREE.BoxGeometry(1.5, SEAT_Y, 0.44), propM); bench.position.set(BENCH.x + 0.45, SEAT_Y / 2, BENCH.z); bench.castShadow = bench.receiveShadow = true; props.add(bench);
 const rail = new THREE.Group(); props.add(rail);
-{ const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 1.1, 16), new THREE.MeshStandardMaterial({ color: '#a8803e', roughness: 0.4, metalness: 0.4 })); bar.rotation.z = Math.PI / 2; bar.castShadow = true; rail.add(bar);
-  for (const x of [-0.5, 0.5]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.2, 0.04), propM); p.position.set(x, -0.56, 0.03); p.castShadow = true; rail.add(p); } }
+{ const panel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.3, 1.3), propM); panel.position.set(WALL.rail.x - 0.08, 1.05, WALL.rail.z); panel.castShadow = panel.receiveShadow = true; rail.add(panel);
+  for (const y of [WALL.rail.y, WALL.rail.hi]) { const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.017, 1.1, 16), brass); bar.rotation.x = Math.PI / 2; bar.position.set(WALL.rail.x, y, WALL.rail.z); bar.castShadow = true; rail.add(bar); } }
+// (and for the correction's posing, a stand-in for the bay and the stage: only where things are, and nothing to move the camera)
+const BAY = { group: new THREE.Group(), spots: { bench: { at: BENCH.clone(), yaw: 0, seatY: SEAT_Y, beside: BENCH.clone().add(new V3(0.62, 0, 0)) },
+  wall: { at: WALL.at.clone(), yaw: -Math.PI / 2, rail: WALL.rail }, watch: [{ at: new V3(3, 0, -3), yaw: 0 }], corner: { at: new V3(3.5, 0, 3), yaw: 0 } } };
+const STAGE = { scene, camera, go() {} };
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
-// ── The figure ──
-const POSES = [['rest', 'At rest'], ['stand', 'Standing'], ['fold', 'Arms folded'], ['parade', 'Parade rest'], ['clasp', 'Hands clasped'], ['head', 'Hands on head'], ['seated', 'Seated'], ['bend', 'Bent at a rail']];
-let F = null, yaw = 0;
-function build() {
-  if (F) scene.remove(F.root);
-  const spec = cfg.who === 'captain' ? Crew.captainSpec({ sex: cfg.sex }) : Crew.figureSpec(cfg.who, cfg.sex, cfg.outfit);
-  spec.outfit = cfg.outfit; F = Figure.make(spec); scene.add(F.root);
-  F.root.traverse(o => { if (o.isMesh) o.castShadow = o.castShadow !== false; });
-  F.setClothes({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] }); F.setExpr(cfg.expr);
-  refresh();
+// ── The two of them ──
+const POSES = [['rest', 'At rest'], ['attention', 'Attention'], ['ease', 'At ease'], ['dressing', 'Dressing down'], ['inspection', 'Inspection'], ['otk', 'Across the knee'], ['wall', 'At the rail'], ['after', 'Aftercare']];
+const BY_SESSION = { otk: 'otk', wall: 'wall', after: 'otk' };
+let F = null, C = null, ses = null;      // (the crew member and the Captain; or, across the knee, at the rail and in the aftercare, a correction's)
+const dressed = { top: 'down', bottoms: 'up', under: 'up' }, worn = () => ({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] });
+const relFor = () => ({ submission: cfg.rel.submission, comfort: cfg.rel.comfort, desire: 0 });
+function clear() {
+  for (const G of [F, C]) if (G) scene.remove(G.root);
+  if (ses) { for (const P of ses.people) scene.remove(P.f.root); scene.remove(ses.captain.root); }
+  F = C = ses = null;
 }
-// the pose, set again each frame (the face and the breath move on top of it), turned by the turntable
+function build() {
+  clear();
+  if (BY_SESSION[cfg.pose]) {
+    ses = Session.create(STAGE, BAY, { captain: { sex: cfg.cap.sex, outfit: cfg.cap.outfit }, position: BY_SESSION[cfg.pose], between: 'aside', queue: [{ id: cfg.who, sex: cfg.sex, outfit: cfg.outfit }], witnesses: [],
+      rel: { [cfg.who]: relFor() }, sound: false });
+    ses.start(); if (cfg.pose === 'after') ses.aftercare(cfg.who); else ses.current.f.setClothes(worn());
+    F = ses.current.f; C = ses.captain;
+  } else {
+    F = Figure.make(Crew.figureSpec(cfg.who, cfg.sex, cfg.outfit)); scene.add(F.root); F.setClothes(worn());
+    C = Figure.make(Crew.captainSpec({ sex: cfg.cap.sex, outfit: cfg.cap.outfit })); scene.add(C.root); C.setClothes(dressed);
+  }
+  for (const G of [F, C]) G.root.traverse(o => { if (o.isMesh) o.castShadow = o.castShadow !== false; });
+  bench.visible = cfg.pose === 'otk' || cfg.pose === 'after'; rail.visible = cfg.pose === 'wall';
+  F.setExpr(cfg.expr); refresh();
+}
+// how the crew member stands for being dressed down: hands clasped in front if they're submissive, arms folded if defiant (whichever's the
+// stronger), else at parade rest
+const dressDown = () => { const r = cfg.rel; return r.defiance > 0.6 && r.defiance >= r.submission ? 'fold' : r.submission > 0.6 ? 'clasp' : 'rest'; };
+// The standing situations, posed each frame: side by side, or facing a stride apart (the crew member on the left, the Captain on the right)
 function pose() {
-  const at = new V3(0, 0, 0), P = Poses, s = F.root.scale.x;
-  block.visible = cfg.pose === 'seated'; rail.visible = cfg.pose === 'bend'; props.rotation.y = yaw;
-  if (cfg.pose === 'rest') { F.resetPose(); P.setRoot(F, at, yaw); }
-  else if (cfg.pose === 'seated') P.seat(F, at, yaw, { seatY: 0.46 });
-  else if (cfg.pose === 'bend') { const d = 0.62; P.bend(F, at, yaw, { y: 1.12, d }); rail.position.set(0, 1.12, d * s + 0.02); }
-  else { P.stand(F, at, yaw, { weight: 0.6 }); if (cfg.pose !== 'stand') P.arms(F, { fold: 'fold', parade: 'rest', clasp: 'clasp', head: 'head' }[cfg.pose]); }
-  F.root.updateMatrixWorld(true);
+  const p = cfg.pose, P = Poses, side = p === 'rest';
+  const fAt = new V3(side ? -0.36 : -0.4, 0, 0), cAt = new V3(side ? 0.36 : 0.4, 0, 0), fYaw = side ? 0 : Math.PI / 2, cYaw = side ? 0 : -Math.PI / 2;
+  if (p === 'rest') { F.resetPose(); P.setRoot(F, fAt, fYaw); }
+  else if (p === 'attention') P.attention(F, fAt, fYaw);
+  else { P.stand(F, fAt, fYaw, { weight: 0.5 }); P.arms(F, p === 'ease' ? 'rest' : p === 'inspection' ? 'head' : dressDown()); }
+  if (p === 'rest' || p === 'ease') { C.resetPose(); P.setRoot(C, cAt, cYaw); }
+  else { P.stand(C, cAt, cYaw, { weight: 0.3, wide: 0.15 }); P.arms(C, p === 'attention' ? 'rest' : 'fold'); }      // (parade rest at attention; arms folded dressing them down and inspecting)
+  C.setExpr(p === 'dressing' || p === 'inspection' ? 'stern' : 'calm');
+  for (const G of [F, C]) G.root.updateMatrixWorld(true);
 }
 
 // ── The camera's views: front, three-quarter, side, back ──
 const VIEWS = [['front', 'Front', 0], ['three', '¾', 0.6], ['side', 'Side', Math.PI / 2], ['back', 'Back', Math.PI]];
 function view(name) {
-  const v = VIEWS.find(x => x[0] === name) || VIEWS[1], a = v[2], d = cfg.pose === 'bend' ? 4.2 : 3.9, ty = cfg.pose === 'seated' ? 0.8 : cfg.pose === 'bend' ? 0.85 : 0.95;
-  controls.target.set(0, ty, 0); camera.position.set(Math.sin(a) * d, ty + 0.25, Math.cos(a) * d);
+  const v = VIEWS.find(x => x[0] === name) || VIEWS[1], a = v[2];
+  // (what to look at: the two of them standing, the bench and the lap, the rail, or the two on the bench)
+  const T = { otk: [0.0, 0.62, 0.3, 3.1], wall: [-0.1, 0.9, 0, 3.4], after: [0.3, 0.85, 0.05, 3.0] }[cfg.pose] || [0, 0.95, 0, 4.2];
+  controls.target.set(T[0], T[1], T[2]); camera.position.set(T[0] + Math.sin(a) * T[3], T[1] + 0.25, T[2] + Math.cos(a) * T[3]);
   // (a close look, from the address: ?at=x,y,z&cam=x,y,z)
   const at = q.get('at'), cp = q.get('cam'); if (at) controls.target.fromArray(at.split(',').map(Number)); if (cp) camera.position.fromArray(cp.split(',').map(Number));
   controls.update(); cfg.view = name; refresh();
@@ -98,14 +132,21 @@ function view(name) {
 
 // ── The panel ──
 const seg = (id, items, cur, fn) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const b = document.createElement('button'); b.textContent = label; b.className = v === cur ? 'on' : ''; b.onclick = () => fn(v); el.append(b); } };
-for (const id of [...Crew.IDS, 'captain']) { const o = document.createElement('option'); o.value = id; o.textContent = id === 'captain' ? 'The Captain' : `${Crew.ROSTER[id].name} · ${Crew.ROSTER[id].role}`; $('who').append(o); }
+for (const id of Crew.IDS) { const o = document.createElement('option'); o.value = id; o.textContent = `${Crew.ROSTER[id].name} · ${Crew.ROSTER[id].role}`; $('who').append(o); }
+// where the crew member is with the Captain: defiance, submission, comfort (the stance they take; and in the aftercare, how close they sit)
+for (const [k, nm] of [['defiance', 'Defiance'], ['submission', 'Submission'], ['comfort', 'Comfort']]) {
+  const l = document.createElement('label'); l.textContent = nm; const r = document.createElement('input'); r.type = 'range'; r.min = 0; r.max = 100; r.step = 1; r.value = Math.round(cfg.rel[k] * 100);
+  const o = document.createElement('span'); o.textContent = r.value + '%';
+  r.oninput = () => { cfg.rel[k] = r.value / 100; o.textContent = r.value + '%'; if (ses) ses.setRel(cfg.who, relFor()); };
+  $('rel').append(l, r, o);
+}
 for (const e of Object.keys(Figure.EXPRS)) { const o = document.createElement('option'); o.value = e; o.textContent = e; $('expr').append(o); }
 $('who').onchange = () => { cfg.who = $('who').value; build(); };
 $('expr').onchange = () => { cfg.expr = $('expr').value; F.setExpr(cfg.expr); };
 // (the body's response, 0–1, as a session would drive it: ?resp=0.5 — the corrections so far go as far as half)
 $('resp').value = Math.round(cfg.resp * 100); $('respV').textContent = $('resp').value + '%';
 $('resp').oninput = () => { cfg.resp = $('resp').value / 100; $('respV').textContent = $('resp').value + '%'; };
-const flip = (i, a, b) => { cfg.clothes[i] = cfg.clothes[i] === a ? b : a; F.setClothes({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] }); refresh(); };
+const flip = (i, a, b) => { cfg.clothes[i] = cfg.clothes[i] === a ? b : a; if (cfg.pose !== 'after') F.setClothes(worn()); refresh(); };
 $('cTop').onclick = () => flip(0, 'down', 'up'); $('cBot').onclick = () => flip(1, 'up', 'down'); $('cUnd').onclick = () => flip(2, 'up', 'down');
 $('spin').onclick = () => { cfg.spin = !cfg.spin; refresh(); };
 $('hide').onclick = () => $('panel').classList.toggle('closed');
@@ -113,7 +154,9 @@ function refresh() {
   $('who').value = cfg.who; $('expr').value = cfg.expr;
   seg('sex', [['f', 'Female'], ['m', 'Male']], cfg.sex, v => { cfg.sex = v; build(); });
   seg('outfit', [['uniform', 'Uniform'], ['offduty', 'Off duty']], cfg.outfit, v => { cfg.outfit = v; build(); });
-  seg('pose', POSES, cfg.pose, v => { cfg.pose = v; view(cfg.view); });
+  seg('csex', [['m', 'Male'], ['f', 'Female']], cfg.cap.sex, v => { cfg.cap.sex = v; build(); });
+  seg('coutfit', [['uniform', 'Uniform'], ['offduty', 'Off duty']], cfg.cap.outfit, v => { cfg.cap.outfit = v; build(); });
+  seg('pose', POSES, cfg.pose, v => { const was = !!BY_SESSION[cfg.pose]; cfg.pose = v; if (was || BY_SESSION[v]) build(); bench.visible = v === 'otk' || v === 'after'; rail.visible = v === 'wall'; view(cfg.view); });
   seg('views', VIEWS.map(v => [v[0], v[1]]), cfg.view, view);
   $('cTop').textContent = 'Top: ' + (cfg.clothes[0] === 'up' ? 'raised' : 'down'); $('cBot').textContent = 'Trousers: ' + (cfg.clothes[1] === 'down' ? 'lowered' : 'up');
   $('cUnd').textContent = 'Briefs: ' + (cfg.clothes[2] === 'down' ? 'lowered' : 'up'); $('spin').classList.toggle('on', cfg.spin);
@@ -123,8 +166,9 @@ function refresh() {
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (F) { if (cfg.spin) yaw += dt * 0.5; pose(); F.setResponse(cfg.resp); F.tick(dt); }
-  controls.update(); renderer.render(scene, camera); requestAnimationFrame(frame);
+  if (ses) { ses.current.resp = cfg.resp; ses.update(dt); F.setExpr(cfg.expr); }
+  else if (F) { pose(); F.setResponse(cfg.resp); F.tick(dt); C.tick(dt); }
+  controls.autoRotate = cfg.spin; controls.autoRotateSpeed = 2.4; controls.update(); renderer.render(scene, camera); requestAnimationFrame(frame);
 }
 Figure.preload().then(() => { build(); view(cfg.view); requestAnimationFrame(frame); setTimeout(() => (window.ready = true), 300); });
 </script></body></html>

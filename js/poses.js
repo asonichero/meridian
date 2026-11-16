@@ -2,7 +2,7 @@
 // correction (js/session.js) and the figure viewer (figures.html). Positions are in the world; each figure's own heights (pelvis, ankle, seat) come
 // from F.H, so the Blender-built bodies and the ones built in code pose alike.
 //
-//   Poses.stand(F, at, yaw, { weight, wide, crouch, lean, look, headYaw, stagger, arms }) · Poses.arms(F, 'fold' | 'rest' | 'clasp' | 'head')
+//   Poses.stand(F, at, yaw, { weight, wide, crouch, lean, look, headYaw, stagger, arms }) · Poses.attention(F, at, yaw) · Poses.arms(F, 'fold' | 'rest' | 'clasp' | 'head')
 //   Poses.seat(F, at, yaw, { seatY, lean, twist, roll, look, … }) · Poses.bend(F, at, yaw, rail) · Poses.reach(F, side, W, pole, palm, fingers)
 (function (root) {
 'use strict';
@@ -96,6 +96,16 @@ function handsOnHead(F) {
     F.grip(sd, 0.3, 0, 0.2);
   }
 }
+// At attention: feet together, weight even, back straight, chin lifted a little, the arms straight down at the sides, the hands lightly closed
+// at the seams.
+function attention(F, at, yaw) {
+  stand(F, at, yaw, { weight: 0, wide: 0.04, look: -0.12, lean: -0.035 });
+  for (const [side, sx] of [['L', 1], ['R', -1]]) {
+    F.bone['upperArm' + side].rotation.set(0.0, 0, sx * (0.035 - H(F).abd)); F.bone['foreArm' + side].rotation.x = -0.06; F.bone['hand' + side].rotation.set(0, sx * 0.25, 0);
+    F.grip(side, 0.5, 0, 0.45);
+  }
+  F.root.updateMatrixWorld(true);
+}
 const _arms = arms;
 function armsHow(F, how) { if (how === 'head') handsOnHead(F); else _arms(F, how); }
 // Bent forward from the hips with a long back, gripping a rail ({ x, y, z } in front of them, running across), feet apart (as at the wall).
@@ -120,5 +130,5 @@ function bend(F, at, yaw, rail) {
   F.root.updateMatrixWorld(true);
 }
 
-root.Poses = { UP, yawQ, sc, H, ankleY, setRoot, local, toWorldDir, W_, reach, legTo, footFlat, stand, arms: armsHow, seat, bend };
+root.Poses = { UP, yawQ, sc, H, ankleY, setRoot, local, toWorldDir, W_, reach, legTo, footFlat, stand, attention, arms: armsHow, seat, bend };
 })(typeof window !== 'undefined' ? window : globalThis);
