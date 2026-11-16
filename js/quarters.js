@@ -261,7 +261,8 @@ function build(scene) {
   const spots = {
     // (perched on the edge of the bunk, square to it, facing into the cabin: they lie along it in front, the head toward the pillow end, the
     // legs toward the foot)
-    bench: { at: new V3(BX - 0.13, 0, BZ0 + 1.15), yaw: Math.PI / 2, turn: 0, seatY: MT - 0.02 },
+    // (and their near arm, beside the Captain, rests up on the mattress, the hand gripping its edge: `rest`, its top and its edge's distance out)
+    bench: { at: new V3(BX - 0.13, 0, BZ0 + 1.15), yaw: Math.PI / 2, turn: 0, seatY: MT - 0.02, rest: { y: MT, edge: 0.11 } },
     // (facing the aft wall, between the desk and the way in, well back from it: bent forward, palms flat on it a little below the shoulder; far
     // enough along from the desk that the Captain, at their left, toward the hull, stands clear of it)
     wall: { at: new V3(X1 - 0.95, 0, DZ + 0.5 + 0.95), yaw: Math.PI / 2, support: { kind: 'wall', y: 1.1, d: 0.95, bend: 0.85 } },

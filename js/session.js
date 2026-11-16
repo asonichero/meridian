@@ -356,12 +356,26 @@ function create(stage, bay, opts) {
         const shd = W_(F, 'upperArm' + side), out = otkX.clone().multiplyScalar(sx), arm = (F.bone['foreArm' + side].position.length() + F.bone['hand' + side].position.length()) * s;
         const held = side === 'R' ? Math.max(R.pinK, R.coverK) : 0, up = Math.max(0, armUp[side]) * (1 - held), back = clamp(rb[side], 0, 0.55) * (1 - held);
         const Wt = new V3(shd.x, 0, shd.z).addScaledVector(otkU, 0.1 * s + 0.02 * lift - 0.05 * up * s).addScaledVector(out, 0.05 * s); Wt.y = 0.032 + 0.02 * Math.max(0, lift) + 0.09 * up * s;
+        // (a seat sat on square, a bunk (`bench.rest`: its top and how far out its edge is): the near arm can't hang down through it, so it rests
+        // on it beside the Captain: the elbow on the mattress, a little toward their head end so it clears the Captain's hip, and the forearm on
+        // along the edge, the hand gripping it, the fingers over it. Solved to their own arm's lengths, so the elbow lands on the mattress.)
+        let rest = null;
+        if (side === 'L' && bench.rest) {
+          const fB = new V3(Math.sin(bench.yaw || 0), 0, Math.cos(bench.yaw || 0)), edge = bench.at.clone().addScaledVector(fB, bench.rest.edge), al = new V3(otkU.x, 0, otkU.z).normalize();
+          const L1 = F.bone.foreArmL.position.length() * s, L2 = F.bone.handL.position.length() * s, ey = bench.rest.y + 0.035 * s, aE = 0.6 * L1;
+          const E = shd.clone().addScaledVector(al, aE).addScaledVector(fB, -Math.sqrt(Math.max(L1 * L1 - (shd.y - ey) ** 2 - aE * aE, 4e-4))); E.y = ey;
+          const inE = edge.clone().sub(E).dot(fB); if (inE < 0.06) E.addScaledVector(fB, inE - 0.06);
+          const H = E.clone().addScaledVector(fB, edge.clone().sub(E).dot(fB) - 0.045 * s); H.y = bench.rest.y + 0.028 * s + 0.012 * Math.max(0, up);
+          H.addScaledVector(al, Math.sqrt(Math.max(L2 * L2 - H.distanceToSquared(E), 4e-4)));
+          rest = { E, fB, al }; Wt.copy(H);
+        }
         // (a hand starting back toward the seat, as if to cover it, before they stop it: never more than halfway)
         if (back > 0.01) Wt.lerp(W_(F, 'hips').addScaledVector(out, 0.16 * s).addScaledVector(UP, 0.06 * s), back);
         const short = Math.max(clamp((Wt.distanceTo(shd) - arm * 0.97) / (0.08 * s), 0, 1), clamp(3 * up + 2 * back, 0, 1));      // (0: on the deck … 1: off it)
         const flat = otkU.clone().addScaledVector(out, 0.35).normalize(), hang = UP.clone().negate().addScaledVector(otkU, 0.35).normalize();
         const fingers = flat.clone().lerp(hang, short).normalize(), palm = new V3(0, -1, 0).lerp(otkU.clone().negate(), short).normalize();
         const pole = out.clone().addScaledVector(otkU, -0.6).addScaledVector(UP, 0.3).normalize();
+        if (rest) { pole.copy(rest.E).sub(shd).normalize(); palm.set(0, -1, 0); fingers.copy(rest.fB).addScaledVector(rest.al, 0.7).normalize(); }
         // the far hand, on purpose: back over the seat, flat on it, the elbow up; or held, the wrist at the small of their back, palm up, the
         // forearm across it, the elbow out to their side
         const cK = side === 'R' ? R.coverK : 0, pK = side === 'R' ? R.pinK : 0;
@@ -375,8 +389,8 @@ function create(stage, bay, opts) {
           const at = bk.p.clone().addScaledVector(otkU, -0.07 * s).addScaledVector(otkX, -0.035 * s).addScaledVector(bk.n, 0.035);
           Wt.lerp(at, pK).addScaledVector(out, 0.16 * s * Math.sin(Math.PI * pK)).addScaledVector(bk.n, 0.06 * Math.sin(Math.PI * pK)); fingers.lerp(ac, pK).normalize(); palm.lerp(bk.n, pK).normalize(); pole.lerp(otkX.clone().negate().addScaledVector(bk.n, 0.7).normalize(), pK).normalize();
         }
-        const handOTK = () => { reach(F, side, Wt, pole, palm, fingers); F.grip(side, lerp(lerp(0.1 + 0.3 * g, 0.35 + 0.3 * g, short), 0.12, cK) * (1 - pK) + 0.45 * pK, 0.35 - 0.25 * g, 0.25); F.bone['hand' + side].updateMatrixWorld(true); };
-        handOTK(); const hl = handLow(F, side); if (hl < 0) { Wt.y -= hl; handOTK(); }
+        const handOTK = () => { reach(F, side, Wt, pole, palm, fingers); F.grip(side, rest ? clamp(0.6 + 0.3 * g - 0.3 * back, 0.2, 0.95) : lerp(lerp(0.1 + 0.3 * g, 0.35 + 0.3 * g, short), 0.12, cK) * (1 - pK) + 0.45 * pK, rest ? 0.05 : 0.35 - 0.25 * g, rest ? 0.5 : 0.25); F.bone['hand' + side].updateMatrixWorld(true); };
+        handOTK(); const hl = rest ? 0 : handLow(F, side); if (hl < 0) { Wt.y -= hl; handOTK(); }
       }
     } else if (st.position === 'table') {
       // Over the end of the table: the front of the hips against its edge, the chest down on it, the head turned to the side, the arms out along
