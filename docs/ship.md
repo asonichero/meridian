@@ -12,11 +12,11 @@ Decided with the design lead; the drawing is `docs/ship-general-arrangement.html
 
 ## The deck
 
-Two corridors: the **spine**, bow to stern, and a **cross corridor** amidships. Every room opens onto one of them.
+One corridor: the **spine**, bow to stern. Every room opens onto it.
 
 - **Bow:** the bridge. The **Ready Room** opens only onto the bridge (desk, chair, a small couch).
 - **Forward:** starboard, three crew cabins (from the bridge: Kit, Rowan, Sefa); port, the Ready Room and the Captain's cabin (its own head and shower).
-- **Amidships:** the cross corridor, with the airlock at its port end. Starboard, the **galley and mess**, open wide onto the spine. Port, the **suit bay** (airlock and docking collar) and the **med bay** next to it.
+- **Amidships:** starboard, the **galley and mess**, running from Sefa's cabin to Morgan's, open wide onto the spine. Port, the **suit bay**, from the Captain's cabin aft, with the airlock and docking collar at its forward end, and the **med bay** next to it.
 - **Aft:** starboard, three more cabins (Morgan, Noor, Sam) and the **communal showers**, warmed by the reactor's heat beyond the shadow shield. Port, **hydroponics and life support**, and the **workshop** (repairs, fabrication, spares).
 - **Stern:** **reactor and propulsion**, the core filling the middle of the room with a walkway and guard rail round it.
 - Each crew cabin has its own head; everyone but the Captain shares the communal showers (co-ed, matter-of-fact). The showers are where the marks of a correction are seen by the rest, and where word of the Captain's methods travels ahead of the formal introductions.

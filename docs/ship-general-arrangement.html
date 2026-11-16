@@ -161,12 +161,11 @@ svg .hd { font: 600 13px var(--display); letter-spacing: 0.09em; }
           <line x1="146" y1="196" x2="918" y2="196" class="deckline"/>
           <line x1="250" y1="150" x2="250" y2="196" class="bh"/>
           <line x1="376" y1="150" x2="376" y2="196" class="bh"/>
-          <line x1="404" y1="150" x2="404" y2="196" class="bh"/>
           <line x1="572" y1="150" x2="572" y2="196" class="bh"/>
           <line x1="684" y1="150" x2="684" y2="196" class="bh"/>
           <text x="201" y="178" text-anchor="middle" class="lbl hd">BRIDGE</text>
           <text x="313" y="178" text-anchor="middle" class="lbl hd">READY · CAPTAIN</text>
-          <text x="488" y="178" text-anchor="middle" class="lbl hd">SUIT BAY · MED</text>
+          <text x="474" y="178" text-anchor="middle" class="lbl hd">SUIT BAY · MED</text>
           <text x="628" y="178" text-anchor="middle" class="lbl hd">HYDROPONICS</text>
           <text x="717" y="178" text-anchor="middle" class="lbl hd">WORKSHOP</text>
           <text x="800" y="178" text-anchor="middle" class="lbl hd">REACTOR</text>
@@ -207,7 +206,7 @@ svg .hd { font: 600 13px var(--display); letter-spacing: 0.09em; }
     <h2>Deck plan <small>from above, shield and roof cut away, same scale</small></h2>
     <figure>
       <div class="sheet wide">
-        <svg viewBox="0 0 1100 410" role="img" aria-label="Deck plan: one level and two corridors. A spine corridor runs from the bridge at the bow to the reactor at the stern, and every room opens onto it or onto the cross corridor amidships. To starboard: three crew cabins, the galley and mess, three more cabins and the communal showers. To port: the Ready Room and the Captain's cabin, the suit bay with the airlock, the med bay, hydroponics and the workshop.">
+        <svg viewBox="0 0 1100 410" role="img" aria-label="Deck plan: one level and one corridor. A spine corridor runs from the bridge at the bow to the reactor at the stern, and every room opens onto it. To starboard: three crew cabins, the galley and mess, three more cabins and the communal showers. To port: the Ready Room and the Captain's cabin, the suit bay with the airlock, the med bay, hydroponics and the workshop.">
           <!-- shield footprint above, radiator wings below -->
           <polygon points="192,52 936,52 936,388 192,388 166,362 166,78" class="dash"/>
           <line x1="936" y1="56" x2="946" y2="56" class="lead"/>
@@ -229,7 +228,6 @@ svg .hd { font: 600 13px var(--display); letter-spacing: 0.09em; }
           <!-- hull and corridors -->
           <polygon points="152,122 922,122 922,318 152,318 138,290 138,150" class="hull"/>
           <rect x="250" y="206" width="504" height="28" class="corr"/>
-          <rect x="376" y="122" width="28" height="196" class="corr"/>
           <!-- bridge -->
           <line x1="250" y1="122" x2="250" y2="318" class="room"/>
           <line x1="144" y1="170" x2="144" y2="270" class="screen"/>
@@ -256,18 +254,19 @@ svg .hd { font: 600 13px var(--display); letter-spacing: 0.09em; }
           <line x1="306" y1="234" x2="322" y2="234" class="door"/>
           <text x="337" y="266" text-anchor="middle" class="lbl sm">CAPTAIN</text>
           <text x="337" y="280" text-anchor="middle" class="lbl sm mut">head · shower</text>
-          <text x="394" y="220" text-anchor="middle" class="lbl sm mut" transform="rotate(-90 394 220)">cross corridor</text>
           <!-- amidships: the galley and mess to starboard, open to the spine; the suit bay and med bay to port -->
-          <rect x="404" y="122" width="168" height="84" class="room"/>
-          <text x="488" y="140" text-anchor="middle" class="lbl sm">GALLEY &amp; MESS</text>
-          <rect x="414" y="150" width="50" height="11" rx="2" class="furn"/>
-          <rect x="478" y="164" width="66" height="14" rx="2" class="furn"/>
-          <line x1="478" y1="159" x2="544" y2="159" class="bh"/><line x1="478" y1="183" x2="544" y2="183" class="bh"/>
+          <rect x="376" y="122" width="196" height="84" class="room"/>
+          <text x="474" y="140" text-anchor="middle" class="lbl sm">GALLEY &amp; MESS</text>
+          <rect x="380" y="126" width="84" height="8" class="furn"/>
+          <rect x="396" y="150" width="50" height="11" rx="2" class="furn"/>
+          <rect x="474" y="164" width="66" height="14" rx="2" class="furn"/>
+          <line x1="474" y1="159" x2="540" y2="159" class="bh"/><line x1="474" y1="183" x2="540" y2="183" class="bh"/>
           <rect x="556" y="132" width="10" height="56" rx="2" class="furn"/>
-          <line x1="424" y1="206" x2="548" y2="206" class="door"/>
-          <rect x="404" y="234" width="98" height="84" class="room"/>
-          <text x="453" y="276" text-anchor="middle" class="lbl sm">SUIT BAY</text>
-          <line x1="404" y1="258" x2="404" y2="276" class="door"/>
+          <line x1="392" y1="206" x2="552" y2="206" class="door"/>
+          <rect x="376" y="234" width="126" height="84" class="room"/>
+          <text x="439" y="276" text-anchor="middle" class="lbl sm">SUIT BAY</text>
+          <text x="439" y="290" text-anchor="middle" class="lbl sm mut">airlock fwd</text>
+          <line x1="452" y1="234" x2="468" y2="234" class="door"/>
           <path d="M420,318 A12,12 0 0 0 444,318" class="hull"/>
           <line x1="422" y1="318" x2="442" y2="318" class="door"/>
           <text x="432" y="348" text-anchor="middle" class="lbl">airlock · docking collar</text>
@@ -302,7 +301,7 @@ svg .hd { font: 600 13px var(--display); letter-spacing: 0.09em; }
           <text x="840" y="300" text-anchor="middle" class="lbl sm mut">walkway · rail</text>
         </svg>
       </div>
-      <figcaption>One level, two corridors. The <b>spine</b> runs from the bridge to the reactor hatch, and every room opens onto it or onto the <b>cross corridor</b> amidships (teal marks are doors). Each crew cabin has its own head by the door (from the bridge: Kit, Rowan, Sefa forward; Morgan, Noor, Sam aft). The Captain's cabin has its own head and shower, and everyone else shares the <b>communal showers</b> aft, warmed by the reactor's heat beyond the shadow shield. The galley and mess open wide onto the spine. The Ready Room opens only onto the bridge. The bridge itself is never used for corrections: once a critical phase is over, the Captain takes anyone who needs one into the Ready Room. The viewport is directly above the plot table, so the Captain can look up along the course. The service crawl duct (the design doc's maintenance crawlspace) runs beside the spine and isn't drawn. The radiator wings sit below deck level, out from the keel.</figcaption>
+      <figcaption>One level, one corridor. The <b>spine</b> runs from the bridge to the reactor hatch, and every room opens onto it (teal marks are doors). The galley and mess run the whole stretch from Sefa's cabin to Morgan's; across the spine, the suit bay runs from the Captain's cabin to the med bay, with the airlock at its forward end. Each crew cabin has its own head by the door (from the bridge: Kit, Rowan, Sefa forward; Morgan, Noor, Sam aft). The Captain's cabin has its own head and shower, and everyone else shares the <b>communal showers</b> aft, warmed by the reactor's heat beyond the shadow shield. The galley and mess open wide onto the spine. The Ready Room opens only onto the bridge. The bridge itself is never used for corrections: once a critical phase is over, the Captain takes anyone who needs one into the Ready Room. The viewport is directly above the plot table, so the Captain can look up along the course. The service crawl duct (the design doc's maintenance crawlspace) runs beside the spine and isn't drawn. The radiator wings sit below deck level, out from the keel.</figcaption>
     </figure>
   </section>
 
