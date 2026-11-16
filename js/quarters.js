@@ -1,23 +1,25 @@
 // Project Meridian — a crew cabin, as issued (docs/ship.md: six of them, three forward and three aft along the starboard side, each the same
 // before its crew member makes it their own). Long and narrow, 3 m along the ship by 6 m from the hull to the spine. Down the fore wall, from
-// the hull: a night table in the corner, the bunk (its head at the night table, drawers under it, a shelf over it), a tall locker, and the head
-// in its own cubicle by the way in, its door opening aft onto the entrance; along the hull, from the night table, a work surface at desk height
-// (to sit or stand at; no terminal); on the aft wall, the fold-down desk with the cabin's terminal and a stool. Standard-issue paint, a
-// speckled vinyl deck, one light in the ceiling.
+// the hull: a night table in the corner as wide as the bunk, the bunk (its head at the night table, drawers under it, a shelf over it),
+// built-in storage floor to ceiling from the bunk's foot to the head, and the head in its own cubicle by the way in, its door opening aft onto
+// the entrance; along the hull, from the night table, a work surface at desk height (to sit or stand at; no terminal); on the aft wall, toward
+// the hull, the fold-down desk with the cabin's terminal and a stool, the rest of that wall clear. Standard-issue paint, a speckled vinyl
+// deck, one light in the ceiling.
 // Private: nobody watches a correction here (spots.watch is empty, and `private` tells the session to leave everyone else outside).
 //
 //   const cabin = Quarters.build(scene) → the same shape as SuitBay.build: { group, spots, bounds, cams, sideOf, sidesAt, setLow, setTime('day' | 'night'), tick, name, private }
 //   spots.bench: across the knee, the Captain perched on the edge of the bunk, facing into the cabin (the bunk's head to their left);
-//   spots.wall: standing, palms flat on the fore wall; spots.after: side by side on the edge of the bunk.
+//   spots.wall: standing, palms flat on the aft wall; spots.after: side by side on the edge of the bunk.
 // Its frame: x along the ship (fore −x), z across it (the hull −z, the spine +z).
 (function (root) {
 'use strict';
 const THREE = root.THREE, F = root.Figure, srgb = F.srgb, V3 = THREE.Vector3;
 const K = root.SuitBay.kit, rnd = K.rnd, speckle = K.speckle;
 const X0 = -1.5, X1 = 1.5, ZO = -3, ZC = 3, HT = 2.45;      // fore and aft walls, the hull, the spine side, height
-// the bunk down the fore wall (out to BX, its head at BZ0 by the night table, its foot at BZ1), its mattress's top; the night table's depth
-// and the work surface's along the hull; the locker; the head's cubicle in the fore corner by the door (out to HX, from HZ to the spine)
-const BX = X0 + 0.86, BZ0 = ZO + 0.48, BZ1 = BZ0 + 2.1, MT = 0.48, NW = 0.5, WD = 0.5, WY = 0.78, LZ0 = 1.24, LZ1 = 1.82, HX = -0.4, HZ = 1.86;
+// the bunk down the fore wall (out to BX, its head at BZ0 by the night table, its foot at BZ1), its mattress's top; the night table as wide
+// as the bunk; the work surface along the hull, its depth and height; the built-in storage's depth; the head's cubicle in the fore corner by
+// the door (out to HX, from HZ to the spine); the desk's middle on the aft wall
+const BX = X0 + 0.86, BZ0 = ZO + 0.48, BZ1 = BZ0 + 2.1, MT = 0.48, NW = BX - X0, WD = 0.5, WY = 0.78, SD = 0.6, HX = -0.4, HZ = 1.86, DZ = -0.7;
 
 // ── Painted textures ──
 const vinylTex = K.canvasTex(256, 256, (c, w, h) => {
@@ -91,10 +93,10 @@ function build(scene) {
   box(0.02, 0.03, bl - 0.3, locker, X0 + 0.235, 1.39, bc, { detail: true });
   box(0.05, 0.3, 0.4, std({ color: srgb('#c8c4b8'), roughness: 0.9 }), X0 + 0.15, 1.53, bc + 0.5, { detail: true });      // (a folded towel on the shelf, issue)
 
-  // ── The night table in the corner at the bunk's head: a drawer, a lamp on it ──
+  // ── The night table in the corner at the bunk's head, as wide as the bunk: two drawers, a lamp on it ──
   const NT = 0.55;
   box(NW, NT, BZ0 - ZO - 0.02, locker, X0 + NW / 2, NT / 2, (ZO + BZ0) / 2 - 0.01);
-  box(NW - 0.06, 0.16, 0.02, steelDark, X0 + NW / 2, NT - 0.12, BZ0 - 0.02, { noCast: true }); box(0.14, 0.02, 0.03, steel, X0 + NW / 2, NT - 0.12, BZ0 - 0.005, { detail: true });
+  for (const y of [NT - 0.12, NT - 0.32]) { box(NW - 0.06, 0.16, 0.02, steelDark, X0 + NW / 2, y, BZ0 - 0.02, { noCast: true }); box(0.18, 0.02, 0.03, steel, X0 + NW / 2, y, BZ0 - 0.005, { detail: true }); }
   cyl(0.06, 0.07, 0.03, steelDark, X0 + 0.22, NT + 0.015, ZO + 0.2, null, 16); cyl(0.008, 0.008, 0.22, steel, X0 + 0.22, NT + 0.14, ZO + 0.2, null, 8);
   const shade = cyl(0.07, 0.1, 0.12, std({ color: srgb('#d8c8a8'), roughness: 0.85, side: THREE.DoubleSide }), X0 + 0.22, NT + 0.27, ZO + 0.2, null, 16); shade.castShadow = false;
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 8), glowR); bulb.position.set(X0 + 0.22, NT + 0.24, ZO + 0.2); G.add(bulb);
@@ -106,15 +108,20 @@ function build(scene) {
   box(wl, 0.08, 0.03, steelDark, (W0 + X1) / 2, WY - 0.06, ZO + 0.015);
   for (const x of [W0 + 0.12, (W0 + X1) / 2, X1 - 0.12]) box(0.025, 0.22, WD - 0.08, steel, x, WY - 0.13, ZO + (WD - 0.08) / 2);
 
-  // ── The locker on the fore wall between the bunk's foot and the head, floor to head height: two doors, vents, a handle ──
-  const LD = 0.58, LZ = (LZ0 + LZ1) / 2, LW = LZ1 - LZ0;
-  box(LD, 2.0, LW, locker, X0 + LD / 2, 1.0, LZ);
-  box(0.01, 1.9, 0.012, steelDark, X0 + LD + 0.005, 1.0, LZ, { noCast: true });
-  for (let i = 0; i < 5; i++) box(0.01, 0.012, LW - 0.14, steelDark, X0 + LD + 0.005, 1.75 + i * 0.035, LZ, { noCast: true, detail: true });
-  box(0.03, 0.16, 0.02, steel, X0 + LD + 0.015, 1.1, LZ - 0.04, { detail: true });
+  // ── Built-in storage down the fore wall from the bunk's foot to the head, floor to ceiling: a recessed plinth, four tall doors (two with
+  // vents), a row of cupboards over them, a handle each ──
+  const S0 = BZ1 + 0.02, S1 = HZ - 0.03, sl = S1 - S0, sz = (S0 + S1) / 2, sf = X0 + SD;
+  box(SD - 0.05, 0.1, sl, kickM, X0 + (SD - 0.05) / 2, 0.05, sz);
+  box(SD, HT - 0.1, sl, locker, X0 + SD / 2, 0.1 + (HT - 0.1) / 2, sz);
+  box(0.01, 0.012, sl, steelDark, sf + 0.005, 1.98, sz, { noCast: true });
+  for (let i = 1; i < 4; i++) box(0.01, HT - 0.12, 0.012, steelDark, sf + 0.005, 0.1 + (HT - 0.1) / 2, S0 + sl * i / 4, { noCast: true });
+  for (let i = 0; i < 4; i++) {
+    const zc = S0 + sl * (i + 0.5) / 4, hz_ = zc + (i % 2 ? -1 : 1) * (sl / 8 - 0.06);
+    box(0.03, 0.18, 0.02, steel, sf + 0.015, 1.1, hz_, { detail: true }); box(0.03, 0.02, 0.1, steel, sf + 0.015, 2.06, zc, { detail: true });
+    if (i === 1 || i === 2) for (let k = 0; k < 5; k++) box(0.01, 0.012, sl / 4 - 0.16, steelDark, sf + 0.005, 1.7 + k * 0.035, zc, { noCast: true, detail: true });
+  }
 
-  // ── The fold-down desk on the aft wall: its top on two brackets, a stool tucked under, the cabin's terminal over it ──
-  const DZ = -0.15;
+  // ── The fold-down desk on the aft wall, toward the hull: its top on two brackets, a stool tucked under, the cabin's terminal over it ──
   box(0.46, 0.035, 1.0, deskM, X1 - 0.23, 0.74, DZ);
   for (const z of [DZ - 0.42, DZ + 0.42]) box(0.36, 0.2, 0.025, steel, X1 - 0.2, 0.63, z);
   cyl(0.17, 0.17, 0.05, std({ color: srgb('#3a4a52'), roughness: 0.8 }), X1 - 0.5, 0.46, DZ + 0.05, null, 20);
@@ -159,15 +166,16 @@ function build(scene) {
     // (perched on the edge of the bunk, square to it, facing into the cabin: they lie along it in front, the head toward the pillow end, the
     // legs toward the foot)
     bench: { at: new V3(BX - 0.13, 0, BZ0 + 1.15), yaw: Math.PI / 2, turn: 0, seatY: MT - 0.02 },
-    // (facing the fore wall between the bunk's foot and the locker, well back from it: bent forward, palms flat on it a little below the shoulder)
-    wall: { at: new V3(X0 + 0.95, 0, (BZ1 + LZ0) / 2 + 0.05), yaw: -Math.PI / 2, support: { kind: 'wall', y: 1.1, d: 0.95, bend: 0.85 } },
+    // (facing the aft wall, between the desk and the way in, well back from it: bent forward, palms flat on it a little below the shoulder; far
+    // enough along from the desk that the Captain, at their left, toward the hull, stands clear of it)
+    wall: { at: new V3(X1 - 0.95, 0, DZ + 0.5 + 0.95), yaw: Math.PI / 2, support: { kind: 'wall', y: 1.1, d: 0.95, bend: 0.85 } },
     after: { at: new V3(BX - 0.15, 0, BZ0 + 1.4), yaw: Math.PI / 2, seatY: MT - 0.02, beside: new V3(BX - 0.15, 0, BZ0 + 0.78) },
     watch: [],
     corner: { at: new V3(1.05, 0, 2.55), yaw: Math.PI / 2 },
   };
 
-  // ── Day and night: by day the ceiling panel's up and the cabin's lit evenly; at night it's turned right down and the reading light's on,
-  // warm, over the pillow. Low-CPU mode: the room's own shadows go (only the figures cast them), the small lamps and the small things go. ──
+  // ── Day and night: by day the ceiling panel's up and the cabin's lit evenly; at night it's turned right down and the night table's lamp
+  // is on, warm, by the pillow. Low-CPU mode: the room's own shadows go (only the figures cast them), the small lamps and the small things go. ──
   const meshes = []; G.traverse(o => { if (o.isMesh) meshes.push(o); });
   const cast0 = new Map(meshes.map(m => [m, m.castShadow]));
   let low = false, time = 'day';
