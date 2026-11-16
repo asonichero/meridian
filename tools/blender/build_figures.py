@@ -790,12 +790,12 @@ def build(sex):
 
 
 def sex_weights(body, X, label, sex, torso, leg):
-    """The sex goes with the pelvis (the automatic weighting splits it between the thighs, which tears it as the legs part): on it all hips,
-    blending back to the automatic weights over a centimetre and a half round it. His penis, from where it leaves the body to the tip, then
+    """His sex goes with the pelvis (the automatic weighting splits it between the thighs, which tears it as the legs part): on it all hips,
+    blending back to the automatic weights over a centimetre and a half round it. Hers goes each side with its own thigh. His penis, from where it leaves the body to the tip, then
     goes onto its own bone for the lift, all of it from where it leaves the body (so it lifts straight)."""
     parts = sex_parts(sex, Surface(torso))[0]
     k = ss(-0.015, -0.002, parts(X))
-    w = np.zeros(len(X)); vg = body.vertex_groups; hips = vg['hips'].index; gs = vg.get('sex')
+    w = np.zeros(len(X)); vg = body.vertex_groups; hips = vg['hips'].index; gs = vg.get('sex'); thL = vg['thighL'].index; thR = vg['thighR'].index
     if sex == 'm':
         E, u = his_root(torso, leg); S0, R0, A, tip = his_axis(Surface(torso))
         cap = capsule(X, A, tip, 0.016, 0.0148); scr = (1 - np.linalg.norm((X - S0) / R0, axis=1)) * R0.min()
@@ -807,7 +807,13 @@ def sex_weights(body, X, label, sex, torso, leg):
         gw = {g.group: g.weight for g in v.groups if g.group != own}
         if gs and any(g.group == own for g in v.groups): gs.remove([i])
         tot = sum(gw.values()); gw = {gi: wt / tot for gi, wt in gw.items()} if tot > 0 else {hips: 1.0}
-        gw = {gi: wt * (1 - k[i]) for gi, wt in gw.items()}; gw[hips] = gw.get(hips, 0.0) + k[i]
+        gw = {gi: wt * (1 - k[i]) for gi, wt in gw.items()}
+        if sex == 'f':
+            # (hers: each form with its own thigh, so they go together as the hips roll: mostly the thigh at the bottom, mostly the pelvis where they
+            # meet the mons; across the middle shared between the two thighs)
+            th = 0.2 + 0.72 * ss(CROTCH_Y + 0.02, CROTCH_Y - 0.015, X[i, 1]); lf = ss(-0.004, 0.004, X[i, 0])
+            for gi, wt in ((hips, 1 - th), (thL, th * lf), (thR, th * (1 - lf))): gw[gi] = gw.get(gi, 0.0) + k[i] * wt
+        else: gw[hips] = gw.get(hips, 0.0) + k[i]
         member = {g.group for g in v.groups}
         for gi, wt in gw.items():
             if wt * (1 - w[i]) > 1e-5: vg[gi].add([i], float(wt * (1 - w[i])), 'REPLACE')
