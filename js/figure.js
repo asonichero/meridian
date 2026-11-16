@@ -1242,7 +1242,7 @@ const EXPRS = {
   teary: { brow: 0.38, browY: 0.04, open: 0.7, mouth: 'soft', blush: 0.6, tears: 0.6, ms: 1.0 }, soft: { brow: 0.12, browY: 0.03, open: 0.8, mouth: 'soft', blush: 0.1, ms: 1.0 },
 };
 const flatExpr = name => { const e = EXPRS[name] || EXPRS.calm, m = MOUTHS[e.mouth] || MOUTHS.flat; return Object.assign({ brow: 0, browY: 0, open: 0.95, look: 0, blush: 0, tears: 0, ms: 1, sq: 0 }, e, m); };
-const SEX_REST = 0.46, _sq = new THREE.Quaternion(), _sv = new V3(), _tuckOff = new V3(0, 0.022, 0.03);      // (his, at rest, hangs this far forward of straight down)
+const SEX_REST = 0.46, _sq = new THREE.Quaternion(), _sv = new V3(), _tuckOff = new V3(0, 0.065, 0.035);      // (his, at rest, hangs this far forward of straight down)
 function tickFace(F, dt) {
   F.t += dt;
   const kk = 1 - Math.exp(-dt * 8), x = F.expr, to = F.exprTo;
@@ -1275,9 +1275,10 @@ function tickFace(F, dt) {
   // (his scrotum: with gravity alone, from hanging toward forward; face down across a lap it swings forward, out of the way between the thighs)
   if (F.bone.sexS) {
     const R = F.resp, b = F.bone.sexS; b.parent.getWorldQuaternion(_sq); _sv.set(0, -1, 0).applyQuaternion(_sq.invert());
-    const want = Math.max(clamp(Math.atan2(_sv.z, -_sv.y), 0, 1.3), F.tuck ? 1.4 : 0);
+    const want = Math.max(clamp(Math.atan2(_sv.z, -_sv.y), 0, 1.3), F.tuck ? 2.1 : 0);
     R.angS = (R.angS || 0) + (want - (R.angS || 0)) * (1 - Math.exp(-dt * 2.5)); b.rotation.x = -R.angS;
-    // (and tucked, drawn up toward the body and forward a little, in front of the thighs rather than between them behind)
+    // (and tucked, drawn up into the crotch and forward, swung up in front: from behind, between the thighs, at most a sliver of it deep in the
+    // gap, nothing hanging back where a stroke could land)
     R.tuckS = (R.tuckS || 0) + ((F.tuck ? 1 : 0) - (R.tuckS || 0)) * (1 - Math.exp(-dt * 2.5));
     b.position.copy(F.rest0.sexS).addScaledVector(_tuckOff, R.tuckS / F.root.scale.x);
   }
@@ -1378,22 +1379,23 @@ function prepare(sx, gltf, M) {
         g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
       }
     }
-    // (his scrotum onto its bone: more of it the further down it hangs from the top, where it joins the body; the bone set a quarter of the way
-    // from the root to its middle)
-    if (name === 'Body' && sx === 'm' && part && BIx.sexS != null) {
-      const sb = BIx.sex, ws = i => { let w = 0; for (let k = 0; k < 4; k++) if (idx[i * 4 + k] === sb) w += wt[i * 4 + k]; return w; };
-      const E = new V3(...joints.sex), C = new V3(), sc_ = []; for (let i = 0; i < n; i++) if (part.getX(i) > 0.5 && ws(i) < 0.05) { sc_.push(i); C.add(new V3(p.getX(i), p.getY(i), p.getZ(i))); }
-      if (sc_.length) {
-        C.divideScalar(sc_.length); const J = E.clone().lerp(C, 0.15), a = C.clone().sub(J), len = a.length(); a.normalize(); joints.sexS = J.toArray();
-        const bs = BIx.sexS;
-        for (const i of sc_) {
-          const t = clamp((new V3(p.getX(i), p.getY(i), p.getZ(i)).sub(J).dot(a) + 0.2 * len) / (1.1 * len), 0, 1), w2 = t * t * (3 - 2 * t); if (w2 <= 0.001) continue;
-          let k0 = 0; for (let k = 1; k < 4; k++) if (wt[i * 4 + k] < wt[i * 4 + k0]) k0 = k;
-          for (let k = 0; k < 4; k++) wt[i * 4 + k] *= 1 - w2; wt[i * 4 + k0] = 0; idx[i * 4 + k0] = bs; wt[i * 4 + k0] = w2;
-          const sum = wt[i * 4] + wt[i * 4 + 1] + wt[i * 4 + 2] + wt[i * 4 + 3]; for (let k = 0; k < 4; k++) wt[i * 4 + k] /= sum;
-        }
-        g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
+    // (his scrotum onto its bone: it isn't marked as the sex (it's joined to the body, as the thighs are), so found by its own shape, the
+    // landmark's centre and radii; more of it the further down it hangs below its root at the top, where it joins the body, the bone's pivot
+    // there; fading out over its join to the thighs and the perineum, and never the shaft's)
+    if (name === 'Body' && sx === 'm' && BIx.sexS != null && L.scrotum) {
+      const sb = BIx.sex, bs = BIx.sexS, ws = i => { let w = 0; for (let k = 0; k < 4; k++) if (idx[i * 4 + k] === sb) w += wt[i * 4 + k]; return w; };
+      const S0 = new V3(L.scrotum[0], L.scrotum[1], L.scrotum[2]), R0 = new V3(L.scrotum[3], L.scrotum[4], L.scrotum[5]);
+      const J = S0.clone().add(new V3(0, 0.8 * R0.y, 0.3 * R0.z)), drop = J.y - (S0.y - R0.y); joints.sexS = J.toArray();
+      const sm = (a_, b_, x) => { const t = clamp((x - a_) / (b_ - a_), 0, 1); return t * t * (3 - 2 * t); };
+      for (let i = 0; i < n; i++) {
+        if ((part && part.getX(i) > 0.5) || ws(i) > 0.05) continue;
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i), q = Math.hypot((x - S0.x) / R0.x, (y - S0.y) / R0.y, (z - S0.z) / R0.z);
+        const w2 = sm(1.3, 1.02, q) * sm(-0.1, 0.45, (J.y - y) / drop); if (w2 <= 0.001) continue;
+        let k0 = 0; for (let k = 1; k < 4; k++) if (wt[i * 4 + k] < wt[i * 4 + k0]) k0 = k;
+        for (let k = 0; k < 4; k++) wt[i * 4 + k] *= 1 - w2; idx[i * 4 + k0] = bs; wt[i * 4 + k0] = w2;
+        const sum = wt[i * 4] + wt[i * 4 + 1] + wt[i * 4 + 2] + wt[i * 4 + 3]; for (let k = 0; k < 4; k++) wt[i * 4 + k] /= sum;
       }
+      g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
     }
     if (name === 'Body' && sx === 'm' && part && g.attributes._ink) {
       const ink_ = g.attributes._ink, S_ = [], B_ = [], sb = BIx.sex;

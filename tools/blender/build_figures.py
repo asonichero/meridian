@@ -926,7 +926,7 @@ def landmarks(sex, torso):
     L['trouserTop'] = L['waist'] - 0.012; L['trouserFoot'] = 0.115
     L['briefTop'] = CROTCH_Y + (0.135 if sex == 'f' else 0.155); L['briefLeg'] = CROTCH_Y - (0.0 if sex == 'f' else 0.075)
     L['briefCut'] = [0.022, CROTCH_Y - 0.03, 0.64]
-    if sex == 'm': _, _, A_, t_ = his_axis(Surface(torso)); L['sexRest'] = float(math.atan2(t_[2] - A_[2], A_[1] - t_[1]))      # (how far forward of straight down he hangs)       # (her leg openings: a line from beside the gusset's bottom (x, y) rising at this slope to the hip)
+    if sex == 'm': S0_, R0_, A_, t_ = his_axis(Surface(torso)); L['sexRest'] = float(math.atan2(t_[2] - A_[2], A_[1] - t_[1])); L['scrotum'] = [float(v) for v in list(S0_) + list(R0_)]      # (its centre and radii: the game finds its points by these)      # (how far forward of straight down he hangs)       # (her leg openings: a line from beside the gusset's bottom (x, y) rising at this slope to the hip)
     L['downTop'] = KNEE_Y + 0.085; L['briefDown'] = CROTCH_Y - 0.115
     L['bootTop'] = 0.205; L['hipX'] = float(at(LEG, CROTCH_Y - 0.02, 'cx')); L['shX'] = SH_X; L['abd'] = ABD
     return {k: ([float(a) for a in v] if isinstance(v, list) else float(v)) for k, v in L.items()}
