@@ -92,7 +92,8 @@ PATTERNS.tunicG = `{
     // Off duty. uL0.x: which: 0 the Captain's henley (bone buttons down the placket); 2 a thermal (heathered, ribbed cuffs and hem, a coloured
     // thread at the left cuff); 3 a printed shirt open over a tee (the tee down the front between its edges and on the forearms below its
     // short sleeves); 4 a waistcoat over a shirt (the shirt in the V, below the hem, in the armholes and on the sleeves; buttons; uL0.y: a
-    // scarf at the collar); 5 a cable-knit cardigan over a collared shirt (the shirt in the V and its collar above); 6 a printed tee.
+    // scarf at the collar); 5 a cable-knit cardigan over a collared shirt (the shirt in the V and its collar above); 6 a printed tee; 7 a
+    // knitted sweater vest over a shirt (down to the hem, ribbed edges; uL0.y: a scarf).
     // uPat0: accent, uPat1: the shirt beneath, uPat2: the print (or buttons).
     float st = uL0.x, sl = vPart, fr = smoothstep(0.03, 0.05, b.z), sx = b.x >= 0.0 ? 1.0 : -1.0, gk = 1.0 + uGrain * (g - 0.5) * 2.0;
     float axX = shX + (shY - b.y) * 0.23, elbow = mix(shY, cuffY, 0.5);
@@ -150,10 +151,30 @@ PATTERNS.tunicG = `{
         for (int i = 0; i < 5; i++) { float by = vBot - 0.012 - 0.05 * float(i); diffuseColor.rgb = mix(diffuseColor.rgb, uPat2, fr * step(hem + 0.02, by) * (1.0 - smoothstep(0.0045, 0.006, length(vec2(b.x - 0.008, b.y - by))))); }
         diffuseColor.rgb *= 1.0 - 0.4 * seamAt(b.y - collar + 0.029, 0.004);
       }
-    } else {
+    } else if (st < 6.5) {
       float ctr, fl = flowerAt(uv, 36.0, ctr);
       diffuseColor.rgb = mix(diffuseColor.rgb, uPat2 * gk, fl); diffuseColor.rgb = mix(diffuseColor.rgb, uPat0 * gk, ctr * fl);
       if (sl < 0.5) diffuseColor.rgb *= 1.0 - 0.12 * smoothstep(nl - 0.02, nl - 0.012, b.y);
+    } else {
+      // a knitted sweater vest over a shirt: down to the top's own hem, a deep V at the neck and the armholes edged in rib, a ribbed hem band
+      float vTop = collar - 0.02, vBot = pit - 0.07, vw = 0.07 * clamp((b.y - vBot) / (vTop - vBot), 0.0, 1.0);
+      float inV = (1.0 - smoothstep(vw - 0.001, vw + 0.001, ax)) * step(vBot, b.y) * smoothstep(0.0, 0.03, b.z);
+      float hole = smoothstep(shX - 0.04, shX - 0.02, ax) * step(pit - 0.035, b.y);
+      float vest = sl < 0.5 ? (1.0 - inV) * (1.0 - hole) : 0.0;
+      vec3 knit = diffuseColor.rgb * (0.9 + 0.12 * (0.5 + 0.5 * sin(uv.x * 700.0)));
+      float vEdge = sl < 0.5 ? step(vBot - 0.01, b.y) * smoothstep(0.0, 0.03, b.z) * (1.0 - smoothstep(0.009, 0.011, ax - vw)) * step(vw - 0.001, ax) : 0.0;
+      float hEdge = sl < 0.5 ? step(pit - 0.045, b.y) * (1.0 - smoothstep(0.009, 0.011, (shX - 0.03) - ax)) * step(ax, shX - 0.03) : 0.0;
+      float band = sl < 0.5 ? max(max(vEdge, hEdge), 1.0 - smoothstep(hem + 0.045, hem + 0.05, b.y)) : 0.0;
+      knit *= 1.0 - 0.14 * band * (0.5 + 0.5 * sin((vEdge > 0.5 ? b.y : uv.x) * 1100.0));
+      diffuseColor.rgb = mix(under, knit, vest);
+      if (sl < 0.5) diffuseColor.rgb *= 1.0 - 0.4 * max(seamAt(ax - vw, 0.004) * step(vBot, b.y) * fr, seamAt(ax - shX + 0.03, 0.004) * step(pit - 0.035, b.y));
+      if (uL0.y > 0.5 && sl < 0.5) {
+        float sband = smoothstep(collar - 0.04, collar - 0.035, b.y);
+        float tail = fr * (1.0 - smoothstep(0.011, 0.015, abs(b.x - 0.014 - (collar - 0.04 - b.y) * 0.12))) * step(collar - 0.16, b.y) * (1.0 - step(collar - 0.04, b.y));
+        float knot = fr * (1.0 - smoothstep(0.012, 0.015, length(vec2(b.x - 0.012, b.y - collar + 0.045))));
+        diffuseColor.rgb = mix(diffuseColor.rgb, uPat0 * (0.9 + 0.2 * fn3(b * 180.0)), max(max(sband, tail), knot));
+        diffuseColor.rgb *= 1.0 - 0.35 * fr * max(seamAt(length(vec2(b.x - 0.012, b.y - collar + 0.045)) - 0.0135, 0.003), seamAt(b.y - collar + 0.0375, 0.003));
+      }
     }
     if (sl < 0.5) diffuseColor.rgb *= 1.0 - 0.22 * (1.0 - up) * (1.0 - smoothstep(hem + 0.009, hem + 0.012, b.y));
   }
@@ -936,7 +957,7 @@ const OUTFITS = {
 };
 // Off duty, a crew member wears their own (spec.off, from Crew: offduty), over the Captain's as the default; which top, legs and shoes, as the
 // patterns number them.
-const TOPS = { henley: 0, thermal: 2, open: 3, waistcoat: 4, cardigan: 5, tee: 6 }, LEGS = { canvas: 0, joggers: 1, chinos: 2, work: 3, combat: 4, pressed: 5 };
+const TOPS = { henley: 0, thermal: 2, open: 3, waistcoat: 4, cardigan: 5, tee: 6, sweatervest: 7 }, LEGS = { canvas: 0, joggers: 1, chinos: 2, work: 3, combat: 4, pressed: 5 };
 const SHOES = { boots: 0, soft: 1, deck: 2, work: 3, sneakers: 4, flats: 5, loafers: 6 };
 function outfitOf(spec) { const O = OUTFITS[spec.outfit] || OUTFITS.uniform; return spec.outfit === 'offduty' && spec.off ? Object.assign({}, O, spec.off) : O; }
 function dress(F, spec, S, BI, w, torsoW, legW, armW) {

@@ -1062,7 +1062,9 @@ def garments(sex, torso, leg, arm, body, label, rig):
     Tt = Cloth(torso, lambda y: 0.01, slope=0.7, below=CROTCH_Y + 0.13)
     leg_ease = lambda y: 0.009 + 0.011 * ss(0.33, 0.2, y)
     Lt = [Cloth(leg, leg_ease, sx) for sx in (1, -1)]
-    over = lambda f_in, gap, top_y: (lambda P: f_in(P) + gap - 0.08 * ss(top_y - 0.004, top_y + 0.016, P[:, 1]))
+    # (a layer kept clear of what's under it up to that garment's top edge, and above it easing in gradually, as cloth drapes over a waistband,
+    # rather than stepping in at once: a dip at the waistband otherwise)
+    over = lambda f_in, gap, top_y: (lambda P: f_in(P) + gap - 0.5 * np.maximum(P[:, 1] - (top_y - 0.004), 0.0))
     trousers_f = (lambda base, inner: lambda P: np.maximum(base(P), inner(P)))(lerp_crotch(Tt, legs_(Lt)), over(briefs_f, 0.008, L['briefTop']))
     under_top = over(trousers_f, 0.01, L['trouserTop'])
     tl = (-0.27, CROTCH_Y - 0.02, -0.2); th = (0.27, L['collar'] + 0.03, 0.24)

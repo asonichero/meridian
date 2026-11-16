@@ -52,7 +52,7 @@ test('defiance: each crew member has back-talk, a breaking line and a guarded af
 });
 
 test('off duty: each crew member has their own, practical aboard (soft shoes, never boots); the Captain keeps the henley', () => {
-  const TOPS = ['thermal', 'open', 'waistcoat', 'cardigan', 'tee'], LEGS = ['joggers', 'chinos', 'work', 'combat', 'pressed'], SHOES = ['soft', 'deck', 'work', 'sneakers', 'flats', 'loafers'];
+  const TOPS = ['thermal', 'open', 'waistcoat', 'sweatervest', 'cardigan', 'tee'], LEGS = ['joggers', 'chinos', 'work', 'combat', 'pressed'], SHOES = ['soft', 'deck', 'work', 'sneakers', 'flats', 'loafers'];
   for (const id of Crew.IDS) {
     const o = Crew.ROSTER[id].offduty; assert.ok(o, id);
     assert.ok(TOPS.includes(o.top) && LEGS.includes(o.legs) && SHOES.includes(o.shoes), id); assert.ok(['long', 'rolled'].includes(o.sleeves), id);

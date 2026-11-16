@@ -64,14 +64,15 @@ const ROSTER = {
 };
 // Off duty: each their own (the Captain keeps the henley, canvas trousers and boots). They never make landfall, so it's what they'd wear about
 // the ship: their own style, practical at home, soft indoor shoes over socks rather than boots. top: thermal | open (a printed shirt open over
-// a tee) | waistcoat (over a shirt: shirt, its colour; scarf, a scarf at the collar) | cardigan (over a collared shirt) | tee (printed);
+// a tee) | waistcoat (over a shirt: shirt, its colour; scarf, a scarf at the collar) | sweatervest (likewise, knitted, down to the hem) |
+// cardigan (over a collared shirt) | tee (printed);
 // sleeves: long, or rolled (pushed up); tunic: the top's main colour; shirt: what's under it; print, accent: its print's colours (or buttons,
 // stitching, a scarf, a thread); legs: joggers | chinos | work | combat | pressed, in trousers, with legAccent; shoes: soft | deck | work |
 // sneakers | flats | loafers, in shoe, on sole, with trim, over sock.
 const OFFDUTY = {
-  // Sefa: the simplest: base layers, comfort first: a fitted thermal and loose joggers in heathered grey, no prints, seams kept flat; the one
-  // colour a lilac thread at a cuff. Soft felt shoes.
-  comms: { top: 'thermal', sleeves: 'long', tunic: '#8f8e8c', accent: '#a48ad0', trousers: '#5e5e62', legs: 'joggers', legAccent: '#7a7a7e', shoes: 'soft', shoe: '#6c6c70', sole: '#46464a', sock: '#8f8e8c' },
+  // Sefa: the simplest: base layers, comfort first: a fitted thermal and loose joggers, no prints, seams kept flat, in soft purples and lilacs
+  // (a heathered lilac thermal, deep plum joggers, lilac socks); a violet thread at a cuff. Soft felt shoes.
+  comms: { top: 'thermal', sleeves: 'long', tunic: '#a28ec6', accent: '#5e3f8e', trousers: '#4e3d6b', legs: 'joggers', legAccent: '#6a5888', shoes: 'soft', shoe: '#5e5078', sole: '#3a3248', sock: '#bba9da' },
   // Rowan: expressive, short of quirky: a bold botanical print, a shirt worn open over a plain long-sleeved tee, olive chinos, canvas deck shoes.
   scientist: { top: 'open', sleeves: 'long', tunic: '#24575a', shirt: '#d9d2c2', print: '#e0d2a6', accent: '#7fa05c', trousers: '#66663f', legs: 'chinos', legAccent: '#4e4e30', shoes: 'deck', shoe: '#2e3a4a', sole: '#ebe5d8', trim: '#ebe5d8', sock: '#8a7a5a' },
   // Sam: quiet, steady, comfortable but with a style of their own: a dark henley, sleeves pushed up, under a worn leather waistcoat; heavy
@@ -80,9 +81,9 @@ const OFFDUTY = {
   // Kit: bright and cheerful: a sunny printed tee (small flowers), sleeves pushed up, faded red carpenter trousers with bellows pockets and a
   // hammer loop, canvas trainers.
   pilot: { top: 'tee', sleeves: 'rolled', tunic: '#e0b64a', print: '#f4efe2', accent: '#d0604a', trousers: '#9a4a3e', legs: 'combat', legAccent: '#6e3028', shoes: 'sneakers', shoe: '#ece9e0', sole: '#f6f4ee', trim: '#d0604a', sock: '#e0b64a' },
-  // Noor: well presented: a high-collared cream blouse, a tailored deep green waistcoat with gold buttons, a soft scarf at the collar, pressed
-  // tapered trousers, neat flats.
-  lifesupport: { top: 'waistcoat', sleeves: 'long', scarf: true, tunic: '#2f5a44', shirt: '#ece4d2', print: '#c8a45a', accent: '#c88a6a', trousers: '#2a2e3a', legs: 'pressed', legAccent: '#3a3f4e', shoes: 'flats', shoe: '#1e2a22', sole: '#141414', trim: '#c8a45a', sock: '#2a2e3a' },
+  // Noor: well presented: a high-collared cream blouse under a deep green knitted sweater vest (down to the blouse's hem, ribbed at the V,
+  // armholes and hem), a soft scarf at the collar, pressed tapered trousers, neat flats.
+  lifesupport: { top: 'sweatervest', sleeves: 'long', scarf: true, tunic: '#2f5a44', shirt: '#ece4d2', print: '#c8a45a', accent: '#c88a6a', trousers: '#2a2e3a', legs: 'pressed', legAccent: '#3a3f4e', shoes: 'flats', shoe: '#1e2a22', sole: '#141414', trim: '#c8a45a', sock: '#2a2e3a' },
   // Morgan: straight-laced but warm: a crisp collared shirt under a mustard cable-knit cardigan, pressed grey slacks, polished loafers.
   medic: { top: 'cardigan', sleeves: 'long', tunic: '#b8892e', shirt: '#eeeae2', print: '#4a3a2a', accent: '#8a6420', trousers: '#4e4f55', legs: 'pressed', legAccent: '#5e5f66', shoes: 'loafers', shoe: '#5a3424', sole: '#2a1a14', trim: '#3a2218', sock: '#3a3a40' },
 };
