@@ -41,8 +41,27 @@ const rugTex = canvasTex(256, 256, (c, w, h) => {
 });
 const drapeTex = canvasTex(128, 256, (c, w, h) => { const g = c.createLinearGradient(0, 0, w, 0); for (let i = 0; i <= 8; i++) g.addColorStop(i / 8, i % 2 ? '#6a3a4a' : '#7e4a58'); c.fillStyle = g; c.fillRect(0, 0, w, h); c.fillStyle = '#c89a52'; c.fillRect(0, h - 14, w, 5); speckle(c, w, h, 300, '#000', 0.1, 2); });
 
+// Several meshes made one (each in the group's frame), by material: what the low-CPU mode draws in place of a wall's many panels.
+function merged(meshes) {
+  const byM = new Map(); for (const m of meshes) { if (!byM.has(m.material)) byM.set(m.material, []); byM.get(m.material).push(m); }
+  const out = [];
+  for (const [mat, ms] of byM) {
+    const pos = [], nrm = [], uv = [], idx = []; let base = 0;
+    for (const m of ms) {
+      m.updateMatrix(); const g = m.geometry.clone().applyMatrix4(m.matrix), P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv;
+      for (let i = 0; i < P.count; i++) { pos.push(P.getX(i), P.getY(i), P.getZ(i)); nrm.push(N.getX(i), N.getY(i), N.getZ(i)); if (U) uv.push(U.getX(i), U.getY(i)); else uv.push(0, 0); }
+      const I = g.index ? g.index.array : Array.from({ length: P.count }, (_, i) => i); for (const i of I) idx.push(base + i); base += P.count;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    const mm = new THREE.Mesh(g, mat); mm.receiveShadow = true; out.push(mm);
+  }
+  return out;
+}
+
 function build(scene) {
   const G = new THREE.Group(); scene.add(G);
+  const detail = [], walls = [];      // (for the low-CPU mode: the small things it leaves out, and each wall's panels, which it draws merged)
   const std = (o) => F.paint(new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.7, metalness: 0.25 }, o)), { grain: 0.05, scale: 8 });
   const box = (w, h, d, m, x, y, z, o) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); if (o && o.ry) b.rotation.y = o.ry; b.castShadow = !(o && o.noCast); b.receiveShadow = true; G.add(b); return b; };
   const cyl = (r0, r1, h, m, x, y, z, rot, seg) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg || 16), m); c.position.set(x, y, z); if (rot) c.rotation.set(rot[0], rot[1], rot[2]); c.castShadow = true; c.receiveShadow = true; G.add(c); return c; };
@@ -59,12 +78,13 @@ function build(scene) {
   const deck = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), std({ map: gratingTex, roughness: 0.55, metalness: 0.6 })); deck.rotation.x = -Math.PI / 2; deck.receiveShadow = true; G.add(deck);
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), steelDark); ceil.rotation.x = Math.PI / 2; ceil.position.y = HT; G.add(ceil);
   const wall = (len, x, z, ry, skip) => {
-    const n = Math.round(len / 0.9), pw = len / n;
+    const n = Math.round(len / 0.9), pw = len / n, panels = []; walls.push(panels);
     for (let i = 0; i < n; i++) {
       if (skip && skip(i)) continue;
       const off = -len / 2 + pw * (i + 0.5), px = x + Math.cos(ry) * off, pz = z - Math.sin(ry) * off;
       const up = new THREE.Mesh(new THREE.PlaneGeometry(pw - 0.01, HT - 0.62), i % 3 === 1 ? teal : steel); up.position.set(px, 0.62 + (HT - 0.62) / 2, pz); up.rotation.y = ry; up.receiveShadow = true; G.add(up);
       const lo = new THREE.Mesh(new THREE.PlaneGeometry(pw - 0.01, 0.6), steelDark); lo.position.set(px, 0.3, pz); lo.rotation.y = ry; lo.receiveShadow = true; G.add(lo);
+      panels.push(up, lo);
     }
     // a frame rib between every other panel
   };
@@ -81,8 +101,8 @@ function build(scene) {
     const collar = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.1, 16, 48), steelDark); collar.castShadow = true; hg.add(collar);
     const door = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.66, 0.08, 48), std({ map: panelTex('#5a5246', [1, 1]), roughness: 0.6, metalness: 0.4 })); door.rotation.x = Math.PI / 2; door.position.z = 0.02; hg.add(door);
     const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.022, 10, 32), pipeY); wheel.position.z = 0.1; hg.add(wheel);
-    for (let i = 0; i < 3; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.03, 0.03), pipeY); sp.rotation.z = i * Math.PI / 3; sp.position.z = 0.1; hg.add(sp); }
-    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.05, 8), pipeM); bolt.rotation.x = Math.PI / 2; bolt.position.set(Math.cos(a) * 0.72, Math.sin(a) * 0.72, 0.09); hg.add(bolt); }
+    for (let i = 0; i < 3; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.03, 0.03), pipeY); sp.rotation.z = i * Math.PI / 3; sp.position.z = 0.1; hg.add(sp); detail.push(sp); }
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.05, 8), pipeM); bolt.rotation.x = Math.PI / 2; detail.push(bolt); bolt.position.set(Math.cos(a) * 0.72, Math.sin(a) * 0.72, 0.09); hg.add(bolt); }
     const strip = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.02), glowC); strip.position.set(0, 0.95, 0.06); hg.add(strip);
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), glowR); lamp.rotation.x = Math.PI / 2; lamp.position.set(0, 1.1, 0.03); hg.add(lamp);
     const red = new THREE.PointLight(srgb('#ff3a22'), 2.2, 3.0, 2); red.position.set(W - 0.25, 2.2, 0); G.add(red);
@@ -118,22 +138,22 @@ function build(scene) {
   {
     const pot = cyl(0.08, 0.06, 0.13, std({ color: srgb('#8a4a2e'), roughness: 0.85, metalness: 0 }), -W + 0.3, 1.97, -D + 2.0);
     const leafM = std({ color: srgb('#4a7a3a'), roughness: 0.7, metalness: 0 });
-    for (let i = 0; i < 9; i++) { const lf = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), leafM); const a = i * 2.4; lf.scale.set(0.02, 0.11, 0.05); lf.position.set(-W + 0.3 + Math.cos(a) * 0.05, 2.1, -D + 2.0 + Math.sin(a) * 0.05); lf.rotation.set(Math.sin(a) * 0.6, a, Math.cos(a) * 0.6); lf.castShadow = true; G.add(lf); }
-    cyl(0.04, 0.035, 0.09, std({ color: srgb('#d8d0c0'), roughness: 0.4, metalness: 0 }), -W + 0.33, 1.945, -D + 1.42);
+    for (let i = 0; i < 9; i++) { const lf = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), leafM); detail.push(lf); const a = i * 2.4; lf.scale.set(0.02, 0.11, 0.05); lf.position.set(-W + 0.3 + Math.cos(a) * 0.05, 2.1, -D + 2.0 + Math.sin(a) * 0.05); lf.rotation.set(Math.sin(a) * 0.6, a, Math.cos(a) * 0.6); lf.castShadow = true; G.add(lf); }
+    detail.push(cyl(0.04, 0.035, 0.09, std({ color: srgb('#d8d0c0'), roughness: 0.4, metalness: 0 }), -W + 0.33, 1.945, -D + 1.42));
   }
   // Conduit: runs along the ceiling and down the walls
   const run = (m, r, a, b) => { const v = new V3().subVectors(b, a), c = cyl(r, r, v.length(), m, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, null, 10); c.quaternion.setFromUnitVectors(new V3(0, 1, 0), v.normalize()); return c; };
   run(pipeM, 0.05, new V3(-W, 2.42, -D + 0.25), new V3(W, 2.42, -D + 0.25)); run(pipeY, 0.035, new V3(-W, 2.3, -D + 0.18), new V3(W, 2.3, -D + 0.18));
   run(pipeR, 0.04, new V3(W - 0.18, 2.42, -D), new V3(W - 0.18, 2.42, D)); run(pipeM, 0.03, new V3(W - 0.12, 0.2, -D), new V3(W - 0.12, 0.2, D));
   run(pipeY, 0.035, new V3(-W + 0.15, 2.3, -D + 0.18), new V3(-W + 0.15, 2.3, D - 0.3)); run(pipeM, 0.045, new V3(-W + 0.12, 0.1, D - 0.3), new V3(-W + 0.12, 2.42, D - 0.3));
-  for (let x = -W + 0.5; x < W; x += 0.9) { box(0.04, 0.2, 0.14, steelDark, x, 2.38, -D + 0.2); }
+  for (let x = -W + 0.5; x < W; x += 0.9) { detail.push(box(0.04, 0.2, 0.14, steelDark, x, 2.38, -D + 0.2)); }
 
   // The rail station (west wall, south half): a padded panel with two grab rails, the place for standing correction.
   const railZ = 0.95, railY = 1.12;
   box(0.06, 1.3, 1.3, std({ color: srgb('#3a2c26'), roughness: 0.9, metalness: 0 }), -W + 0.04, 1.05, railZ);
   for (const dy of [0, 0.32]) {
     run(pipeY, 0.017, new V3(-W + 0.12, railY + dy, railZ - 0.55), new V3(-W + 0.12, railY + dy, railZ + 0.55));
-    for (const dz of [-0.5, 0.5]) run(pipeM, 0.012, new V3(-W + 0.04, railY + dy, railZ + dz), new V3(-W + 0.12, railY + dy, railZ + dz));
+    for (const dz of [-0.5, 0.5]) detail.push(run(pipeM, 0.012, new V3(-W + 0.04, railY + dy, railZ + dz), new V3(-W + 0.12, railY + dy, railZ + dz)));
   }
   box(0.02, 0.03, 0.8, glowC, -W + 0.08, 1.9, railZ, { noCast: true });
 
@@ -175,8 +195,26 @@ function build(scene) {
     watch: [{ at: new V3(1.55, 0, -1.2), yaw: -2.4 }, { at: new V3(-0.9, 0, -1.35), yaw: 2.6 }, { at: new V3(1.85, 0, 0.9), yaw: -1.9 }, { at: new V3(0.6, 0, -1.55), yaw: 3.0 }],
     corner: { at: new V3(W - 0.34, 0, D - 0.34), yaw: Math.PI / 4 },
   };
+  // ── Low-CPU mode: the figures are drawn as ever; the room gives way. Its own shadows go (only the figures cast them, and only from the
+  // pendant, on a smaller map), the three small coloured lamps go (the sky fill a little up to make up), the small things (bolts, spokes,
+  // brackets, the plant's leaves, the mug) aren't drawn, and each wall is drawn as a few meshes rather than a panel at a time. ──
+  const wallsMerged = walls.map(ps => { const ms = merged(ps); for (const m of ms) { m.visible = false; G.add(m); } return ms; });
+  const meshes = []; G.traverse(o => { if (o.isMesh) meshes.push(o); });
+  const cast0 = new Map(meshes.map(m => [m, m.castShadow]));
+  let low = false;
+  function setLow(on) {
+    low = !!on;
+    for (const m of meshes) m.castShadow = low ? false : cast0.get(m);
+    for (const d of detail) d.visible = !low;
+    walls.forEach((ps, i) => { for (const p of ps) p.visible = !low; for (const m of wallsMerged[i]) m.visible = low; });
+    for (const l of [G.userData.hatch.userData.red, rim, alcove]) l.visible = !low;
+    hemi.intensity = low ? 1.15 : 0.9; rim2.intensity = low ? 4.2 : 3.5;
+    wallKey.castShadow = !low;
+    const sz = low ? 1024 : 2048;
+    if (key.shadow.mapSize.x !== sz) { key.shadow.mapSize.set(sz, sz); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  }
   let t = 0;
-  return { group: G, spots, key, tick(dt) { t += dt; glowR.emissiveIntensity = 3 + 1.5 * Math.sin(t * 2.2); G.userData.hatch.userData.red.intensity = 1.6 + 0.8 * Math.sin(t * 2.2); } };
+  return { group: G, spots, key, setLow, get low() { return low; }, tick(dt) { t += dt; glowR.emissiveIntensity = 3 + 1.5 * Math.sin(t * 2.2); G.userData.hatch.userData.red.intensity = 1.6 + 0.8 * Math.sin(t * 2.2); } };
 }
 
 root.SuitBay = { build };

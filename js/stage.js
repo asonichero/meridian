@@ -1,7 +1,7 @@
 // Project Meridian — the stage: a renderer drawing into a high-range buffer, soft bloom on the lights, then one grading pass (filmic tone curve,
 // a moody split tone (cool steel shadows, warm amber highlights), a vignette and a little film grain). An orbiting camera that glides between shots.
 //
-//   const st = Stage.create(view, { fov });  st.scene.add(…);  st.start(dt => …);  st.go(pos, look, ms)
+//   const st = Stage.create(view, { fov, low });  st.scene.add(…);  st.start(dt => …);  st.go(pos, look, ms);  st.setLow(on)
 (function (root) {
 'use strict';
 const THREE = root.THREE;
@@ -87,7 +87,18 @@ function create(view, opts) {
     const loop = now => { if (!running) return; frame(now, each); requestAnimationFrame(loop); };
     requestAnimationFrame(loop);
   }
-  const api = { renderer, scene, camera, controls, composer, bloom, grade, resize, setInsets, start, go, draw, step: (ms, each) => { last = performance.now() - ms; frame(performance.now(), each); }, get moving() { return !!tween; } };
+  // Low-CPU mode: the picture at one pixel per pixel, no bloom, no multisampling (the grade stays). What's drawn is the bay's business
+  // (SuitBay's setLow); the figures and their animation are untouched.
+  let low = false;
+  function setLow(on) {
+    low = !!on;
+    renderer.setPixelRatio(low ? 1 : Math.min(1.5, root.devicePixelRatio || 1));
+    bloom.enabled = !low;
+    for (const t of [composer.renderTarget1, composer.renderTarget2]) if (t && t.samples !== undefined) { t.samples = low ? 0 : 4; t.dispose(); }
+    resize();
+  }
+  if (opts.low) setLow(true);
+  const api = { renderer, scene, camera, controls, composer, bloom, grade, resize, setInsets, setLow, get low() { return low; }, start, go, draw, step: (ms, each) => { last = performance.now() - ms; frame(performance.now(), each); }, get moving() { return !!tween; } };
   return api;
 }
 

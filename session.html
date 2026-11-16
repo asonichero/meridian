@@ -53,6 +53,7 @@ button:hover { border-color: #56687a; } button.on { background: #4a3a22; border-
 #summary { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 18px 22px; display: none; min-width: min(360px, calc(100% - 32px)); max-width: calc(100% - 32px); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; z-index: 6; }
 #summary table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; } #summary td { padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
 kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
+small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.4; margin-top: 6px; }
 .vols { display: grid; grid-template-columns: auto 1fr 40px; gap: 6px 10px; align-items: center; font-size: 13px; } .vols input { width: 100%; accent-color: var(--amber); } .vols .pct { color: var(--dim); font-size: 12px; text-align: right; }
 /* Phones and small windows: the HUD's parts placed on their own. The set-up a sheet over the whole view (☰), the crew member's name and word
    compact at the top. Held upright, the controls take the lower third (on the same grid as above), the dialogue just above them and the cameras a
@@ -115,6 +116,9 @@ kbd { font: 11px ui-monospace, monospace; color: var(--dim); }
   <div class="row seg" id="cbuild" style="margin-top:6px"><button data-v="lean">Lean</button><button data-v="average" class="on">Average</button><button data-v="heavy">Heavy</button></div>
   <h2>Sound</h2>
   <div class="vols" id="vols"></div>
+  <h2>Graphics</h2>
+  <div class="row seg" id="gfx"><button data-v="full" class="on">Full</button><button data-v="low">Low-CPU</button></div>
+  <small class="note">Low-CPU keeps the figures and their animation at full quality and gives way in the room: fewer lights and shadows, no bloom, less detail.</small>
   <div class="row" style="margin-top:14px"><button id="begin" class="on">Begin</button> <a href="figures.html" style="color:var(--dim);font-size:12px">the crew line-up</a></div>
 </div>
 <button id="hide">☰</button>
@@ -193,7 +197,10 @@ drawCrew(); drawCaptain();
 $('hide').onclick = () => $('setup').classList.toggle('closed');
 
 // ── The stage ──
-const stage = Stage.create($('view'), { keep: !!q.get('still') }), bay = SuitBay.build(stage.scene);
+if (q.get('low')) cfg.graphics = q.get('low') === '0' ? 'full' : 'low';
+const stage = Stage.create($('view'), { keep: !!q.get('still'), low: cfg.graphics === 'low' }), bay = SuitBay.build(stage.scene);
+bay.setLow(cfg.graphics === 'low');
+seg('gfx', cfg.graphics || 'full', v => { cfg.graphics = v; save(); stage.setLow(v === 'low'); bay.setLow(v === 'low'); });
 let ses = null;
 function begin() {
   if (!cfg.order.length) { alert('Choose at least one crew member to be corrected.'); return; }
