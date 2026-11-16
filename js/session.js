@@ -801,8 +801,10 @@ function create(stage, bay, opts) {
   // camera doesn't draw, while still casting its shadow. What they're on (the bench, the rug, the deck) and the room's shell stay. ──
   const HIDDEN = 1;
   bay.group.traverse(o => { if (o.isLight && o.shadow) o.shadow.camera.layers.enable(HIDDEN); });
-  const fittings = bay.group.children.filter(o => !o.isLight).map(o => ({ o, box: new THREE.Box3().setFromObject(o) }))
-    .filter(({ box }) => !box.isEmpty() && box.max.y > 0.62 && [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z].filter(d => d > 2.5).length < 2);
+  // (each with its box, the wall it's on, and whether it's one of the big planes, the room's shell, which nothing can be behind)
+  const fittings = bay.group.children.filter(o => !o.isLight).map(o => { const box = new THREE.Box3().setFromObject(o); return { o, box, side: bay.sideOf ? bay.sideOf.get(o) : null,
+    inWay: box.max.y > 0.62 && [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z].filter(d => d > 2.5).length < 2 }; })
+    .filter(f => !f.box.isEmpty() && (f.side || f.inWay));
   const hiddenNow = new Map();
   function setHidden(o, h) {
     if (hiddenNow.get(o) === h) return; hiddenNow.set(o, h);
@@ -815,7 +817,9 @@ function create(stage, bay, opts) {
     if (st.phase === 'after' && afterWith) add(afterWith.f, ['hips', 'chest', 'head']); else if (cur && st.phase === 'turn') add(cur.f, ['hips', 'chest', 'head', 'shinL']);
     if (focus.length) add(captain, ['hips', 'chest', 'head']);
     const blocks = box => focus.length && (box.containsPoint(cam) || focus.some(t => { const d = t.distanceTo(cam); _ray.set(cam, t.clone().sub(cam).divideScalar(d)); return _ray.intersectBox(box, _hit) && _hit.distanceTo(cam) < d - 0.05; }));
-    for (const f of fittings) setHidden(f.o, blocks(f.box));
+    // (a whole wall goes, with all that's on it, when the camera comes through it; anything else, if it's in the way)
+    const sides = bay.sidesAt ? bay.sidesAt(cam) : new Set();
+    for (const f of fittings) setHidden(f.o, (f.side && sides.has(f.side)) || (f.inWay && blocks(f.box)));
     // (people: a box round where their bones are now)
     for (const P of people) {
       if (P === cur || (st.phase === 'after' && P === afterWith)) { setHidden(P.f.root, false); continue; }

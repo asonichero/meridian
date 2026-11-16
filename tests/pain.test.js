@@ -33,13 +33,13 @@ test('the bar is high: crossing it for a moment is not enough', () => {
   assert.equal(p.tooHarsh, true);
 });
 
-test('past the edge, distress grows with the pain’s logarithm: too harsh takes three times the edge’s pain', () => {
+test('past the edge, distress follows the pain’s logarithm: too harsh takes over three times the edge’s pain', () => {
   assert.equal(perceive(0.5), 0.5); assert.equal(perceive(PAIN.EDGE), PAIN.EDGE);
   assert.ok(Math.abs(perceive(PAIN.HARSH_RAW) - PAIN.TOO_HARSH) < 1e-9 && PAIN.HARSH_RAW >= 3);
   for (const d of [0.3, 1, 1.2, 1.5, 1.8, 2.0]) assert.ok(Math.abs(perceive(rawAt(d)) - d) < 1e-9);
-  // (each step past the edge takes more pain than the last)
-  assert.ok(rawAt(1.6) - rawAt(1.4) > rawAt(1.4) - rawAt(1.2) && rawAt(1.4) - rawAt(1.2) > rawAt(1.2) - rawAt(1.0));
-  const p = createPain(); p.ache = 2 * p.capacity(); assert.ok(p.distress() > 1.5 && p.distress() < 1.75, 'twice the edge’s pain: well past it, short of crying steadily');
+  // (the stretch past the edge takes far more pain than the way to it, and distress keeps rising with it)
+  assert.ok(rawAt(PAIN.TOO_HARSH) - rawAt(PAIN.EDGE) > 2 * PAIN.EDGE); assert.ok(perceive(1.5) < perceive(2) && perceive(2) < perceive(3));
+  const p = createPain(); p.ache = 2 * p.capacity(); assert.ok(p.distress() > 1.3 && p.distress() < 1.45, 'twice the edge’s pain: well past it, far short of crying steadily');
 });
 
 test('soothing takes the sting down faster than waiting', () => {

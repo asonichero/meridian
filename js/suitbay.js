@@ -2,7 +2,7 @@
 // steel panels, exposed conduit, a pressure hatch, deck grating) with the crew's warm pockets in it (a synthetic-wood bench top, a drape over the suit
 // alcove, an amber pendant, a rug, a plant). Painted in code.
 //
-//   const bay = SuitBay.build(scene) → { group, spots: { bench, wall, watch: [...], corner }, tick(dt) }
+//   const bay = SuitBay.build(scene) → { group, spots: { bench, wall, watch: [...], corner }, sideOf, sidesAt(p), tick(dt) }
 //   spots.bench: where the bench is (the corrector sits facing +z there); spots.wall: where the subject stands, facing the rail; watch: places for witnesses;
 //   corner: where someone waits between turns, facing the wall.
 (function (root) {
@@ -213,8 +213,22 @@ function build(scene) {
     const sz = low ? 1024 : 2048;
     if (key.shadow.mapSize.x !== sz) { key.shadow.mapSize.set(sz, sz); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
   }
+  // ── Which wall (or the ceiling) each thing belongs to: the nearest wall within reach of its middle, else the ceiling if it hangs from it. When
+  // the camera comes through a wall (or is in among what's on it), that whole side is hidden: the wall, its ribs, pipes, lockers, alcoves. ──
+  const REACH = 0.75, sideOf = new Map(), _bx = new THREE.Box3(), _c = new V3();
+  for (const o of G.children) {
+    if (o.isLight || o === deck) continue;
+    _bx.setFromObject(o); if (_bx.isEmpty()) continue; _bx.getCenter(_c);
+    const d = { N: _c.z + D, S: D - _c.z, W: _c.x + W, E: W - _c.x }; let best = null;
+    for (const k in d) if (d[k] < REACH && (!best || d[k] < d[best])) best = k;
+    if (!best && HT - _c.y < REACH) best = 'C';
+    if (best) sideOf.set(o, best);
+  }
+  // (the sides the camera's in or beyond: within a little of a wall, or up by the ceiling)
+  const IN = 0.45;
+  const sidesAt = p => { const s = new Set(); if (p.z < -D + IN) s.add('N'); if (p.z > D - IN) s.add('S'); if (p.x < -W + IN) s.add('W'); if (p.x > W - IN) s.add('E'); if (p.y > HT - 0.3) s.add('C'); return s; };
   let t = 0;
-  return { group: G, spots, key, setLow, get low() { return low; }, tick(dt) { t += dt; glowR.emissiveIntensity = 3 + 1.5 * Math.sin(t * 2.2); G.userData.hatch.userData.red.intensity = 1.6 + 0.8 * Math.sin(t * 2.2); } };
+  return { group: G, spots, key, setLow, sideOf, sidesAt, get low() { return low; }, tick(dt) { t += dt; glowR.emissiveIntensity = 3 + 1.5 * Math.sin(t * 2.2); G.userData.hatch.userData.red.intensity = 1.6 + 0.8 * Math.sin(t * 2.2); } };
 }
 
 root.SuitBay = { build };

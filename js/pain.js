@@ -25,17 +25,18 @@ const PAIN = {
   // a moment (HARSH_HOLD seconds) or goes on past it to TOO_HARSH × HARSH_SPIKE (2.05). Since the player is the one who disciplines, this is
   // what the crew member's safe word is called on (js/session.js).
   EDGE: 1, CRYING: 1.7, STILL: 1.8, TOO_HARSH: 2.0, HARSH_HOLD: 1.2, HARSH_SPIKE: 1.025,
-  // Up to the edge, distress is the pain they hold against what they can take. Past it, it grows with the pain's logarithm: each step further
-  // takes more than the last, so the stretch from the edge to too harsh is longer than the way to the edge (too harsh at HARSH_RAW times the
-  // edge's pain, rather than twice it). A correction can settle well past the edge for a while, the fight going out of them, without tipping.
-  HARSH_RAW: 3,
+  // Up to the edge, distress is the pain they hold against what they can take. Past it, it follows the pain's logarithm (L = ln(pain / the
+  // edge's)): slowly at first, then faster (EDGE + LOG_B·L + a·L², a set so too harsh comes at HARSH_RAW times the edge's pain), so the
+  // stretch from the edge to too harsh takes far more than the way to it. Firm and steady (strength 1.5, pace 1.5, bare) reaches the edge in
+  // about a minute and 1.4 two minutes after, levelling off short of steady crying; only a faster pace takes them on to stillness and too harsh.
+  HARSH_RAW: 3.44, LOG_B: 0.15,
   BANDS: [[0.3, 'composed'], [0.6, 'flinching'], [0.9, 'struggling'], [1, 'close to the edge of resistance'], [2.0, 'past the edge of resistance: most receptive'], [Infinity, 'too harsh']],
 };
 
 // Distress from the pain held (as a share of capacity), and back.
-const LOGK = () => (PAIN.TOO_HARSH - PAIN.EDGE) / Math.log(PAIN.HARSH_RAW / PAIN.EDGE);
-const perceive = x => (x <= PAIN.EDGE ? x : PAIN.EDGE + LOGK() * Math.log(x / PAIN.EDGE));
-const rawAt = d => (d <= PAIN.EDGE ? d : PAIN.EDGE * Math.exp((d - PAIN.EDGE) / LOGK()));
+const LOGA = () => { const L = Math.log(PAIN.HARSH_RAW / PAIN.EDGE); return (PAIN.TOO_HARSH - PAIN.EDGE - PAIN.LOG_B * L) / (L * L); };
+const perceive = x => { if (x <= PAIN.EDGE) return x; const L = Math.log(x / PAIN.EDGE); return PAIN.EDGE + PAIN.LOG_B * L + LOGA() * L * L; };
+const rawAt = d => { if (d <= PAIN.EDGE) return d; const a = LOGA(), b = PAIN.LOG_B; return PAIN.EDGE * Math.exp((-b + Math.sqrt(b * b + 4 * a * (d - PAIN.EDGE))) / (2 * a)); };
 
 function createPain(stats = {}) {
   const st = { tolerance: 0.5, resilience: 0.5, ...stats };
