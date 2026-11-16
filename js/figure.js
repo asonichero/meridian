@@ -1036,10 +1036,12 @@ function buildHair(F, spec, S, H, Hs, k) {
 }
 
 // ── Expressions (redlessons'): the mouth's shapes and each expression's brows, lids, gaze, mouth, blush and tears ──
-const MOUTHS = { flat: { mw: 0.42, mc: 0.05, mo: 0, mt: 0 }, smile: { mw: 0.6, mc: 0.6, mo: 0.06, mt: 0.6 }, frown: { mw: 0.48, mc: -0.5, mo: 0, mt: 0 },
+const MOUTHS = { warm: { mw: 0.46, mc: 0.22, mo: 0, mt: 0 }, flat: { mw: 0.42, mc: 0.05, mo: 0, mt: 0 }, smile: { mw: 0.6, mc: 0.6, mo: 0.06, mt: 0.6 }, frown: { mw: 0.48, mc: -0.5, mo: 0, mt: 0 },
   open: { mw: 0.48, mc: -0.15, mo: 0.8, mt: 0.15 }, gritted: { mw: 0.68, mc: -0.8, mo: 0.3, mt: 1 }, pout: { mw: 0.26, mc: -0.2, mo: 0.1, mt: 0 },
   wail: { mw: 0.6, mc: -0.95, mo: 0.42, mt: 0.25 }, sad: { mw: 0.34, mc: -0.7, mo: 0.06, mt: 0 }, concern: { mw: 0.36, mc: -0.28, mo: 0, mt: 0 }, soft: { mw: 0.44, mc: 0.36, mo: 0, mt: 0 } };
 const EXPRS = {
+  // (the Captain in aftercare: care, warmth and authority in balance; the eyes steady, the brow a touch level and low, the mouth kind)
+  caring: { brow: -0.1, browY: -0.03, open: 0.86, mouth: 'warm', blush: 0, ms: 0.95 },
   calm: { brow: 0, browY: 0, open: 0.95, mouth: 'flat', blush: 0, ms: 1 }, smile: { brow: 0.1, browY: 0.08, open: 0.72, mouth: 'smile', blush: 0.35, ms: 1.3 },
   shy: { brow: 0.28, browY: 0.04, open: 0.55, look: -1, mouth: 'concern', blush: 1, ms: 0.8 }, cheeky: { brow: -0.22, browY: 0.12, open: 0.62, look: 1, mouth: 'smile', blush: 0.1, ms: 1.2 },
   defiant: { brow: -0.3, browY: 0.04, open: 0.7, look: 0.5, mouth: 'flat', blush: 0.1, ms: 0.95 },
