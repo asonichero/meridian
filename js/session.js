@@ -36,12 +36,36 @@ function create(stage, bay, opts) {
   const addPerson = (p, role) => {
     const f = Fg.make(C.figureSpec(p.id, p.sex, p.outfit)); scene.add(f.root);
     const r = C.ROSTER[p.id], pain = S.createPain(r.pain || {});
-    const P = { id: p.id, sex: p.sex, f, role, pain, r, done: false, outcome: null, hits: 0, peak: 0, marks: 0, said: {}, bandSeen: 0, pitch: C.pitch(p.id, p.sex), spot: null };
+    const P = { id: p.id, sex: p.sex, f, role, pain, r, done: false, outcome: null, hits: 0, peak: 0, marks: 0, said: {}, bandSeen: 0, pitch: C.pitch(p.id, p.sex), spot: null, resp: 0 };
     people.push(P); return P;
   };
   const queue = (opts.queue || []).map(p => addPerson(p, 'subject'));
   const witnesses = (opts.witnesses || []).map(p => addPerson(p, 'witness'));
   let cur = null;      // the one across the lap / at the rail now
+
+  // ── The body's response (purely visual for now): blood to the sex as a correction goes on. It builds with each smack (less through cloth),
+  // with the warmth of the marks and with soothing, and fades over minutes once it's over. How far it may go: partway in these corrections
+  // (opts.desire, for later ones where desire is present, lets it go all the way). Each crew member has their own scale (Crew: body.response;
+  // a bodily response, not a measure of desire). The Captain's builds more slowly, from giving it; he keeps most of it in check, and what shows
+  // grows with the affection between him and the one in his care, given and returned (Crew: dynamic.bond), and he colours a little. ──
+  const RESP = { hit: 0.045, soothe: 0.03, warm: 0.012, tau: 150, captain: 0.6, cap: opts.desire ? 1 : 0.5 };
+  let capResp = 0;
+  const respond = (P, amt) => {
+    const k = P.r.body && P.r.body.response != null ? P.r.body.response : 1;
+    P.resp = Math.min(RESP.cap, P.resp + amt * k * Math.max(0, 1 - P.resp / RESP.cap));
+    capResp = Math.min(RESP.cap, capResp + amt * RESP.captain * Math.max(0, 1 - capResp / RESP.cap));
+  };
+  function responses(dt) {
+    if (cur && st.phase === 'turn') {
+      let warm = 0; for (const a of AREAS) for (const sd of ['L', 'R']) warm += cur.f.spot[a + sd].mark / (AREAS.length * 2);
+      respond(cur, (RESP.warm * warm + (st.soothe && !st.swing ? RESP.soothe : 0)) * dt);
+    }
+    const fade = Math.exp(-dt / RESP.tau);
+    for (const P of people) { P.resp *= fade; P.f.setResponse(P.resp); }
+    capResp *= fade;
+    const W = cur || afterWith, bond = W && W.r.dynamic && W.r.dynamic.bond != null ? W.r.dynamic.bond : 0;
+    captain.setResponse(capResp * (0.3 + 0.7 * bond), { blush: Math.min(0.45, capResp * 0.7) });
+  }
 
   // ── Springs for the reactions: each driven toward a target and kicked by impulses as smacks land, so they snap and settle ──
   const J = { kick: 0, side: 'R', flick: 0, stamp: 0 };
@@ -278,6 +302,7 @@ function create(stage, bay, opts) {
     const P = cur, key = spotOf(sw.side, st.area), tender = P.f.spot[key].mark;
     const hit = P.pain.hit({ implement: 'hand', strength: st.strength, speed: st.pace, raised: sw.waited, tender, cushion: cushion() });
     P.f.mark(key, 0.032 * st.strength * (1 - 0.6 * cushion())); for (const a of AREAS) if (a !== st.area) P.f.mark(a + sw.side, 0.005 * st.strength);
+    respond(P, RESP.hit * st.strength * (1 - 0.5 * cushion()));
     P.hits++; P.peak = Math.max(P.peak, P.pain.distress());
     J.side = sw.side; J.flick = 0.45;
     const r = hit.reaction;
@@ -410,6 +435,7 @@ function create(stage, bay, opts) {
       captain.setExpr('soft');
     } else { stand(captain, bench.at.clone().add(new V3(0.3, 0, 0.6)), 0, {}); }
     poseOthers(st.t);
+    responses(dt);
     captain.tick(dt); for (const P of people) P.f.tick(dt);
     occlude();
   }
@@ -442,7 +468,7 @@ function create(stage, bay, opts) {
   }
 
   const api = {
-    st, captain, people, queue, witnesses, BANDS, AREAS, CAMS, bench,
+    st, captain, people, queue, witnesses, BANDS, AREAS, CAMS, bench, RESP, get captainResponse() { return capResp; },
     get current() { return cur; },
     on: fn => listeners.push(fn),
     start() { beginTurn(0); camera(0, 0); },

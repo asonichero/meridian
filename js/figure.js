@@ -115,7 +115,7 @@ function paint(m, o) {
   o = o || {};
   const U = { uRim: { value: srgb(o.rim || '#2a3440').multiplyScalar(o.rimK == null ? 1 : o.rimK) }, uGrain: { value: o.grain == null ? 0.03 : o.grain }, uGrainScale: { value: o.scale || 60 }, uHide: { value: 0 },
     uMarks: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, -9, 0, 0)) }, uMarkCol: { value: srgb(o.markCol || '#b8323a') },
-    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() }, uNape: { value: new THREE.Vector4() } };
+    uPat0: { value: new THREE.Color(1, 1, 1) }, uPat1: { value: new THREE.Color(1, 1, 1) }, uPat2: { value: new THREE.Color(1, 1, 1) }, uParam: { value: new THREE.Vector4() }, uL0: { value: new THREE.Vector4() }, uL1: { value: new THREE.Vector4() }, uNape: { value: new THREE.Vector4() }, uFlush: { value: new THREE.Vector4() } };
   m.userData.u = U;
   const key = 'paint|' + [o.regions, o.marks, o.bindAttr].map(x => (x ? 1 : 0)).join('') + (o.pattern || '');
   m.customProgramCacheKey = () => key;
@@ -129,11 +129,18 @@ vBind = ${o.bindAttr ? 'bind' : 'position'};
 ${o.regions ? 'vHide = mod(floor(uHide / exp2(region) + 0.001), 2.0);' : 'vHide = 0.0;'} ${o.pattern ? 'vPart = region;' : 'vPart = 0.0;'}`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uNape; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
+varying vec3 vBind; varying float vHide; varying float vPart; uniform vec3 uPat0; uniform vec3 uPat1; uniform vec3 uPat2; uniform vec4 uParam; uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uNape; uniform vec4 uFlush; uniform vec3 uRim; uniform float uGrain; uniform float uGrainScale; uniform vec4 uMarks[8]; uniform vec3 uMarkCol;
 ${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 if (vHide > 0.5) discard;
 if (uNape.z > 0.5 && vBind.y > uNape.x + max(0.0, vBind.z - uNape.y) * uNape.w) discard;      // (the nape, under the skull: see makeGLB)
+// (the body's response (F.setResponse): blood to the sex, a deeper, rosier tone there; his, the whole length as it hangs at rest, and the
+// scrotum; hers, the outer forms and the bottom of the mons)
+if (uFlush.x > 0.001) {
+  float lo = uFlush.y - (uFlush.w > 0.5 ? 0.125 : 0.04), hi = uFlush.y + (uFlush.w > 0.5 ? 0.06 : 0.04);
+  float fw = (1.0 - smoothstep(0.014, 0.042, abs(vBind.x))) * smoothstep(lo, lo + 0.02, vBind.y) * (1.0 - smoothstep(hi - 0.025, hi, vBind.y)) * smoothstep(uFlush.z - 0.03, uFlush.z, vBind.z);
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.9, 0.7, 0.72), fw * uFlush.x);
+}
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
 diffuseColor.rgb *= 1.0 + uGrain * (g - 0.5) * 2.0;
 ${o.pattern ? PATTERNS[o.pattern] : ''}
@@ -672,6 +679,7 @@ function finish(F, spec) {
   F.expr = flatExpr('calm'); F.exprTo = flatExpr('calm'); F.exprName = 'calm'; F.drawn = {};
   F.setExpr = name => { if (EXPRS[name]) { F.exprTo = flatExpr(name); F.exprName = name; } };
   F.t = Math.random() * 10; F.blink = 2 + Math.random() * 3; F.breath = 0.3; F.gaze = new V3(0, 0, 1);
+  F.resp = { r: 0, lift: 0, ang: 0 }; F.blushAdd = 0; if (!F.setResponse) F.setResponse = (r, o) => { F.resp.r = clamp(r || 0, 0, 1); F.blushAdd = (o && o.blush) || 0; };
   F.tick = dt => tickFace(F, dt);
   F.rest0 = {}; for (const b of F.bones) F.rest0[b.name] = b.position.clone();
   F.grip = (s, curl, spread, thumb) => grip(F, s, curl, spread, thumb);
@@ -1041,6 +1049,7 @@ function tickFace(F, dt) {
   F.t += dt;
   const kk = 1 - Math.exp(-dt * 8), x = F.expr, to = F.exprTo;
   for (const key in to) if (typeof to[key] === 'number') x[key] = lerp(x[key] == null ? to[key] : x[key], to[key], kk);
+  if (F.blushAdd) x.blush = Math.max(x.blush, F.blushAdd);
   F.blink -= dt; let bl = 0; if (F.blink < 0) { bl = clamp(1 - Math.abs(F.blink + 0.07) / 0.07, 0, 1); if (F.blink < -0.14) F.blink = 2 + Math.random() * 4; }
   const open = clamp(x.open * (1 - bl), 0, 1.15), d = F.drawn;
   let moved = Math.abs((d.open == null ? -9 : d.open) - open) > 0.004;
@@ -1056,6 +1065,8 @@ function tickFace(F, dt) {
     J.v += (-wv * wv * J.x - 2 * z * wv * J.v) * dt; J.x += J.v * dt; J.x = clamp(J.x, -0.02, 0.02);
     const g = F.bone['glute' + sd]; g.position.set(F.rest0['glute' + sd].x, F.rest0['glute' + sd].y + 0.35 * J.x, F.rest0['glute' + sd].z + J.x);
   }
+  // his lift (F.setResponse), eased toward: it comes up slowly and settles, never snapping (about the bone's own x: down toward forward)
+  if (F.bone.sex) { const R = F.resp; R.ang += (R.lift - R.ang) * (1 - Math.exp(-dt * 0.8)); F.bone.sex.rotation.x = -R.ang; }
   if (F.tail) {
     const pv = F.tail.piv, q = new THREE.Quaternion(); pv.parent.getWorldQuaternion(q);
     const down = new V3(0, -1, 0).applyQuaternion(q.invert());
@@ -1160,7 +1171,7 @@ function bodyKeys(spec) {
   const z = spec.size != null ? spec.size : 0.25 + 0.6 * b;
   return { muscle: clamp((m - 0.5) / 0.4, 0, 1), slight: clamp((0.5 - m) / 0.25, 0, 1) * 0.8, soft: clamp((fat - 0.4) / 0.35, 0, 1), firm: clamp((0.4 - fat) / 0.3, 0, 1) * 0.8,
     bust: her ? clamp((b - 0.4) / 0.6, 0, 1) : 0, bustSmall: her ? clamp((0.4 - b) / 0.4, 0, 1) : 0,
-    sexLarge: her ? 0 : clamp((z - 0.4) / 0.6, 0, 1), sexSmall: her ? 0 : clamp((0.4 - z) / 0.4, 0, 1) };
+    sexLarge: her ? 0 : clamp((z - 0.4) / 0.6, 0, 1), sexSmall: her ? 0 : clamp((0.4 - z) / 0.4, 0, 1), sexSwell: 0 };
 }
 function setKeys(mesh, keys) {
   const dict = mesh.geometry.userData.keys || {}, inf = mesh.morphTargetInfluences;
@@ -1186,6 +1197,16 @@ function makeGLB(spec, T) {
   // (the nape, from just above the collar up under the skull, isn't drawn: the head's own skin is there, and the neck's would show through the
   // back of the head as it tips back; cut level behind, rising round the sides toward the jaw)
   skinM.userData.u.uNape.value.set(T.L.collar + 0.002, -0.025, 1, 3);
+  // The body's response, 0–1 (the session decides how much, and how far it may go): the sex fuller (the shape key), his lifting on its bone
+  // (eased toward, in tick), a deeper tone there; and, given, a blush on the face besides whatever the expression has.
+  F.setResponse = (r, o) => {
+    r = clamp(r || 0, 0, 1); o = o || {};
+    const swell = clamp(r * 1.2, 0, 1), u = clamp((r - 0.12) / 0.88, 0, 1);
+    F.resp.r = r; F.resp.lift = 2.0 * u * u * (3 - 2 * u);
+    if (Math.abs((F.keys.sexSwell || 0) - swell) > 0.004) { F.keys.sexSwell = swell; F.root.traverse(m => { if (m.isSkinnedMesh && m.morphTargetInfluences) setKeys(m, F.keys); }); }
+    skinM.userData.u.uFlush.value.set(clamp(r * 1.1, 0, 1), T.L.crotch, 0.0, spec.sex === 'm' ? 1 : 0);
+    F.blushAdd = o.blush || 0;
+  };
   { const hm = dqs(paint(new THREE.MeshBasicMaterial(Object.assign({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }, HULL_OFS)), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; hm.userData.u.uNape = skinM.userData.u.uNape; ink(F.body, INK_W, F, hm); }
   const L = T.L;
   // the seat's spots from its own shape (measured in Blender): the cheek where it's fullest, the sit spot just above the fold beneath it, the

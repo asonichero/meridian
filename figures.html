@@ -24,6 +24,7 @@ a { color: var(--dim); }
   <h2>Clothes</h2><div class="row"><button id="cTop"></button><button id="cBot"></button><button id="cUnd"></button></div>
   <h2>Pose</h2><div class="row" id="pose"></div>
   <h2>Expression</h2><select id="expr"></select>
+  <h2>Response</h2><div class="row" style="align-items:center;gap:8px"><input type="range" id="resp" min="0" max="100" step="1" style="flex:1;accent-color:var(--amber, #c89a3a)"><span id="respV" style="font-size:12px;color:var(--dim);width:34px;text-align:right"></span></div>
   <h2>View</h2><div class="row" id="views"></div><div class="row" style="margin-top:5px"><button id="spin">Turntable</button></div>
   <p style="margin:12px 0 0;color:var(--dim);font-size:12px">Drag to orbit, scroll or pinch to zoom. <a href="session.html">The correction test</a></p>
 </div>
@@ -35,7 +36,7 @@ a { color: var(--dim); }
 // One figure at a time, in a plain, well-lit space: any crew member (or the Captain) in either translation, either outfit, the clothes as worn
 // or lowered, a choice of poses and expressions. ?who=pilot&sex=f&outfit=uniform&clothes=down,up,up&pose=stand&expr=calm&view=front&spin=1
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search), V3 = THREE.Vector3;
-const cfg = { who: q.get('who') || 'pilot', sex: q.get('sex') || 'f', outfit: q.get('outfit') || 'uniform', pose: q.get('pose') || 'stand', expr: q.get('expr') || 'calm',
+const cfg = { who: q.get('who') || 'pilot', sex: q.get('sex') || 'f', outfit: q.get('outfit') || 'uniform', pose: q.get('pose') || 'stand', expr: q.get('expr') || 'calm', resp: +(q.get('resp') || 0),
   view: q.get('view') || 'three', spin: !!q.get('spin'), clothes: (q.get('clothes') || 'down,up,up').split(',') };
 
 // ── The space: a soft backdrop and floor, lit from three sides ──
@@ -101,6 +102,9 @@ for (const id of [...Crew.IDS, 'captain']) { const o = document.createElement('o
 for (const e of Object.keys(Figure.EXPRS)) { const o = document.createElement('option'); o.value = e; o.textContent = e; $('expr').append(o); }
 $('who').onchange = () => { cfg.who = $('who').value; build(); };
 $('expr').onchange = () => { cfg.expr = $('expr').value; F.setExpr(cfg.expr); };
+// (the body's response, 0–1, as a session would drive it: ?resp=0.5 — the corrections so far go as far as half)
+$('resp').value = Math.round(cfg.resp * 100); $('respV').textContent = $('resp').value + '%';
+$('resp').oninput = () => { cfg.resp = $('resp').value / 100; $('respV').textContent = $('resp').value + '%'; };
 const flip = (i, a, b) => { cfg.clothes[i] = cfg.clothes[i] === a ? b : a; F.setClothes({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] }); refresh(); };
 $('cTop').onclick = () => flip(0, 'down', 'up'); $('cBot').onclick = () => flip(1, 'up', 'down'); $('cUnd').onclick = () => flip(2, 'up', 'down');
 $('spin').onclick = () => { cfg.spin = !cfg.spin; refresh(); };
@@ -119,7 +123,7 @@ function refresh() {
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (F) { if (cfg.spin) yaw += dt * 0.5; pose(); F.tick(dt); }
+  if (F) { if (cfg.spin) yaw += dt * 0.5; pose(); F.setResponse(cfg.resp); F.tick(dt); }
   controls.update(); renderer.render(scene, camera); requestAnimationFrame(frame);
 }
 Figure.preload().then(() => { build(); view(cfg.view); requestAnimationFrame(frame); setTimeout(() => (window.ready = true), 300); });

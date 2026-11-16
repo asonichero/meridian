@@ -298,6 +298,9 @@ VARIANTS = {
     'bustSmall': {'torsoP': lambda P: bust_variant(P, 0.4), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
     'sexLarge': {'sex': (1.35, 1.45, 1.15), 'torso': lambda r: (1, 1, 1, 1), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
     'sexSmall': {'sex': (0.86, 0.82, 0.94), 'torso': lambda r: (1, 1, 1, 1), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
+    # the body's response, at its fullest (the game rises toward it): his fuller and longer (and lifted by its own bone), the scrotum drawn in;
+    # hers, the outer forms fuller and parting a little
+    'sexSwell': {'sex': {'m': (1.22, 1.25, 0.9), 'f': (1.25, 1.25, 1.0)}, 'torso': lambda r: (1, 1, 1, 1), 'leg': lambda r: (1, 1, 1, 1), 'arm': lambda r: (1, 1, 1, 1)},
 }
 
 
@@ -523,6 +526,7 @@ def joints(sex, torso, leg, arm, N):
         ax = sx * at(leg, ANKLE_Y + 0.02, 'cx')
         J['foot' + s] = ('shin' + s, (ax, ANKLE_Y, -0.008)); J['toe' + s] = ('foot' + s, (ax + sx * 0.008, 0.024, FOOT_LEN - 0.105))
         J['glute' + s] = ('hips', (sx * 0.072, ym(crotch_py - 45), -at(torso, ym(crotch_py - 45), 'zB') * 0.55 + at(torso, ym(crotch_py - 45), 'cz')))
+    if m: J['sex'] = ('hips', tuple(float(v) for v in his_root(torso, leg)[0]))       # (his: the lift's pivot, where it leaves the body)
     return J
 
 def armature(name, J):
@@ -533,7 +537,7 @@ def armature(name, J):
     eb = {}
     for n, (par, p) in J.items():
         b = arm.edit_bones.new(n); b.head = toB(p)
-        ch = [k for k in kids.get(n, []) if not k.startswith('glute') and not k.startswith('clav')]
+        ch = [k for k in kids.get(n, []) if not k.startswith('glute') and not k.startswith('clav') and k != 'sex']
         if n == 'chest': ch = ['neck']
         if n.startswith('hand'): ch = ['middle1' + n[-1]]
         if len(ch) == 1 and (Vector(toB(J[ch[0]][1])) - b.head).length > 0.01: b.tail = toB(J[ch[0]][1])
@@ -601,6 +605,19 @@ def front_z(Sf, y, x=0.0):
         if Sf.f(np.array([[x, y, m]]))[0] > 0: lo = m
         else: hi = m
     return lo
+def his_axis(T):
+    """His parts' frame: the scrotum's centre and radii, the penis's root (well up in the body) and tip."""
+    zp = front_z(T, CROTCH_Y + 0.025)
+    return (np.array([0.0, CROTCH_Y - 0.02, zp - 0.03]), np.array([0.026, 0.031, 0.023]), np.array([0.0, CROTCH_Y + 0.05, zp - 0.026]),
+            np.array([0.0, CROTCH_Y - 0.052, zp + 0.01]))
+def his_root(torso, leg):
+    """Where his penis leaves the body (along its line, the first point outside the trunk and thighs), and its line: the lift's pivot."""
+    St, Sl = Surface(torso), [Surface(leg, 1), Surface(leg, -1)]
+    S0, R0, A, tip = his_axis(St); u = (tip - A) / np.linalg.norm(tip - A)
+    P = A[None, :] + np.arange(0, 0.12, 0.001)[:, None] * u[None, :]
+    s = ss(CROTCH_Y - 0.012, CROTCH_Y + 0.04, P[:, 1]); t = s * St.f(P) + (1 - s) * np.maximum(Sl[0].f(P), Sl[1].f(P))
+    i = int(np.argmax(t < 0)); return P[i], u
+
 # her outer forms: either side of the middle at the front of the crotch, hanging a little below it between the thighs (centre, radii)
 LAB_C, LAB_R = np.array([0.0078, 0.001, 0.028]), np.array([0.0125, 0.024, 0.021])
 def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
@@ -609,7 +626,7 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     in the body so they join it without a crease; k: (girth, length, scrotum) for the shape keys toward smaller or larger. Returns the forms
     to join to the body, a field to cut from it, and how softly they're joined. Simple, soft forms, as the rest is."""
     if sex == 'f':
-        C = LAB_C + np.array([0.0, CROTCH_Y, 0.0]); R_ = LAB_R
+        C = LAB_C + np.array([(k[1] - 1) * 0.01, CROTCH_Y, 0.0]); R_ = LAB_R * k[0]       # (k: fuller, and parting, with her response)
         def parts(P):
             # (each its own rounded form, the two meeting in the middle in a narrow V: the slit between them is where they meet)
             fl = [(1 - np.linalg.norm((P - C * np.array([sx, 1, 1])) / R_, axis=1)) * R_.min() for sx in (1, -1)]
@@ -617,9 +634,7 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
         return parts, None, 0.007
 
     kg, kl, ks = k
-    zp = front_z(T, CROTCH_Y + 0.025)
-    S0, R0 = np.array([0.0, CROTCH_Y - 0.02, zp - 0.03]), np.array([0.026, 0.031, 0.023]) * ks
-    A = np.array([0.0, CROTCH_Y + 0.05, zp - 0.026]); tip = np.array([0.0, CROTCH_Y - 0.052, zp + 0.01])
+    S0, R0, A, tip = his_axis(T); R0 = R0 * ks
     B = A + (tip - A) * kl
     def parts(P):
         q = np.linalg.norm((P - S0) / R0, axis=1); scrotum = (1 - q) * R0.min()
@@ -736,8 +751,9 @@ def build(sex):
     for pgn in body.data.polygons: pgn.use_smooth = True
     body.shape_key_add(name='Basis')
     for v, fns in VARIANTS.items():
-        if (v.startswith('bust') and sex == 'm') or (v.startswith('sex') and sex == 'f'): continue
-        Fv = body_field(fns['torsoP'](torso) if 'torsoP' in fns else scaled(torso, fns['torso']), scaled(leg, fns['leg']), scaled(arm, fns['arm']), sex, fns.get('sex', (1.0, 1.0, 1.0)))
+        if (v.startswith('bust') and sex == 'm') or (v in ('sexLarge', 'sexSmall') and sex == 'f'): continue
+        sk = fns.get('sex', (1.0, 1.0, 1.0)); sk = sk[sex] if isinstance(sk, dict) else sk
+        Fv = body_field(fns['torsoP'](torso) if 'torsoP' in fns else scaled(torso, fns['torso']), scaled(leg, fns['leg']), scaled(arm, fns['arm']), sex, sk)
         t_v = along(Fv, X, Nrm)
         dt = np.where(limb & ~np.isnan(t_v) & ~np.isnan(t_base), t_v - t_base, 0.0)
         acc = np.zeros(len(X)); cnt = np.zeros(len(X))
@@ -751,7 +767,7 @@ def build(sex):
         near = (np.abs(X[:, 0]) < 0.06) & (X[:, 1] > CROTCH_Y - 0.32) & (X[:, 1] < CROTCH_Y + 0.22) & (label != 'sex')
         bad = near & ((Yv[:, 0] * sg) < lim)
         Yv[bad, 0] = sg[bad] * lim[bad]
-        if sex == 'f':      # (her forms the same whatever the build; round them, the thighs fill out but never in over them)
+        if sex == 'f' and v != 'sexSwell':      # (her forms the same whatever the build; round them, the thighs fill out but never in over them)
             Yv[label == 'sex'] = X[label == 'sex']
             ring = (label != 'sex') & (np.abs(X[:, 0]) < 0.045) & (X[:, 1] > CROTCH_Y - 0.06) & (X[:, 1] < CROTCH_Y + 0.02) & (X[:, 2] > -0.015)
             Yv[ring, 0] = sg[ring] * np.maximum(Yv[ring, 0] * sg[ring], np.abs(X[ring, 0]))
@@ -762,9 +778,26 @@ def build(sex):
     rig = armature('Rig', J)
     bpy.ops.object.select_all(action='DESELECT'); body.select_set(True); rig.select_set(True); bpy.context.view_layer.objects.active = rig
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+    if sex == 'm': lift_weights(body, X, label, torso, leg)
     print(sex, 'groups', len(body.vertex_groups))
     return body, rig, J, (torso, leg, arm, label)
 
+
+def lift_weights(body, X, label, torso, leg):
+    """His lift: the penis, from where it leaves the body to the tip, on its own bone (none of it at the root, all of it 2 cm out), the scrotum
+    and everything else as the automatic weighting left it (less whatever it gave the new bone)."""
+    E, u = his_root(torso, leg); S0, R0, A, tip = his_axis(Surface(torso))
+    cap = capsule(X, A, tip, 0.016, 0.0148); scr = (1 - np.linalg.norm((X - S0) / R0, axis=1)) * R0.min()
+    w = ss(-0.003, 0.003, cap - scr) * ss(-0.004, 0.022, (X - E) @ u) * (label == 'sex')
+    vg = body.vertex_groups; gs = vg['sex']; hips = vg['hips'].index
+    for v in body.data.vertices:
+        i = v.index; gw = {g.group: g.weight for g in v.groups if g.group != gs.index}
+        if gs.index in [g.group for g in v.groups]: gs.remove([i])
+        tot = sum(gw.values())
+        if tot <= 0: gw = {hips: 1.0}; tot = 1.0
+        for gi, wt in gw.items(): vg[gi].add([i], float(wt / tot * (1 - w[i])), 'REPLACE')
+        if w[i] > 1e-4: gs.add([i], float(w[i]), 'REPLACE')
+    print('lift: on its bone', int((w > 0.5).sum()), 'points; pivot', np.round(E, 3))
 
 def ink_weights(ob, reach=0.016):
     """How far each point's outline may stand out: where the skin faces more of itself close across a crease (the cleft, between the thighs,
@@ -968,7 +1001,7 @@ def garments(sex, torso, leg, arm, body, label, rig):
         b = np.zeros(n * 3); kbs['Basis'].data.foreach_get('co', b); Xb = b.reshape(-1, 3); X = np.stack([Xb[:, 0], Xb[:, 2], -Xb[:, 1]], 1)
         wp = ss(-0.003, 0.004, pouch(X) + gap - base_f(X)) * ss(PC[2] - 0.035, PC[2] - 0.01, X[:, 2])
         d = (X - PC) / PR; d /= np.linalg.norm(d, axis=1, keepdims=True) + 1e-9
-        for k, amt in (('sexLarge', 0.007), ('sexSmall', -0.004)):
+        for k, amt in (('sexLarge', 0.007), ('sexSmall', -0.004), ('sexSwell', 0.012)):
             if k not in kbs: continue
             c = np.zeros(n * 3); kbs[k].data.foreach_get('co', c); c = c.reshape(-1, 3)
             mv = d * amt * wp[:, None]; c = c * (1 - wp[:, None]) + (Xb + np.stack([mv[:, 0], -mv[:, 2], mv[:, 1]], 1)) * wp[:, None]
