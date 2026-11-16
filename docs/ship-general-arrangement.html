@@ -1,0 +1,401 @@
+<title>Meridian General Arrangement</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single drawing sheet. Title block, then the two long views stacked on one shared scale, then the bow view and the comparison side by side. */
+:root {
+  --paper: #e6ecef; --sheet: #f2f5f6; --ink: #1b2630; --muted: #5d6c78; --rule: #bcc8d0;
+  --grid: rgba(27, 38, 48, 0.055); --hull: #dae2e7; --corr: rgba(27, 38, 48, 0.07);
+  --deck: #23746f; --deckfill: rgba(35, 116, 111, 0.15); --drive: #bf6a0f; --drivefill: rgba(191, 106, 15, 0.2);
+  --display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #0f161c; --sheet: #141d24; --ink: #d4dee5; --muted: #8b9ca9; --rule: #2b3843;
+  --grid: rgba(212, 222, 229, 0.045); --hull: #1c2730; --corr: rgba(212, 222, 229, 0.07);
+  --deck: #55b9b1; --deckfill: rgba(85, 185, 177, 0.17); --drive: #ec9c45; --drivefill: rgba(236, 156, 69, 0.24); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --paper: #0f161c; --sheet: #141d24; --ink: #d4dee5; --muted: #8b9ca9; --rule: #2b3843;
+  --grid: rgba(212, 222, 229, 0.045); --hull: #1c2730; --corr: rgba(212, 222, 229, 0.07);
+  --deck: #55b9b1; --deckfill: rgba(85, 185, 177, 0.17); --drive: #ec9c45; --drivefill: rgba(236, 156, 69, 0.24); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 400 15px/1.55 var(--body); margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px 32px; align-items: end; border-bottom: 2px solid var(--ink); padding-bottom: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+h1 { font: 700 clamp(30px, 5vw, 46px)/1 var(--display); letter-spacing: 0.02em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+.lede { max-width: 62ch; margin: 12px 0 0; }
+.block { border: 1.5px solid var(--ink); display: grid; grid-template-columns: repeat(3, auto); font: 400 12px var(--mono); font-variant-numeric: tabular-nums; min-width: 0; }
+.block div { padding: 6px 12px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.block div:nth-child(3n) { border-right: 0; }
+.block div:nth-last-child(-n+3) { border-bottom: 0; }
+.block span { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.block b { font-weight: 500; }
+section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+h2 { font: 600 18px var(--display); letter-spacing: 0.06em; text-transform: uppercase; margin: 0; display: flex; gap: 10px; align-items: baseline; }
+h2 small { font: 400 12px var(--mono); letter-spacing: 0.04em; text-transform: none; color: var(--muted); }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.sheet { background-color: var(--sheet); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 14px 14px; border: 1px solid var(--rule); overflow-x: auto; }
+.sheet svg { display: block; width: 100%; height: auto; color: var(--ink); }
+.wide svg { min-width: 820px; }
+.half svg { min-width: 440px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 72ch; }
+figcaption b { color: var(--ink); font-weight: 600; }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.note { border-top: 1px solid var(--rule); padding-top: 16px; max-width: 72ch; color: var(--muted); }
+.note b { color: var(--ink); font-weight: 600; }
+@media (max-width: 860px) { header { grid-template-columns: minmax(0, 1fr); } .pair { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 460px) { .block { grid-template-columns: repeat(2, auto); } .block div:nth-child(3n) { border-right: 1px solid var(--rule); } .block div:nth-child(2n) { border-right: 0; } .block div:nth-last-child(-n+3) { border-bottom: 1px solid var(--rule); } .block div:nth-last-child(-n+2) { border-bottom: 0; } }
+/* drawing marks (all ink in currentColor; teal is the crew deck, amber is the drive) */
+svg .hull { fill: var(--hull); stroke: currentColor; stroke-width: 1.5; }
+svg .shield { stroke: currentColor; stroke-width: 1.5; }
+svg .hatch { stroke: currentColor; stroke-width: 1.3; opacity: 0.4; }
+svg .wing { fill: var(--hull); stroke: currentColor; stroke-width: 1; }
+svg .fin { stroke: currentColor; stroke-width: 0.8; opacity: 0.5; }
+svg .ln { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+svg .bh { stroke: currentColor; stroke-width: 1; opacity: 0.55; }
+svg .room { fill: none; stroke: currentColor; stroke-width: 1; }
+svg .corr { fill: var(--corr); }
+svg .furn { fill: var(--hull); stroke: currentColor; stroke-width: 1; }
+svg .solid { fill: currentColor; }
+svg .deckband { fill: var(--deckfill); }
+svg .deckline { fill: none; stroke: var(--deck); stroke-width: 2; }
+svg .deckdash { fill: none; stroke: var(--deck); stroke-width: 1.5; stroke-dasharray: 5 4; }
+svg .screen { stroke: var(--deck); stroke-width: 4; stroke-linecap: round; }
+svg .door { stroke: var(--deck); stroke-width: 3; }
+svg .glass { fill: var(--deckfill); stroke: currentColor; stroke-width: 1.5; }
+svg .shutter { stroke: currentColor; stroke-width: 3; stroke-linecap: round; }
+svg .drive { fill: var(--drivefill); stroke: var(--drive); stroke-width: 1.5; }
+svg .plume { fill: var(--drive); opacity: 0.22; }
+svg .arrow { stroke: currentColor; stroke-width: 1.6; fill: none; }
+svg .arrowd { stroke: var(--drive); stroke-width: 1.6; fill: none; }
+svg .ah { fill: currentColor; }
+svg .ahd { fill: var(--drive); }
+svg .lead { stroke: var(--muted); stroke-width: 1; fill: none; }
+svg .dash { stroke: var(--muted); stroke-width: 1; fill: none; stroke-dasharray: 4 4; }
+svg .dim { stroke: var(--muted); stroke-width: 1; }
+svg .rail { fill: none; stroke: currentColor; stroke-width: 1; stroke-dasharray: 3 3; }
+svg .lbl { fill: currentColor; font: 500 11px var(--mono); letter-spacing: 0.02em; }
+svg .sm { font-size: 10px; }
+svg .mut { fill: var(--muted); }
+svg .dk { fill: var(--deck); }
+svg .drv { fill: var(--drive); }
+svg .hd { font: 600 13px var(--display); letter-spacing: 0.09em; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">Exploration vessel · thrust gravity · one deck</p>
+      <h1>Meridian General Arrangement</h1>
+      <p class="lede">The main drive fires down out of the keel. Under thrust the floor faces the drive, so the whole crew deck runs bow to stern on one level: the bridge at the front, the reactor at the back, everything else between.</p>
+    </div>
+    <div class="block" aria-label="Principal dimensions">
+      <div><span>Length</span><b>57 m</b></div>
+      <div><span>Hull beam</span><b>14 m</b></div>
+      <div><span>Shield span</span><b>24 m</b></div>
+      <div><span>Height</span><b>13 m</b></div>
+      <div><span>Decks</span><b>1</b></div>
+      <div><span>Aboard</span><b>7 + the Proctor</b></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Side elevation <small>port side, bow to the left, port rooms shown</small></h2>
+    <figure>
+      <div class="sheet wide">
+        <svg viewBox="0 0 1100 380" role="img" aria-label="Port-side elevation: a long low hull with the crew deck running its length, bridge at the bow and reactor at the stern behind a shadow shield, an armoured shield along the back, and drive bells under the keel firing downward, so the ship travels roof first.">
+          <defs>
+            <pattern id="e-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" class="hatch"/></pattern>
+            <marker id="e-ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+          </defs>
+          <!-- direction of travel -->
+          <line x1="640" y1="96" x2="640" y2="30" class="arrow" marker-end="url(#e-ar)"/>
+          <text x="654" y="44" class="lbl">direction of travel under thrust</text>
+          <text x="654" y="58" class="lbl mut">roof first</text>
+          <text x="138" y="92" class="lbl hd">FORE</text>
+          <text x="936" y="92" text-anchor="end" class="lbl hd">AFT</text>
+          <!-- the lost long-range array -->
+          <polyline points="334,102 336,80 339,66" class="ln"/>
+          <polyline points="339,66 344,63 341,59 348,55" class="ln"/>
+          <path d="M350,74 Q364,68 368,50" class="ln"/>
+          <text x="380" y="66" class="lbl">long-range array</text>
+          <text x="380" y="80" class="lbl mut">lost in the shear</text>
+          <!-- dorsal shield -->
+          <polygon points="166,140 192,102 936,102 936,140" fill="url(#e-hatch)" class="shield"/>
+          <!-- armoured viewport: a well up through the shield over the bridge, its shutter open -->
+          <rect x="200" y="102" width="34" height="38" class="glass"/>
+          <line x1="200" y1="102" x2="200" y2="140" class="ln"/><line x1="234" y1="102" x2="234" y2="140" class="ln"/>
+          <line x1="234" y1="101" x2="250" y2="88" class="shutter"/>
+          <line x1="204" y1="100" x2="194" y2="78" class="lead"/>
+          <text x="190" y="60" text-anchor="end" class="lbl">armoured viewport</text>
+          <text x="190" y="74" text-anchor="end" class="lbl mut">overhead, facing travel</text>
+          <line x1="936" y1="121" x2="946" y2="121" class="lead"/>
+          <text x="950" y="118" class="lbl">dorsal shield</text>
+          <text x="950" y="132" class="lbl mut">water &amp; ice tanks</text>
+          <!-- keel, radiators edge-on, drive bells and exhaust -->
+          <polygon points="474,218 502,260 922,260 922,218" class="hull"/>
+          <rect x="558" y="236" width="350" height="4" class="solid"/>
+          <g>
+            <polygon points="518,260 542,260 550,284 510,284" class="drive"/><polygon points="512,288 548,288 535,336 525,336" class="plume"/>
+            <polygon points="588,260 612,260 620,284 580,284" class="drive"/><polygon points="582,288 618,288 605,336 595,336" class="plume"/>
+            <polygon points="658,260 682,260 690,284 650,284" class="drive"/><polygon points="652,288 688,288 675,336 665,336" class="plume"/>
+            <polygon points="728,260 752,260 760,284 720,284" class="drive"/><polygon points="722,288 758,288 745,336 735,336" class="plume"/>
+            <polygon points="798,260 822,260 830,284 790,284" class="drive"/><polygon points="792,288 828,288 815,336 805,336" class="plume"/>
+            <polygon points="868,260 892,260 900,284 860,284" class="drive"/><polygon points="862,288 898,288 885,336 875,336" class="plume"/>
+          </g>
+          <line x1="922" y1="226" x2="946" y2="226" class="lead"/>
+          <text x="950" y="230" class="lbl">keel</text>
+          <line x1="908" y1="238" x2="946" y2="246" class="lead"/>
+          <text x="950" y="250" class="lbl">radiators, edge-on</text>
+          <line x1="900" y1="306" x2="946" y2="308" class="lead"/>
+          <text x="950" y="312" class="lbl drv">drive exhaust</text>
+          <!-- hull with the crew deck inside it -->
+          <polygon points="152,140 922,140 922,218 152,218 138,204 138,154" class="hull"/>
+          <rect x="146" y="150" width="604" height="46" class="deckband"/>
+          <rect x="758" y="150" width="160" height="46" class="deckband"/>
+          <line x1="146" y1="196" x2="918" y2="196" class="deckline"/>
+          <line x1="250" y1="150" x2="250" y2="196" class="bh"/>
+          <line x1="376" y1="150" x2="376" y2="196" class="bh"/>
+          <line x1="404" y1="150" x2="404" y2="196" class="bh"/>
+          <line x1="572" y1="150" x2="572" y2="196" class="bh"/>
+          <line x1="684" y1="150" x2="684" y2="196" class="bh"/>
+          <text x="201" y="178" text-anchor="middle" class="lbl hd">BRIDGE</text>
+          <text x="313" y="178" text-anchor="middle" class="lbl hd">READY · CAPTAIN</text>
+          <text x="488" y="178" text-anchor="middle" class="lbl hd">SUIT BAY · MED</text>
+          <text x="628" y="178" text-anchor="middle" class="lbl hd">HYDROPONICS</text>
+          <text x="717" y="178" text-anchor="middle" class="lbl hd">WORKSHOP</text>
+          <text x="800" y="178" text-anchor="middle" class="lbl hd">REACTOR</text>
+          <rect x="840" y="158" width="50" height="86" rx="12" class="drive"/>
+          <!-- shadow shield between the reactor and the crew -->
+          <rect x="750" y="140" width="8" height="78" class="solid"/>
+          <text x="744" y="211" text-anchor="end" class="lbl sm">shadow shield</text>
+          <!-- probe bay, docking collar, cameras, thrusters -->
+          <rect x="222" y="218" width="84" height="12" class="hull"/>
+          <line x1="264" y1="218" x2="264" y2="230" class="bh"/>
+          <text x="264" y="250" text-anchor="middle" class="lbl">probe bay</text>
+          <circle cx="418" cy="173" r="11" class="hull"/>
+          <circle cx="418" cy="173" r="5" class="ln"/>
+          <line x1="418" y1="184" x2="418" y2="264" class="lead"/>
+          <text x="418" y="278" text-anchor="middle" class="lbl">docking collar · airlock</text>
+          <circle cx="135" cy="168" r="3.5" class="solid"/><circle cx="134" cy="179" r="3.5" class="solid"/><circle cx="135" cy="190" r="3.5" class="solid"/>
+          <line x1="132" y1="193" x2="96" y2="290" class="lead"/>
+          <text x="20" y="304" class="lbl">camera &amp; sensor cluster</text>
+          <text x="20" y="318" class="lbl mut">feeds the bridge viewscreen</text>
+          <rect x="130" y="157" width="7" height="7" class="solid"/><rect x="130" y="194" width="7" height="7" class="solid"/>
+          <rect x="923" y="146" width="7" height="7" class="solid"/><rect x="923" y="200" width="7" height="7" class="solid"/>
+          <line x1="931" y1="150" x2="946" y2="152" class="lead"/>
+          <text x="950" y="156" class="lbl">thruster quads</text>
+          <!-- dimensions -->
+          <line x1="138" y1="358" x2="936" y2="358" class="dim"/>
+          <line x1="138" y1="350" x2="138" y2="366" class="dim"/><line x1="936" y1="350" x2="936" y2="366" class="dim"/>
+          <text x="537" y="352" text-anchor="middle" class="lbl mut">57 m</text>
+          <line x1="76" y1="102" x2="76" y2="284" class="dim"/>
+          <line x1="68" y1="102" x2="84" y2="102" class="dim"/><line x1="68" y1="284" x2="84" y2="284" class="dim"/>
+          <text x="68" y="198" text-anchor="end" class="lbl mut">13 m</text>
+        </svg>
+      </div>
+      <figcaption>The drive bells hang under the keel and fire <b>down</b>. Pushed from below, the ship climbs roof first, so the crew feel "down" as the deck floor. The <b>dorsal shield</b> faces the direction of travel, where the dust and radiation come from. The reactor sits aft behind its <b>shadow shield</b>. Over the bridge, an <b>armoured viewport</b> looks straight up through the shield along the direction of travel: the ship's one real window, shuttered when it isn't needed. The long-range array on the back is the one lost in the shear.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Deck plan <small>from above, shield and roof cut away, same scale</small></h2>
+    <figure>
+      <div class="sheet wide">
+        <svg viewBox="0 0 1100 410" role="img" aria-label="Deck plan: one level and two corridors. A spine corridor runs from the bridge at the bow to the reactor at the stern, and every room opens onto it or onto the cross corridor amidships. To starboard: three crew cabins, the galley and mess, three more cabins and the communal showers. To port: the Ready Room and the Captain's cabin, the suit bay with the airlock, the med bay, hydroponics and the workshop.">
+          <!-- shield footprint above, radiator wings below -->
+          <polygon points="192,52 936,52 936,388 192,388 166,362 166,78" class="dash"/>
+          <line x1="936" y1="56" x2="946" y2="56" class="lead"/>
+          <text x="950" y="60" class="lbl">shield footprint</text>
+          <text x="950" y="74" class="lbl mut">(cut away)</text>
+          <rect x="558" y="66" width="350" height="56" class="wing"/>
+          <rect x="558" y="318" width="350" height="56" class="wing"/>
+          <g class="fin">
+            <line x1="583" y1="66" x2="583" y2="122"/><line x1="608" y1="66" x2="608" y2="122"/><line x1="633" y1="66" x2="633" y2="122"/><line x1="658" y1="66" x2="658" y2="122"/><line x1="683" y1="66" x2="683" y2="122"/><line x1="708" y1="66" x2="708" y2="122"/><line x1="733" y1="66" x2="733" y2="122"/><line x1="758" y1="66" x2="758" y2="122"/><line x1="783" y1="66" x2="783" y2="122"/><line x1="808" y1="66" x2="808" y2="122"/><line x1="833" y1="66" x2="833" y2="122"/><line x1="858" y1="66" x2="858" y2="122"/><line x1="883" y1="66" x2="883" y2="122"/>
+            <line x1="583" y1="318" x2="583" y2="374"/><line x1="608" y1="318" x2="608" y2="374"/><line x1="633" y1="318" x2="633" y2="374"/><line x1="658" y1="318" x2="658" y2="374"/><line x1="683" y1="318" x2="683" y2="374"/><line x1="708" y1="318" x2="708" y2="374"/><line x1="733" y1="318" x2="733" y2="374"/><line x1="758" y1="318" x2="758" y2="374"/><line x1="783" y1="318" x2="783" y2="374"/><line x1="808" y1="318" x2="808" y2="374"/><line x1="833" y1="318" x2="833" y2="374"/><line x1="858" y1="318" x2="858" y2="374"/><line x1="883" y1="318" x2="883" y2="374"/>
+          </g>
+          <line x1="908" y1="94" x2="946" y2="94" class="lead"/>
+          <text x="950" y="98" class="lbl">radiator wing</text>
+          <line x1="908" y1="346" x2="946" y2="346" class="lead"/>
+          <text x="950" y="350" class="lbl">radiator wing</text>
+          <text x="124" y="128" text-anchor="end" class="lbl hd">STBD</text>
+          <text x="124" y="225" text-anchor="end" class="lbl hd">FORE</text>
+          <text x="124" y="322" text-anchor="end" class="lbl hd">PORT</text>
+          <!-- hull and corridors -->
+          <polygon points="152,122 922,122 922,318 152,318 138,290 138,150" class="hull"/>
+          <rect x="250" y="206" width="504" height="28" class="corr"/>
+          <rect x="376" y="122" width="28" height="196" class="corr"/>
+          <!-- bridge -->
+          <line x1="250" y1="122" x2="250" y2="318" class="room"/>
+          <line x1="144" y1="170" x2="144" y2="270" class="screen"/>
+          <text x="152" y="163" class="lbl sm dk">viewscreen</text>
+          <text x="200" y="142" text-anchor="middle" class="lbl hd">BRIDGE</text>
+          <rect x="166" y="212" width="14" height="16" rx="2" class="furn"/>
+          <rect x="182" y="178" width="16" height="12" rx="2" class="furn"/>
+          <rect x="182" y="250" width="16" height="12" rx="2" class="furn"/>
+          <rect x="212" y="207" width="22" height="26" rx="4" class="furn"/>
+          <rect x="204" y="197" width="38" height="46" class="rail"/>
+          <text x="210" y="286" text-anchor="middle" class="lbl sm mut">viewport</text>
+          <text x="210" y="298" text-anchor="middle" class="lbl sm mut">overhead</text>
+          <!-- forward: three crew cabins to starboard, each with its own head by the door; the Ready Room and the Captain's cabin to port -->
+          <rect x="250" y="122" width="42" height="84" class="room"/><rect x="292" y="122" width="42" height="84" class="room"/><rect x="334" y="122" width="42" height="84" class="room"/>
+          <rect x="255" y="126" width="32" height="11" rx="2" class="furn"/><rect x="297" y="126" width="32" height="11" rx="2" class="furn"/><rect x="339" y="126" width="32" height="11" rx="2" class="furn"/>
+          <rect x="254" y="186" width="14" height="16" class="furn"/><rect x="296" y="186" width="14" height="16" class="furn"/><rect x="338" y="186" width="14" height="16" class="furn"/>
+          <line x1="272" y1="206" x2="286" y2="206" class="door"/><line x1="314" y1="206" x2="328" y2="206" class="door"/><line x1="356" y1="206" x2="370" y2="206" class="door"/>
+          <text x="271" y="160" text-anchor="middle" class="lbl sm">KIT</text><text x="313" y="160" text-anchor="middle" class="lbl sm">ROWAN</text><text x="355" y="160" text-anchor="middle" class="lbl sm">SEFA</text>
+          <rect x="250" y="234" width="49" height="84" class="room"/>
+          <text x="274" y="270" text-anchor="middle" class="lbl sm">READY</text>
+          <line x1="250" y1="280" x2="250" y2="300" class="door"/>
+          <rect x="299" y="234" width="77" height="84" class="room"/>
+          <rect x="352" y="296" width="20" height="18" class="furn"/><rect x="330" y="300" width="16" height="14" class="furn"/>
+          <line x1="306" y1="234" x2="322" y2="234" class="door"/>
+          <text x="337" y="266" text-anchor="middle" class="lbl sm">CAPTAIN</text>
+          <text x="337" y="280" text-anchor="middle" class="lbl sm mut">head · shower</text>
+          <text x="394" y="220" text-anchor="middle" class="lbl sm mut" transform="rotate(-90 394 220)">cross corridor</text>
+          <!-- amidships: the galley and mess to starboard, open to the spine; the suit bay and med bay to port -->
+          <rect x="404" y="122" width="168" height="84" class="room"/>
+          <text x="488" y="140" text-anchor="middle" class="lbl sm">GALLEY &amp; MESS</text>
+          <rect x="414" y="150" width="50" height="11" rx="2" class="furn"/>
+          <rect x="478" y="164" width="66" height="14" rx="2" class="furn"/>
+          <line x1="478" y1="159" x2="544" y2="159" class="bh"/><line x1="478" y1="183" x2="544" y2="183" class="bh"/>
+          <rect x="556" y="132" width="10" height="56" rx="2" class="furn"/>
+          <line x1="424" y1="206" x2="548" y2="206" class="door"/>
+          <rect x="404" y="234" width="98" height="84" class="room"/>
+          <text x="453" y="276" text-anchor="middle" class="lbl sm">SUIT BAY</text>
+          <line x1="404" y1="258" x2="404" y2="276" class="door"/>
+          <path d="M420,318 A12,12 0 0 0 444,318" class="hull"/>
+          <line x1="422" y1="318" x2="442" y2="318" class="door"/>
+          <text x="432" y="348" text-anchor="middle" class="lbl">airlock · docking collar</text>
+          <rect x="502" y="234" width="70" height="84" class="room"/>
+          <text x="537" y="276" text-anchor="middle" class="lbl sm">MED BAY</text>
+          <line x1="502" y1="288" x2="502" y2="304" class="door"/><line x1="522" y1="234" x2="538" y2="234" class="door"/>
+          <!-- aft: three more cabins and the communal showers to starboard; hydroponics and the workshop to port -->
+          <rect x="572" y="122" width="42" height="84" class="room"/><rect x="614" y="122" width="42" height="84" class="room"/><rect x="656" y="122" width="42" height="84" class="room"/>
+          <rect x="577" y="126" width="32" height="11" rx="2" class="furn"/><rect x="619" y="126" width="32" height="11" rx="2" class="furn"/><rect x="661" y="126" width="32" height="11" rx="2" class="furn"/>
+          <rect x="576" y="186" width="14" height="16" class="furn"/><rect x="618" y="186" width="14" height="16" class="furn"/><rect x="660" y="186" width="14" height="16" class="furn"/>
+          <line x1="594" y1="206" x2="608" y2="206" class="door"/><line x1="636" y1="206" x2="650" y2="206" class="door"/><line x1="678" y1="206" x2="692" y2="206" class="door"/>
+          <text x="593" y="160" text-anchor="middle" class="lbl sm">MORGAN</text><text x="635" y="160" text-anchor="middle" class="lbl sm">NOOR</text><text x="677" y="160" text-anchor="middle" class="lbl sm">SAM</text>
+          <rect x="698" y="122" width="56" height="84" class="room"/>
+          <line x1="704" y1="206" x2="732" y2="206" class="door"/>
+          <text x="726" y="160" text-anchor="middle" class="lbl sm">SHOWERS</text>
+          <text x="726" y="173" text-anchor="middle" class="lbl sm mut">communal</text>
+          <rect x="572" y="234" width="112" height="84" class="room"/>
+          <line x1="600" y1="234" x2="616" y2="234" class="door"/>
+          <text x="628" y="272" text-anchor="middle" class="lbl sm">HYDROPONICS</text>
+          <text x="628" y="286" text-anchor="middle" class="lbl sm mut">&amp; life support</text>
+          <rect x="684" y="234" width="70" height="84" class="room"/>
+          <line x1="700" y1="234" x2="716" y2="234" class="door"/>
+          <text x="719" y="272" text-anchor="middle" class="lbl sm">WORKSHOP</text>
+          <text x="719" y="286" text-anchor="middle" class="lbl sm mut">spares</text>
+          <text x="470" y="224" text-anchor="middle" class="lbl sm mut">spine corridor</text>
+          <!-- reactor behind the shadow shield -->
+          <rect x="750" y="122" width="8" height="196" class="solid"/>
+          <text x="840" y="142" text-anchor="middle" class="lbl hd">REACTOR</text>
+          <circle cx="840" cy="220" r="54" class="rail"/>
+          <circle cx="840" cy="220" r="38" class="drive"/>
+          <text x="840" y="224" text-anchor="middle" class="lbl sm drv">core</text>
+          <text x="840" y="300" text-anchor="middle" class="lbl sm mut">walkway · rail</text>
+        </svg>
+      </div>
+      <figcaption>One level, two corridors. The <b>spine</b> runs from the bridge to the reactor hatch, and every room opens onto it or onto the <b>cross corridor</b> amidships (teal marks are doors). Each crew cabin has its own head by the door (from the bridge: Kit, Rowan, Sefa forward; Morgan, Noor, Sam aft). The Captain's cabin has its own head and shower, and everyone else shares the <b>communal showers</b> aft, warmed by the reactor's heat beyond the shadow shield. The galley and mess open wide onto the spine. The Ready Room opens only onto the bridge. The bridge itself is never used for corrections: once a critical phase is over, the Captain takes anyone who needs one into the Ready Room. The viewport is directly above the plot table, so the Captain can look up along the course. The service crawl duct (the design doc's maintenance crawlspace) runs beside the spine and isn't drawn. The radiator wings sit below deck level, out from the keel.</figcaption>
+    </figure>
+  </section>
+
+  <div class="pair">
+    <section>
+      <h2>Bow view <small>looking aft</small></h2>
+      <figure>
+        <div class="sheet half">
+          <svg viewBox="0 0 520 360" role="img" aria-label="Bow view: a wide armoured shield on top, the hull with its one deck beneath it, the keel and drive bells below firing down, and radiator wings out to the sides inside the shadow of the shield. The crew feel gravity toward the keel.">
+            <defs>
+              <pattern id="b-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" class="hatch"/></pattern>
+              <marker id="b-ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+            </defs>
+            <line x1="260" y1="58" x2="260" y2="20" class="arrow" marker-end="url(#b-ar)"/>
+            <text x="272" y="34" class="lbl">travel</text>
+            <polygon points="116,102 116,84 132,70 388,70 404,84 404,102" fill="url(#b-hatch)" class="shield"/>
+            <rect x="243" y="63" width="34" height="7" class="glass"/>
+            <text x="116" y="60" class="lbl">dorsal shield</text>
+            <line x1="116" y1="102" x2="116" y2="196" class="dash"/>
+            <line x1="404" y1="102" x2="404" y2="196" class="dash"/>
+            <rect x="176" y="102" width="168" height="60" class="hull"/>
+            <rect x="182" y="110" width="156" height="40" class="deckband"/>
+            <line x1="182" y1="150" x2="338" y2="150" class="deckdash"/>
+            <text x="190" y="134" class="lbl sm dk">deck</text>
+            <circle cx="248" cy="124" r="3.5" class="solid"/><circle cx="260" cy="124" r="3.5" class="solid"/><circle cx="272" cy="124" r="3.5" class="solid"/>
+            <line x1="318" y1="114" x2="318" y2="146" class="arrow" marker-end="url(#b-ar)"/>
+            <line x1="324" y1="130" x2="410" y2="126" class="lead"/>
+            <text x="414" y="124" class="lbl">felt gravity</text>
+            <text x="414" y="138" class="lbl mut">toward the keel</text>
+            <rect x="128" y="162" width="48" height="4" class="solid"/>
+            <rect x="344" y="162" width="48" height="4" class="solid"/>
+            <text x="152" y="182" text-anchor="middle" class="lbl sm">radiators</text>
+            <text x="200" y="232" text-anchor="end" class="lbl sm mut">in the shield's shadow</text>
+            <rect x="212" y="162" width="96" height="36" class="hull"/>
+            <polygon points="226,198 246,198 252,218 220,218" class="drive"/><polygon points="222,222 250,222 240,272 232,272" class="plume"/>
+            <polygon points="274,198 294,198 300,218 268,218" class="drive"/><polygon points="270,222 298,222 288,272 280,272" class="plume"/>
+            <text x="306" y="262" class="lbl drv">exhaust</text>
+            <line x1="176" y1="300" x2="344" y2="300" class="dim"/>
+            <line x1="176" y1="293" x2="176" y2="307" class="dim"/><line x1="344" y1="293" x2="344" y2="307" class="dim"/>
+            <text x="260" y="295" text-anchor="middle" class="lbl mut">14 m hull</text>
+            <line x1="116" y1="336" x2="404" y2="336" class="dim"/>
+            <line x1="116" y1="329" x2="116" y2="343" class="dim"/><line x1="404" y1="329" x2="404" y2="343" class="dim"/>
+            <text x="260" y="331" text-anchor="middle" class="lbl mut">24 m shield</text>
+          </svg>
+        </div>
+        <figcaption>The shield overhangs the hull, and the radiator wings tuck into its <b>shadow</b> (the dashed lines), so nothing fragile faces the direction of travel. The viewport's armoured coaming sits on top of the shield, facing travel. The camera cluster on the bow face feeds the bridge viewscreen.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>Why the keel <small>where the drive goes decides the decks</small></h2>
+      <figure>
+        <div class="sheet half">
+          <svg viewBox="0 0 520 380" role="img" aria-label="Comparison. With the drive at the stern, thrust gravity points toward the stern, so decks stack like floors in a tower, fore is up, and ladders connect them. With the drive in the keel, gravity points toward the keel, so one deck runs from bow to stern with no stairs.">
+            <defs>
+              <pattern id="c-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" class="hatch"/></pattern>
+              <marker id="c-ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+            </defs>
+            <text x="130" y="30" text-anchor="middle" class="lbl hd">DRIVE AT THE STERN</text>
+            <text x="130" y="50" text-anchor="middle" class="lbl sm mut">fore</text>
+            <polygon points="100,70 115,56 145,56 160,70 160,256 100,256" class="hull"/>
+            <line x1="104" y1="96" x2="156" y2="96" class="deckline"/>
+            <line x1="104" y1="136" x2="156" y2="136" class="deckline"/>
+            <line x1="104" y1="176" x2="156" y2="176" class="deckline"/>
+            <line x1="104" y1="216" x2="156" y2="216" class="deckline"/>
+            <line x1="130" y1="72" x2="130" y2="252" class="dash"/>
+            <polygon points="112,256 148,256 156,276 104,276" class="drive"/>
+            <polygon points="108,280 152,280 136,330 124,330" class="plume"/>
+            <line x1="200" y1="220" x2="200" y2="96" class="arrow" marker-end="url(#c-ar)"/>
+            <text x="208" y="108" class="lbl sm">travel</text>
+            <text x="130" y="352" text-anchor="middle" class="lbl sm">decks stack like floors</text>
+            <text x="130" y="368" text-anchor="middle" class="lbl sm mut">fore is up · ladders</text>
+            <line x1="260" y1="20" x2="260" y2="370" class="dim"/>
+            <text x="390" y="30" text-anchor="middle" class="lbl hd">DRIVE IN THE KEEL</text>
+            <polygon points="306,150 314,140 486,140 486,150" fill="url(#c-hatch)" class="shield"/>
+            <polygon points="306,150 486,150 486,190 306,190 300,184 300,156" class="hull"/>
+            <rect x="304" y="158" width="180" height="26" class="deckband"/>
+            <line x1="304" y1="184" x2="484" y2="184" class="deckline"/>
+            <polygon points="366,190 374,202 486,202 486,190" class="hull"/>
+            <polygon points="392,202 408,202 413,216 387,216" class="drive"/><polygon points="389,220 411,220 403,262 397,262" class="plume"/>
+            <polygon points="448,202 464,202 469,216 443,216" class="drive"/><polygon points="445,220 467,220 459,262 453,262" class="plume"/>
+            <line x1="430" y1="132" x2="430" y2="64" class="arrow" marker-end="url(#c-ar)"/>
+            <text x="440" y="76" class="lbl sm">travel</text>
+            <text x="296" y="176" text-anchor="end" class="lbl sm mut">fore</text>
+            <text x="490" y="232" class="lbl sm mut">aft</text>
+            <text x="390" y="352" text-anchor="middle" class="lbl sm">one deck, bow to stern</text>
+            <text x="390" y="368" text-anchor="middle" class="lbl sm mut">fore is forward · no stairs</text>
+          </svg>
+        </div>
+        <figcaption>Thrust gravity always pulls toward the drive. With the drive at the stern, "down" is aft and the ship becomes a tower of floors. With the drive in the keel, "down" is the keel, so one deck can run the whole length. That's the deck you asked for, with the bridge forward.</figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <p class="note"><b>What it resembles.</b> In profile it sits between Nostromo's industrial tug and Serenity's single working deck, with Hermes from <i>The Martian</i> behind the radiators and the long-haul mission feel. The armoured back and the drive firing out of the keel are the Meridian's own.</p>
+</div>
