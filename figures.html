@@ -38,12 +38,12 @@ a { color: var(--dim); }
 'use strict';
 // A crew member and the Captain, in a plain, well-lit space: either translation and outfit for each (the Captain always fully dressed; the clothes
 // toggles are the crew member's), the two of them placed for a choice of situations, and where the crew member is with the Captain (defiance,
-// submission, comfort). Across the knee, at the rail and in the aftercare, the correction's own posing does it (js/session.js), with a block for
-// the bench and a rail. ?who=pilot&sex=f&outfit=uniform&clothes=down,up,up&csex=m&coutfit=uniform&pose=rest&def=0&sub=0&com=0&expr=calm&resp=0&view=three&spin=1
+// submission, desire, comfort). Across the knee, at the rail and in the aftercare, the correction's own posing does it (js/session.js), with a block for
+// the bench and a rail. ?who=pilot&sex=f&outfit=uniform&clothes=down,up,up&csex=m&coutfit=uniform&pose=rest&def=0&sub=0&des=0&com=0&expr=calm&resp=0&view=three&spin=1
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search), V3 = THREE.Vector3;
 const cfg = { who: q.get('who') || 'pilot', sex: q.get('sex') || 'f', outfit: q.get('outfit') || 'uniform', pose: q.get('pose') || 'rest', expr: q.get('expr') || 'calm', resp: +(q.get('resp') || 0),
   view: q.get('view') || 'three', spin: !!q.get('spin'), clothes: (q.get('clothes') || 'down,up,up').split(','),
-  cap: { sex: q.get('csex') || 'm', outfit: q.get('coutfit') || 'uniform' }, rel: { defiance: +(q.get('def') || 0), submission: +(q.get('sub') || 0), comfort: +(q.get('com') || 0) } };
+  cap: { sex: q.get('csex') || 'm', outfit: q.get('coutfit') || 'uniform' }, rel: { defiance: +(q.get('def') || 0), submission: +(q.get('sub') || 0), desire: +(q.get('des') || 0), comfort: +(q.get('com') || 0) } };
 if (!Crew.ROSTER[cfg.who]) cfg.who = 'pilot';
 
 // ── The space: a soft backdrop and floor, lit from three sides ──
@@ -81,7 +81,9 @@ const POSES = [['rest', 'At rest'], ['attention', 'Attention'], ['ease', 'At eas
 const BY_SESSION = { otk: 'otk', wall: 'wall', after: 'otk' };
 let F = null, C = null, ses = null;      // (the crew member and the Captain; or, across the knee, at the rail and in the aftercare, a correction's)
 const dressed = { top: 'down', bottoms: 'up', under: 'up' }, worn = () => ({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] });
-const relFor = () => ({ submission: cfg.rel.submission, comfort: cfg.rel.comfort, desire: 0 });
+// (the asexual crew member has no desire to speak of: it stays at nothing for them, whatever the slider says)
+const asexual = () => !!Crew.ROSTER[cfg.who].dynamic.asexual, desire = () => asexual() ? 0 : cfg.rel.desire;
+const relFor = () => ({ submission: cfg.rel.submission, comfort: cfg.rel.comfort, desire: desire() });
 function clear() {
   for (const G of [F, C]) if (G) scene.remove(G.root);
   if (ses) { for (const P of ses.people) scene.remove(P.f.root); scene.remove(ses.captain.root); }
@@ -133,15 +135,22 @@ function view(name) {
 // ── The panel ──
 const seg = (id, items, cur, fn) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const b = document.createElement('button'); b.textContent = label; b.className = v === cur ? 'on' : ''; b.onclick = () => fn(v); el.append(b); } };
 for (const id of Crew.IDS) { const o = document.createElement('option'); o.value = id; o.textContent = `${Crew.ROSTER[id].name} · ${Crew.ROSTER[id].role}`; $('who').append(o); }
-// where the crew member is with the Captain: defiance, submission, comfort (the stance they take; and in the aftercare, how close they sit)
-for (const [k, nm] of [['defiance', 'Defiance'], ['submission', 'Submission'], ['comfort', 'Comfort']]) {
-  const l = document.createElement('label'); l.textContent = nm; const r = document.createElement('input'); r.type = 'range'; r.min = 0; r.max = 100; r.step = 1; r.value = Math.round(cfg.rel[k] * 100);
-  const o = document.createElement('span'); o.textContent = r.value + '%';
-  r.oninput = () => { cfg.rel[k] = r.value / 100; o.textContent = r.value + '%'; if (ses) ses.setRel(cfg.who, relFor()); };
-  $('rel').append(l, r, o);
+// where the crew member is with the Captain: defiance, submission, desire, comfort (the stance they take; across the knee and at the rail,
+// how they take it, desire flushing them as the body responds; in the aftercare, how close they sit and whether they lean in). Desire is
+// greyed out for the asexual crew member.
+function relSliders() {
+  const el = $('rel'); el.innerHTML = '';
+  for (const [k, nm] of [['defiance', 'Defiance'], ['submission', 'Submission'], ['desire', 'Desire'], ['comfort', 'Comfort']]) {
+    const l = document.createElement('label'); l.textContent = nm; const r = document.createElement('input'); r.type = 'range'; r.min = 0; r.max = 100; r.step = 1; r.value = Math.round(cfg.rel[k] * 100);
+    const o = document.createElement('span'); o.textContent = r.value + '%';
+    if (k === 'desire' && asexual()) { r.disabled = true; r.value = 0; o.textContent = '—'; l.title = r.title = 'Asexual: no desire to speak of'; }
+    r.oninput = () => { cfg.rel[k] = r.value / 100; o.textContent = r.value + '%'; if (ses) ses.setRel(cfg.who, relFor()); };
+    el.append(l, r, o);
+  }
 }
+relSliders();
 for (const e of Object.keys(Figure.EXPRS)) { const o = document.createElement('option'); o.value = e; o.textContent = e; $('expr').append(o); }
-$('who').onchange = () => { cfg.who = $('who').value; build(); };
+$('who').onchange = () => { cfg.who = $('who').value; relSliders(); build(); };
 $('expr').onchange = () => { cfg.expr = $('expr').value; F.setExpr(cfg.expr); };
 // (the body's response, 0–1, as a session would drive it: ?resp=0.5 — the corrections so far go as far as half)
 $('resp').value = Math.round(cfg.resp * 100); $('respV').textContent = $('resp').value + '%';
@@ -167,7 +176,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (ses) { ses.current.resp = cfg.resp; ses.update(dt); F.setExpr(cfg.expr); }
-  else if (F) { pose(); F.setResponse(cfg.resp); F.tick(dt); C.tick(dt); }
+  else if (F) { pose(); F.setResponse(cfg.resp, { blush: Math.min(0.9, 1.4 * cfg.resp * desire()), chest: cfg.resp * desire() }); F.tick(dt); C.tick(dt); }      // (desire flushes them, as in a session)
   controls.autoRotate = cfg.spin; controls.autoRotateSpeed = 2.4; controls.update(); renderer.render(scene, camera); requestAnimationFrame(frame);
 }
 Figure.preload().then(() => { build(); view(cfg.view); requestAnimationFrame(frame); setTimeout(() => (window.ready = true), 300); });
