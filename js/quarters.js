@@ -145,7 +145,7 @@ function build(scene) {
 
   // ── The bunk down the fore wall: a pale oak frame, two drawers under it facing into the cabin, the mattress, the pillow at its head by the
   // night table, a blanket folded square at its foot; along the wall over it, a padded headboard the bunk's length (soft to lean on, and it
-  // quiets the cabin), a shelf over that with a warm strip under it; a curtain on a track along its open side, drawn back to the foot. Its own
+  // quiets the cabin), a shelf over that with a warm strip under it; a curtain on a track along its open side, drawn back to its head. Its own
   // group, so it never hides with the fore wall when the camera comes close: it's what they sit on. ──
   const bunk = new THREE.Group(); G.add(bunk);
   const bw = BX - X0, bl = BZ1 - BZ0, bc = (BZ0 + BZ1) / 2, bx = (X0 + BX) / 2;
@@ -164,7 +164,7 @@ function build(scene) {
   { const g = new THREE.PlaneGeometry(0.3, HT - 0.12 - (MT + 0.08), 24, 1), q = g.attributes.position;
     for (let i = 0; i < q.count; i++) { const x = q.getX(i); q.setZ(i, Math.sin(x * 60) * 0.025); }
     g.computeVertexNormals();
-    const cu = new THREE.Mesh(g, linenM); cu.rotation.y = Math.PI / 2; cu.position.set(BX - 0.02, (HT - 0.12 + MT + 0.08) / 2, BZ1 - 0.2); cu.castShadow = true; cu.receiveShadow = true; G.add(cu); }
+    const cu = new THREE.Mesh(g, linenM); cu.rotation.y = Math.PI / 2; cu.position.set(BX - 0.02, (HT - 0.12 + MT + 0.08) / 2, BZ0 + 0.2); cu.castShadow = true; cu.receiveShadow = true; G.add(cu); }
 
   // ── The night table in the corner at the bunk's head, as wide as the bunk: two drawers, a lamp on it ──
   const NT = 0.55;
