@@ -196,7 +196,8 @@ function build(scene) {
     wall: { at: new V3(-3.5, 0, -0.1), yaw: Math.PI, support: { kind: 'edge', y: 0.95, d: 0.85, bend: 0.95 } },
     table: { at: new V3(-0.55, 0, TZ), yaw: Math.PI / 2, top: 0.75, d: 0.55, w: 1.0, len: TX1 - TX0, grip: 'sides' },
     after: { at: new V3(2.3, 0, -2.48), yaw: 0, seatY: 0.44, beside: new V3(2.92, 0, -2.48) },
-    watch: [{ at: new V3(-5.2, 0, 3.9), yaw: 0 }, { at: new V3(-1.0, 0, 3.7), yaw: 0 }, { at: new V3(2.6, 0, 3.8), yaw: 0 }, { at: new V3(5.6, 0, 3.5), yaw: 0 }],
+    watch: [{ at: new V3(-5.2, 0, 3.9), yaw: 0 }, { at: new V3(-1.0, 0, 3.7), yaw: 0 }, { at: new V3(2.6, 0, 3.8), yaw: 0 }, { at: new V3(5.6, 0, 3.5), yaw: 0 },
+      { at: new V3(-3.2, 0, 3.6), yaw: 0 }, { at: new V3(3.9, 0, 4.3), yaw: 0 }],      // (six: room for everyone aboard but the one in the middle)
     corner: { at: new V3(6.55, 0, 2.6), yaw: Math.PI / 2, next: { base: new V3(0, 0, 0), step: new V3(0, 0, -0.75), yaw: Math.PI / 2 } },
   };
   // (the island's own camera on their face: across it, from the galley side)

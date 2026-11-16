@@ -287,9 +287,12 @@ function create(stage, bay, opts) {
         F.setExpr(P.outcome === 'word' ? 'sad' : 'teary');
         continue;
       }
-      const spot = bay.spots.watch[w++ % bay.spots.watch.length], f = focus();
+      // (more of them than the room has places: each lap round them stands beside a place, alternately to either side, never on top of
+      // whoever's there)
+      const ws_ = bay.spots.watch, spot = ws_[w % ws_.length], lap = Math.floor(w++ / ws_.length), f = focus(), at = spot.at.clone();
+      if (lap) { const to = new V3(f.x - at.x, 0, f.z - at.z).normalize(); at.addScaledVector(new V3(-to.z, 0, to.x), 0.7 * Math.ceil(lap / 2) * (lap % 2 ? 1 : -1)); }
       const waiting = !P.done && P.role === 'subject';
-      stand(F, spot.at, Math.atan2(f.x - spot.at.x, f.z - spot.at.z), { weight: i % 2 ? 0.6 : -0.6, look: waiting ? 0.3 : 0.15, headYaw: 0.05 * Math.sin(i * 1.7) });
+      stand(F, at, Math.atan2(f.x - at.x, f.z - at.z), { weight: i % 2 ? 0.6 : -0.6, look: waiting ? 0.3 : 0.15, headYaw: 0.05 * Math.sin(i * 1.7) });
       arms(F, waiting ? 'clasp' : HOLDS[i % HOLDS.length]);
       if (P.done) F.setExpr(P.outcome === 'word' ? 'sad' : 'teary'); else F.setExpr(P.role === 'witness' ? 'concerned' : 'shy');
     }
