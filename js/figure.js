@@ -683,7 +683,7 @@ function anchorsOn(F, geo) {
 // Expression and life: the face easing between expressions, blinking, breathing, the hands' grip, the rest pose, the flesh's give.
 function finish(F, spec) {
   F.expr = flatExpr('calm'); F.exprTo = flatExpr('calm'); F.exprName = 'calm'; F.drawn = {};
-  F.setExpr = name => { if (EXPRS[name]) { F.exprTo = flatExpr(name); F.exprName = name; } };
+  F.setExpr = (name, o) => { if (EXPRS[name]) { F.exprTo = flatExpr(name); F.exprName = name; if (o) Object.assign(F.exprTo, o); } };      // (o: any of it overridden, e.g. where the eyes look)
   F.t = Math.random() * 10; F.blink = 2 + Math.random() * 3; F.breath = 0.3; F.gaze = new V3(0, 0, 1);
   F.resp = { r: 0, lift: 0, ang: 0 }; F.blushAdd = 0; if (!F.setResponse) F.setResponse = (r, o) => { F.resp.r = clamp(r || 0, 0, 1); F.blushAdd = (o && o.blush) || 0; };
   F.tick = dt => tickFace(F, dt);

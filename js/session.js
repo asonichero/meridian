@@ -586,11 +586,14 @@ function create(stage, bay, opts) {
       const G = afterWith.f, Rl = afterWith.rel, close = 1 - (1 - 0.7 * Rl.comfort) * (1 - 0.6 * Rl.submission) * (1 - 0.7 * Rl.desire), lean = Math.max(Rl.submission, Rl.desire);
       seat(G, bench.beside.clone().add(new V3(-0.06 - 0.2 * close, 0, 0.02 - 0.04 * close)), -0.3 - 0.15 * close,
         { look: 0.3 + 0.22 * lean, lean: 0.1 + 0.06 * lean, roll: 0.14 + 0.1 * lean, headRoll: 0.18 + 0.24 * lean, headYaw: -0.2 - 0.15 * lean, spread: -0.03 });
-      // (the Captain looks at them: the head turned and tipped to their face, the shoulders a little with it)
+      // (the Captain looks at them: the head turned and tipped to their face, the shoulders a little with it. With their head on his shoulder his
+      // body angles to take them, leaning a touch away so his head stays clear of theirs, his face coming forward, his eyes on them)
       seat(captain, bench.at, 0, { lean: 0.02 }); const ch = W_(captain, 'head'), dl = W_(G, 'head').addScaledVector(UP, 0.04).sub(ch);
-      const yawTo = clamp(Math.atan2(dl.x, dl.z), -1.3, 1.3), pitchTo = clamp(Math.atan2(-dl.y, Math.hypot(dl.x, dl.z)), -0.3, 0.6);
-      seat(captain, bench.at, 0, { look: pitchTo * 0.8 + 0.06, headYaw: yawTo * 0.75, twist: yawTo * 0.2, roll: -0.03 - 0.03 * lean, headRoll: -0.08 * lean, lean: 0.02 });
-      for (const [sd, sx] of [['L', 1], ['R', -1]]) { const T = local(G, sx * 0.05, bench.seatY + 0.16, 0.24); reach(G, sd, T, toWorldDir(G, sx, -0.3, -0.4).normalize(), UP.clone().negate(), toWorldDir(G, -sx * 0.6, 0, 1).normalize()); G.grip(sd, 0.4, 0, 0.4); }
+      const yawTo = clamp(Math.atan2(dl.x, dl.z), -1.3, 1.3), pitchTo = clamp(Math.atan2(-dl.y, Math.hypot(dl.x, dl.z)), -0.3, 0.6), hy = yawTo * lerp(0.75, 0.2, lean);
+      seat(captain, bench.at, 0, { look: pitchTo * lerp(0.8, 0.35, lean) + 0.06, headYaw: hy, twist: yawTo * (0.2 + 0.12 * lean), roll: 0.06 * lean, headRoll: 0.07 * lean, lean: 0.02 });
+      const eyes = clamp((yawTo - hy) * 1.4, -1, 1);
+      for (const [sd, sx] of [['L', 1], ['R', -1]]) { const T = local(G, sx * 0.05, bench.seatY + 0.16, 0.24); reach(G, sd, T, toWorldDir(G, sx * 0.3, -0.6, -0.5).normalize(),      // (the elbows in at their sides)
+ UP.clone().negate(), toWorldDir(G, -sx * 0.6, 0, 1).normalize()); G.grip(sd, 0.4, 0, 0.4); }
       // the Captain's arm round them: the hand resting on their far shoulder, the elbow low behind their back; with submission and desire it
       // moves to between their shoulder blades and rubs there, slow circles. His other hand on his own knee. (Each hand on the skin: the palm on
       // the place, the wrist a hand's length back along the fingers.)
@@ -602,7 +605,7 @@ function create(stage, bay, opts) {
       reach(captain, 'L', L_.W, toWorldDir(G, 0.4, -0.7, -1).normalize(), L_.n.clone().negate(), L_.f); captain.grip('L', 0.25 - 0.1 * rub, 0.12, 0.25);
       const knee = W_(captain, 'shinR').addScaledVector(UP, 0.05 * s), kf = toWorldDir(captain, -0.15, -0.2, 1).normalize();
       reach(captain, 'R', knee.clone().addScaledVector(UP, 0.012).addScaledVector(kf, -0.085 * s), new V3(-1, -0.4, -0.5).normalize(), UP.clone().negate(), kf); captain.grip('R', 0.3, 0.1, 0.3);
-      captain.setExpr(Rl.desire > 0.6 ? 'soft' : 'caring');      // (care, warmth and authority in balance; softer where desire's between them)
+      captain.setExpr(Rl.desire > 0.6 ? 'soft' : 'caring', { look: eyes });      // (care, warmth and authority in balance; softer where desire's between them)
     } else { stand(captain, bench.at.clone().add(new V3(0.3, 0, 0.6)), 0, {}); }
     poseOthers(st.t);
     responses(dt);
