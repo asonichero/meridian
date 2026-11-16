@@ -15,7 +15,8 @@ const PLACE = {
 };
 
 // During: start (as they're placed), first (the first smack), flinching, struggling, edge, past (each the first time it's reached), plead
-// (now and then while it's hard), soothe (the palm on them, between), word (the safe word, called), end (when the Captain stops).
+// (now and then while it's hard), spent (now and then, rarely, once the fight's gone out of them: hardly words), soothe (the palm on them,
+// between), word (the safe word, called), end (when the Captain stops).
 const REACT = {
   scientist: {
     start: ['Understood. I— yes. Proceeding.', 'This is… a grounding protocol. I know. I agreed to it.'],
@@ -25,6 +26,7 @@ const REACT = {
     edge: ['I can’t think past it— I can’t— that’s the point, isn’t it—', 'Please— I’m here, I’m listening—'],
     past: ['I’m sorry— I’m sorry, I was so far away—'],
     plead: ['Captain—', 'Mm— please—'],
+    spent: ['…', 'Mm…', '…here.'],
     soothe: ['…oh.', 'That’s— thank you.'],
     word: '{word}. {word}— stop, please.',
     end: ['…I’m still here. That’s… strange to say.'],
@@ -37,6 +39,7 @@ const REACT = {
     edge: ['I’m tired, Captain— I’m so tired—', 'I didn’t want to bother you— ow— I know— I know—'],
     past: ['I can put it down. I can put it down now.'],
     plead: ['Captain—', 'Please—'],
+    spent: ['…', 'Hff…', 'Mm.'],
     soothe: ['…Thanks.', 'Mm.'],
     word: '{word}. That’s— {word}. I need it to stop.',
     end: ['…Copy. Thank you.'],
@@ -49,6 +52,7 @@ const REACT = {
     edge: ['I was scared, okay— I was scared—', 'Please— I’ll run the checklist, every time—'],
     past: ['I don’t want to be the one who gets us killed—'],
     plead: ['Captain, please—', 'C’mon—'],
+    spent: ['…', 'Hh…', '…okay.'],
     soothe: ['…Okay. Okay.', 'That’s… not fair, being nice now.'],
     word: '{word}! {word}— stop, that’s too much—',
     end: ['…Yeah. Yes, Captain.'],
@@ -61,6 +65,7 @@ const REACT = {
     edge: ['I can feel it all, all the time— I can’t keep it out—', 'It’s too loud in my head— please—'],
     past: ['It’s quiet. It’s gone quiet.'],
     plead: ['Please—', 'Captain—'],
+    spent: ['…', 'Mm…', '(a shaky breath)'],
     soothe: ['Oh— thank you.', '…That helps.'],
     word: '{word}— {word}, please, stop—',
     end: ['…Thank you. I mean it.'],
@@ -73,6 +78,7 @@ const REACT = {
     edge: ['I keep listening, I keep listening and there’s nothing—', 'Please— I can’t stop listening—'],
     past: ['…They can’t hear me. You can. All right.'],
     plead: ['Captain.', 'Please.'],
+    spent: ['…', '…quiet.', 'Mm.'],
     soothe: ['…Acknowledged.', 'Thank you.'],
     word: '{word}. {word}. Stop.',
     end: ['…Signal received.'],
@@ -85,6 +91,7 @@ const REACT = {
     edge: ['I didn’t think it would— I didn’t think it would help—', 'Please— I’m not arguing— I’m not—'],
     past: ['…It does help. Damn it. It helps.'],
     plead: ['Captain—', 'Please—'],
+    spent: ['…', 'Mm.', '…noted.'],
     soothe: ['…Clinically, that’s very good technique.', 'Mm. Thank you.'],
     word: '{word}. I’m calling it. {word}.',
     end: ['…I’ll need to revise some notes.'],

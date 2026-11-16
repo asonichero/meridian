@@ -609,7 +609,7 @@ def his_axis(T):
     """His parts' frame: the scrotum's centre and radii, the penis's root (well up in the body) and tip."""
     zp = front_z(T, CROTCH_Y + 0.025)
     return (np.array([0.0, CROTCH_Y - 0.02, zp - 0.03]), np.array([0.026, 0.031, 0.023]), np.array([0.0, CROTCH_Y + 0.05, zp - 0.026]),
-            np.array([0.0, CROTCH_Y - 0.052, zp + 0.01]))
+            np.array([0.0, CROTCH_Y - 0.05, zp + 0.024]))      # (forward enough to hang clear of the scrotum's front, not lying on it)
 def his_root(torso, leg):
     """Where his penis leaves the body (along its line, the first point outside the trunk and thighs), and its line: the lift's pivot."""
     St, Sl = Surface(torso), [Surface(leg, 1), Surface(leg, -1)]
@@ -626,7 +626,8 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     in the body so they join it without a crease; k: (girth, length, scrotum) for the shape keys toward smaller or larger. Returns the forms
     to join to the body, a field to cut from it, and how softly they're joined. Simple, soft forms, as the rest is."""
     if sex == 'f':
-        C = LAB_C + np.array([(k[1] - 1) * 0.01, CROTCH_Y, 0.0]); R_ = LAB_R * k[0]       # (k: fuller, and parting, with her response)
+        # (k: fuller and parting, with her response: fuller forward and down, hardly at all sideways into the thighs, parting a millimetre)
+        C = LAB_C + np.array([(k[1] - 1) * 0.004, CROTCH_Y, 0.0]); R_ = LAB_R * np.array([1 + (k[0] - 1) * 0.3, k[0], k[0]])
         def parts(P):
             # (each its own rounded form, the two meeting in the middle in a narrow V: the slit between them is where they meet)
             fl = [(1 - np.linalg.norm((P - C * np.array([sx, 1, 1])) / R_, axis=1)) * R_.min() for sx in (1, -1)]
@@ -638,7 +639,7 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     B = A + (tip - A) * kl
     def parts(P):
         q = np.linalg.norm((P - S0) / R0, axis=1); scrotum = (1 - q) * R0.min()
-        return smax(scrotum, capsule(P, A, B, 0.016 * kg, 0.0148 * kg), 0.012)
+        return smax(scrotum, capsule(P, A, B, 0.016 * kg, 0.0148 * kg), 0.004)      # (only a tight join: lifting, it comes away clean)
     return parts, None, 0.026
 
 def body_field(torso, leg, arm, sex, sexk=(1.0, 1.0, 1.0)):
@@ -787,14 +788,15 @@ def build(sex):
 def sex_weights(body, X, label, sex, torso, leg):
     """The sex goes with the pelvis (the automatic weighting splits it between the thighs, which tears it as the legs part): on it all hips,
     blending back to the automatic weights over a centimetre and a half round it. His penis, from where it leaves the body to the tip, then
-    goes onto its own bone for the lift (none of it at the root, all of it 2 cm out)."""
+    goes onto its own bone for the lift, all of it from where it leaves the body (so it lifts straight)."""
     parts = sex_parts(sex, Surface(torso))[0]
     k = ss(-0.015, -0.002, parts(X))
     w = np.zeros(len(X)); vg = body.vertex_groups; hips = vg['hips'].index; gs = vg.get('sex')
     if sex == 'm':
         E, u = his_root(torso, leg); S0, R0, A, tip = his_axis(Surface(torso))
         cap = capsule(X, A, tip, 0.016, 0.0148); scr = (1 - np.linalg.norm((X - S0) / R0, axis=1)) * R0.min()
-        w = ss(-0.003, 0.003, cap - scr) * ss(-0.004, 0.022, (X - E) @ u) * (label == 'sex')
+        # (the whole length rigidly, so it lifts straight: blending only across the centimetre where it leaves the body)
+        w = ss(-0.004, 0.003, cap - scr) * ss(-0.006, 0.006, (X - E) @ u) * (label == 'sex')
     for v in body.data.vertices:
         i = v.index; own = gs.index if gs else -1
         if k[i] <= 0 and w[i] <= 0 and not (gs and any(g.group == own for g in v.groups)): continue
@@ -884,7 +886,8 @@ def landmarks(sex, torso):
     L['cuffA'] = ARM_LEN - 0.014; L['rollA'] = ARM_LEN * 0.6
     L['trouserTop'] = L['waist'] - 0.012; L['trouserFoot'] = 0.115
     L['briefTop'] = CROTCH_Y + (0.135 if sex == 'f' else 0.155); L['briefLeg'] = CROTCH_Y - (0.0 if sex == 'f' else 0.075)
-    L['briefCut'] = [0.022, CROTCH_Y - 0.03, 0.64]       # (her leg openings: a line from beside the gusset's bottom (x, y) rising at this slope to the hip)
+    L['briefCut'] = [0.022, CROTCH_Y - 0.03, 0.64]
+    if sex == 'm': _, _, A_, t_ = his_axis(Surface(torso)); L['sexRest'] = float(math.atan2(t_[2] - A_[2], A_[1] - t_[1]))      # (how far forward of straight down he hangs)       # (her leg openings: a line from beside the gusset's bottom (x, y) rising at this slope to the hip)
     L['downTop'] = KNEE_Y + 0.085; L['briefDown'] = CROTCH_Y - 0.115
     L['bootTop'] = 0.205; L['hipX'] = float(at(LEG, CROTCH_Y - 0.02, 'cx')); L['shX'] = SH_X; L['abd'] = ABD
     return {k: ([float(a) for a in v] if isinstance(v, list) else float(v)) for k, v in L.items()}

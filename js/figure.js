@@ -137,9 +137,9 @@ if (uNape.z > 0.5 && vBind.y > uNape.x + max(0.0, vBind.z - uNape.y) * uNape.w) 
 // (the body's response (F.setResponse): blood to the sex, a deeper, rosier tone there; his, the whole length as it hangs at rest, and the
 // scrotum; hers, the outer forms and the bottom of the mons)
 if (uFlush.x > 0.001) {
-  float lo = uFlush.y - (uFlush.w > 0.5 ? 0.125 : 0.035), hi = uFlush.y + (uFlush.w > 0.5 ? 0.06 : 0.022), wx = uFlush.w > 0.5 ? 0.042 : 0.03;
+  float lo = uFlush.y - (uFlush.w > 0.5 ? 0.125 : 0.042), hi = uFlush.y + (uFlush.w > 0.5 ? 0.06 : 0.034), wx = uFlush.w > 0.5 ? 0.042 : 0.032;
   float fw = (1.0 - smoothstep(wx - 0.022, wx, abs(vBind.x))) * smoothstep(lo, lo + 0.015, vBind.y) * (1.0 - smoothstep(hi - 0.02, hi, vBind.y)) * smoothstep(uFlush.z - 0.03, uFlush.z, vBind.z);
-  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.9, 0.7, 0.72), fw * uFlush.x);
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.86, 0.54, 0.58), fw * uFlush.x);
 }
 float g = fn3(vBind * uGrainScale) * 0.6 + fn3(vBind * uGrainScale * 2.7) * 0.4;
 diffuseColor.rgb *= 1.0 + uGrain * (g - 0.5) * 2.0;
@@ -1045,6 +1045,7 @@ const EXPRS = {
   teary: { brow: 0.38, browY: 0.04, open: 0.7, mouth: 'soft', blush: 0.6, tears: 0.6, ms: 1.0 }, soft: { brow: 0.12, browY: 0.03, open: 0.8, mouth: 'soft', blush: 0.1, ms: 1.0 },
 };
 const flatExpr = name => { const e = EXPRS[name] || EXPRS.calm, m = MOUTHS[e.mouth] || MOUTHS.flat; return Object.assign({ brow: 0, browY: 0, open: 0.95, look: 0, blush: 0, tears: 0, ms: 1, sq: 0 }, e, m); };
+const SEX_REST = 0.46, _sq = new THREE.Quaternion(), _sv = new V3();      // (his, at rest, hangs this far forward of straight down)
 function tickFace(F, dt) {
   F.t += dt;
   const kk = 1 - Math.exp(-dt * 8), x = F.expr, to = F.exprTo;
@@ -1065,8 +1066,14 @@ function tickFace(F, dt) {
     J.v += (-wv * wv * J.x - 2 * z * wv * J.v) * dt; J.x += J.v * dt; J.x = clamp(J.x, -0.02, 0.02);
     const g = F.bone['glute' + sd]; g.position.set(F.rest0['glute' + sd].x, F.rest0['glute' + sd].y + 0.35 * J.x, F.rest0['glute' + sd].z + J.x);
   }
-  // his lift (F.setResponse), eased toward: it comes up slowly and settles, never snapping (about the bone's own x: down toward forward)
-  if (F.bone.sex) { const R = F.resp; R.ang += (R.lift - R.ang) * (1 - Math.exp(-dt * 0.8)); F.bone.sex.rotation.x = -R.ang; }
+  // his: with no response it hangs with gravity, whichever way the body lies (turned from its rest toward the ground, never back through the
+  // thighs); as the response rises it lifts away from that toward where the response puts it, straight. Eased: it swings and settles, it
+  // never snaps. (About the bone's own x: from down toward forward.)
+  if (F.bone.sex) {
+    const R = F.resp, b = F.bone.sex; b.parent.getWorldQuaternion(_sq); _sv.set(0, -1, 0).applyQuaternion(_sq.invert());
+    const grav = clamp(Math.atan2(_sv.z, -_sv.y) - (F.L && F.L.sexRest != null ? F.L.sexRest : SEX_REST), 0, 2.0), u = clamp((R.r - 0.1) / 0.35, 0, 1), want = grav + (R.lift - grav) * u * u * (3 - 2 * u);
+    R.ang += (want - R.ang) * (1 - Math.exp(-dt * 2.5)); b.rotation.x = -R.ang;
+  }
   if (F.tail) {
     const pv = F.tail.piv, q = new THREE.Quaternion(); pv.parent.getWorldQuaternion(q);
     const down = new V3(0, -1, 0).applyQuaternion(q.invert());
@@ -1201,10 +1208,10 @@ function makeGLB(spec, T) {
   // (eased toward, in tick), a deeper tone there; and, given, a blush on the face besides whatever the expression has.
   F.setResponse = (r, o) => {
     r = clamp(r || 0, 0, 1); o = o || {};
-    const swell = clamp(r * 1.2, 0, 1), u = clamp((r - 0.12) / 0.88, 0, 1);
+    const swell = clamp(r * (spec.sex === 'f' ? 0.9 : 1.2), 0, 1), u = clamp((r - 0.12) / 0.88, 0, 1);
     F.resp.r = r; F.resp.lift = 2.0 * u * u * (3 - 2 * u);
     if (Math.abs((F.keys.sexSwell || 0) - swell) > 0.004) { F.keys.sexSwell = swell; F.root.traverse(m => { if (m.isSkinnedMesh && m.morphTargetInfluences) setKeys(m, F.keys); }); }
-    skinM.userData.u.uFlush.value.set(clamp(r * 1.1, 0, 1), T.L.crotch, 0.0, spec.sex === 'm' ? 1 : 0);
+    skinM.userData.u.uFlush.value.set(clamp(r * 1.7, 0, 1), T.L.crotch, 0.0, spec.sex === 'm' ? 1 : 0);
     F.blushAdd = o.blush || 0;
   };
   { const hm = dqs(paint(new THREE.MeshBasicMaterial(Object.assign({ color: srgb(INK), side: THREE.BackSide, skinning: true, morphTargets: true }, HULL_OFS)), { regions: true, grain: 0 })); hm.userData.u.uHide = skinM.userData.u.uHide; hm.userData.u.uNape = skinM.userData.u.uNape; ink(F.body, INK_W, F, hm); }

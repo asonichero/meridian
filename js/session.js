@@ -23,7 +23,7 @@ const AREAS = ['cheek', 'sitspot', 'thighs'];
 const SOOTHE = ['cheekL', 'cheekR', 'sitspotR', 'sitspotL', 'thighsL', 'thighsR'];
 const UP = new V3(0, 1, 0);
 const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-const freshReact = () => ({ fight: 1, ff: 1, A: 0, bout: 0, cad: 2.6, stepPh: 0, stepAmp: 0, step: 0, ph: [0, 1, 2, 3, 4].map(() => Math.random() * 20), n: { kicks: 0, bucks: 0, bouts: 0, stamps: 0 } });
+const freshReact = () => ({ fight: 1, ff: 1, A: 0, bout: 0, cad: 2.6, stepPh: 0, stepAmp: 0, step: 0, ph: [0, 1, 2, 3, 4].map(() => Math.random() * 20), n: { kicks: 0, bucks: 0, bouts: 0, stamps: 0, reaches: 0 } });
 const yawQ = yaw => new Q().setFromAxisAngle(UP, yaw);
 
 function create(stage, bay, opts) {
@@ -51,7 +51,7 @@ function create(stage, bay, opts) {
   // (opts.desire, for later ones where desire is present, lets it go all the way). Each crew member has their own scale (Crew: body.response;
   // a bodily response, not a measure of desire). The Captain's builds more slowly, from giving it; he keeps most of it in check, and what shows
   // grows with the affection between him and the one in his care, given and returned (Crew: dynamic.bond), and he colours a little. ──
-  const RESP = { hit: 0.045, soothe: 0.03, warm: 0.012, tau: 150, captain: 0.6, cap: opts.desire ? 1 : 0.5 };
+  const RESP = { hit: 0.005, soothe: 0.006, warm: 0.003, tau: 150, captain: 0.6, cap: opts.desire ? 1 : 0.5 };
   let capResp = 0;
   const respond = (P, amt) => {
     const k = P.r.body && P.r.body.response != null ? P.r.body.response : 1;
@@ -75,22 +75,26 @@ function create(stage, bay, opts) {
   const sp = {}; for (const k of ['kick', 'kickO', 'lift', 'wrig', 'toe', 'fwd', 'stamp', 'flinch', 'arch', 'head', 'grip', 'raise', 'rebound']) sp[k] = spring(15, 0.5);
   sp.raise.w = 9; sp.raise.z = 0.9; sp.rebound.w = 30; sp.rebound.z = 0.35;
   const kickSp = (k, v) => { sp[k].v += v; };
-  for (const k of ['lkL', 'lkR', 'twist', 'shift']) sp[k] = spring(14, 0.45);
+  for (const k of ['lkL', 'lkR', 'twist', 'shift', 'away', 'armL', 'armR', 'shrug']) sp[k] = spring(14, 0.45);
+  sp.rbL = spring(7, 0.55); sp.rbR = spring(7, 0.55);
   sp.buck = spring(9, 0.42);
 
   // ── How they fight it ──
   // Agitation: how much they're moving, from nothing while composed, rising through flinching and struggling to its height at the edge of
-  // resistance. The fight in them: well past the edge, while it goes on, it drains out of them (in half a minute or so deep into it, faster the
-  // deeper), and they still again on a plateau, breathing hard, taking each smack with less and less; back below the edge it slowly returns.
+  // resistance. The fight in them: past the edge it goes out of them, and by five eighths of the way from the edge to their safe word they've
+  // stilled (the player's tell to wind down): breathing hard, head hanging, still answering each smack, but less; as distress falls it slowly
+  // returns. They know it's for their good and try to hold their position: what moves, until they're still, is involuntary.
   // Their temperament (Crew.wriggle: the smaller, the more) sets how much of what agitation there is goes into squirming and kicking.
-  // Over the knee: light kicks now and then, squirming (the hips, the back, the legs scissoring), and at its worst a buck, the hips heaving up off
-  // the lap. At the rail: no wriggling, but stepping, in bouts of a few seconds, and a stamp now and then on a hard smack.
+  // Over the knee: light kicks now and then (from the knee, the foot leaving the deck), squirming (the hips rolling, pulling away from the side
+  // struck, the back, the legs scissoring), and at its worst a buck, the hips heaving up off the lap. At the rail: no wriggling, but stepping,
+  // in bouts of a few seconds, and a stamp now and then on a hard smack. The men don't kick from the hip or stamp: at the rail their stepping is
+  // a shift of the weight, a heel coming up.
   function react(dt) {
     const P = cur, R = P.rx, D = P.pain.distress(), under = st.running || !!st.swing, otk = st.position === 'otk';
-    if (under) R.fight -= dt * 0.035 * sm(1.1, 1.5, D);
-    if (D < S.PAIN.EDGE) R.fight += dt * (1 - R.fight) / 60;
-    R.fight = clamp(R.fight, 0.06, 1); R.ff = sm(0.12, 0.7, R.fight);
-    R.A = sm(0.15, 0.95, D) * lerp(0.04, 1, R.ff);
+    const E = S.PAIN.EDGE, Hh = S.PAIN.TOO_HARSH, tgt = 1 - sm(E + 0.3 * (Hh - E), E + 0.625 * (Hh - E), D);
+    R.fight += (tgt - R.fight) * (tgt < R.fight ? 1 - Math.exp(-dt * 2) : dt / 45);      // (going: as fast as distress rises; coming back: slowly)
+    R.fight = clamp(R.fight, 0, 1); R.ff = R.fight;
+    R.A = sm(0.15, 0.95, D) * lerp(0.05, 1, R.ff);
     const A = R.A, Wg = P.wrig, act = under ? 1 : 0.3;
     // stepping, in bouts: a few seconds of it now and then once it really hurts, then not
     if (R.bout > 0) R.bout -= dt;
@@ -100,8 +104,20 @@ function create(stage, bay, opts) {
       // a light kick now and then, one leg flicking up
       if (Math.random() < dt * 0.6 * A * (0.05 + 0.95 * Wg) * act) { kickSp(Math.random() < 0.5 ? 'lkL' : 'lkR', (4 + 5 * Math.random()) * (0.4 + 0.6 * A)); R.n.kicks++; }
       // and, at its worst, a buck
-      if (Math.random() < dt * 0.025 * A * A * Wg * act) { kickSp('buck', 5 + 4 * A); R.n.bucks++; }
-    }
+      if (Math.random() < dt * 0.015 * A * A * Wg * act) { kickSp('buck', 5 + 4 * A); R.n.bucks++; }
+      // a hand that won't stay put: off the deck a moment, or starting back toward the seat before they stop it
+      if (Math.random() < dt * 0.25 * A * (0.3 + 0.7 * Wg) * act) kickSp(Math.random() < 0.5 ? 'armL' : 'armR', 3 + 3 * Math.random());
+      if (A > 0.5 && Math.random() < dt * 0.08 * A * Wg * act) { kickSp(Math.random() < 0.5 ? 'rbL' : 'rbR', 4 + 2 * A); R.n.reaches++; }
+    } else if (A > 0.4 && Math.random() < dt * 0.05 * A * act) kickSp(Math.random() < 0.5 ? 'armL' : 'armR', 3 + 2 * Math.random());      // (at the rail: a hand lets go and grips again)
+  }
+
+  // A knee bent further than the leg's pose has it: the lower leg turned about the hinge (their own left–right), the foot with it.
+  const _kq = new Q(), _kr = new Q();
+  function flexKnee(F, side, a) {
+    if (a <= 0.001) return;
+    const shin = F.bone['shin' + side], ax = toWorldDir(F, 1, 0, 0).normalize();
+    shin.getWorldQuaternion(_kq); _kr.setFromAxisAngle(ax, a).multiply(_kq);
+    shin.parent.getWorldQuaternion(_kq).invert(); shin.quaternion.copy(_kq.multiply(_kr)); shin.updateMatrixWorld(true);
   }
 
   // ── Positions ──
@@ -196,7 +212,8 @@ function create(stage, bay, opts) {
     const wrig = sp.wrig.to(sq * (Math.sin(t * 2.3 + ph[0]) * 0.6 + Math.sin(t * 3.9 + ph[1]) * 0.4), dt);
     const twist = sp.twist.to(sq * (Math.sin(t * 1.4 + ph[2]) * 0.6 + Math.sin(t * 5.1 + ph[3]) * 0.4), dt), shift = sp.shift.to(sq * Math.sin(t * 0.47 + ph[4]), dt);
     const k = sp.kick.to(0, dt), ko = sp.kickO.to(0, dt), fl = sp.flinch.to(0, dt), ar = sp.arch.to(0, dt), bk = sp.buck.to(0, dt);
-    const lk = { L: sp.lkL.to(0, dt), R: sp.lkR.to(0, dt) }, spent = 1 - R.ff;
+    const lk = { L: sp.lkL.to(0, dt), R: sp.lkR.to(0, dt) }, spent = 1 - R.ff, aw = otk ? sp.away.to(0, dt) : 0, shr = sp.shrug.to(0, dt);
+    const armUp = { L: sp.armL.to(0, dt), R: sp.armR.to(0, dt) }, rb = { L: sp.rbL.to(0, dt), R: sp.rbR.to(0, dt) };
     // (spent: the head hangs, the hands loosen, the breath long)
     const hd = sp.head.to(0.15 * dd * R.ff - 0.3 * dd * spent, dt);
     const g = sp.grip.to((0.25 + 0.75 * dd) * (0.35 + 0.65 * R.ff), dt);
@@ -206,27 +223,34 @@ function create(stage, bay, opts) {
       placeOTK(P, fl);
       // over the left thigh the back rounds down toward the deck, the head up and turned to the room; on a smack the back arches and the head
       // comes up. Squirming rolls and turns the hips and the back; a buck heaves the hips up off the lap, the back hollowing under it.
-      F.bone.hips.position.z -= 0.035 * Math.max(0, bk) * s;
-      F.bone.hips.rotation.set(0.04 - 0.05 * ar - 0.16 * bk, 0.1 * wrig + 0.07 * shift, 0.06 * wrig + 0.09 * shift + 0.04 * fl * (J.side === 'L' ? 1 : -1));
-      F.bone.spine.rotation.set(0.04 - 0.08 * ar + 0.12 * bk, 0.08 * twist, 0.03 * wrig + 0.05 * twist);
+      F.bone.hips.position.z -= 0.035 * Math.max(0, bk) * s; F.bone.hips.position.x += 0.022 * (wrig + aw) * s;
+      F.bone.hips.rotation.set(0.04 - 0.05 * ar - 0.16 * bk, 0.26 * wrig + 0.14 * shift + 0.3 * aw, 0.07 * wrig + 0.09 * shift + 0.04 * fl * (J.side === 'L' ? 1 : -1));
+      F.bone.spine.rotation.set(0.04 - 0.08 * ar + 0.12 * bk, -0.1 * wrig + 0.1 * twist - 0.12 * aw, 0.03 * wrig + 0.05 * twist);
       F.bone.chest.rotation.set(0.85 - 0.14 * ar + 0.06 * bk + 0.12 * spent * dd, 0.04 * twist, 0);
       F.bone.neck.rotation.set(-0.7 - 0.4 * hd - 0.2 * ar - 0.15 * bk, -0.7 + (0.1 * dd * R.ff + 0.12 * sq) * Math.sin(t * 1.7 + ph[1]), -0.1);
+      F.bone.clavL.rotation.z += 0.1 * Math.max(0, shr); F.bone.clavR.rotation.z -= 0.1 * Math.max(0, shr);
       F.root.updateMatrixWorld(true);
       // legs: the toes on the deck beyond the bench's end, knees soft; a kick bends the knee, the foot leaving the deck (the side struck on a
       // smack, either now and then as they squirm); squirming scissors them a little; stepping lifts one foot then the other
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
-        const kk = Math.max(0, (side === J.side ? k : ko) + lk[side] + 0.3 * Math.max(0, sx * wrig) + 0.6 * Math.max(0, side === 'L' ? pedal : -pedal));
+        // (kicks come from the knee: the lower leg flicking up, the foot leaving the deck; the hip goes with it only a little)
+        const kick = side === J.side ? k : ko, knee = Math.max(0, 1.15 * kick + 1.3 * lk[side] + 0.8 * Math.max(0, side === 'L' ? pedal : -pedal));
+        const kk = P.sex === 'm' ? 0 : Math.max(0, 0.3 * kick + 0.3 * Math.max(0, sx * wrig));      // (the men: none from the hip at all)
         const Wt = otkH.clone().addScaledVector(otkU, -(0.62 * s - 0.2 * kk) + sx * 0.05 * twist * s).addScaledVector(otkX, sx * (0.085 * s + 0.04 * kk)); Wt.y = 0.06 + 0.5 * kk;
         legTo(F, side, Wt, new V3(-0.15, -1, 0).normalize());
-        F.bone['foot' + side].rotation.x = 1.0 - 0.35 * kk; F.bone['toe' + side].rotation.x = -0.6 + 0.3 * kk;
+        flexKnee(F, side, Math.min(1.5, knee));
+        F.bone['foot' + side].rotation.x = 1.0 - 0.3 * Math.min(1, knee); F.bone['toe' + side].rotation.x = -0.6 + 0.3 * Math.min(1, knee);
       }
       // the hands down to the deck, a little ahead of the shoulders and out to their sides, the elbows soft: braced flat on it where they reach
       // it, else hanging, the fingertips brushing it; on a smack they push and grip
       const lift = sp.lift.to(0, dt);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
         const shd = W_(F, 'upperArm' + side), out = otkX.clone().multiplyScalar(sx), arm = (F.bone['foreArm' + side].position.length() + F.bone['hand' + side].position.length()) * s;
-        const Wt = new V3(shd.x, 0, shd.z).addScaledVector(otkU, 0.1 * s + 0.02 * lift).addScaledVector(out, 0.05 * s); Wt.y = 0.032 + 0.02 * Math.max(0, lift);
-        const short = clamp((Wt.distanceTo(shd) - arm * 0.97) / (0.08 * s), 0, 1);      // (0: it reaches the deck … 1: well short of it)
+        const up = Math.max(0, armUp[side]), back = clamp(rb[side], 0, 0.55);
+        const Wt = new V3(shd.x, 0, shd.z).addScaledVector(otkU, 0.1 * s + 0.02 * lift - 0.05 * up * s).addScaledVector(out, 0.05 * s); Wt.y = 0.032 + 0.02 * Math.max(0, lift) + 0.09 * up * s;
+        // (a hand starting back toward the seat, as if to cover it, before they stop it: never more than halfway)
+        if (back > 0.01) Wt.lerp(W_(F, 'hips').addScaledVector(out, 0.16 * s).addScaledVector(UP, 0.06 * s), back);
+        const short = Math.max(clamp((Wt.distanceTo(shd) - arm * 0.97) / (0.08 * s), 0, 1), clamp(3 * up + 2 * back, 0, 1));      // (0: on the deck … 1: off it)
         const flat = otkU.clone().addScaledVector(out, 0.35).normalize(), hang = UP.clone().negate().addScaledVector(otkU, 0.35).normalize();
         const fingers = flat.clone().lerp(hang, short).normalize(), palm = new V3(0, -1, 0).lerp(otkU.clone().negate(), short).normalize();
         reach(F, side, Wt, out.clone().addScaledVector(otkU, -0.6).addScaledVector(UP, 0.3).normalize(), palm, fingers);
@@ -246,7 +270,8 @@ function create(stage, bay, opts) {
       const stamp = sp.stamp.to(0, dt);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
         const st_ = side === J.side ? Math.max(0, stamp) : 0, pd = side === 'L' ? Math.max(0, pedal) : Math.max(0, -pedal);
-        const up = 0.03 * Math.max(0, toe) + 0.16 * st_ + 0.1 * pd;
+        // (the men don't lift a foot: their stepping is a shift of the weight, a heel coming up, the foot staying on the deck)
+        const up = 0.03 * Math.max(0, toe) + (P.sex === 'm' ? 0 : 0.16 * st_ + 0.1 * pd);
         legTo(F, side, local(F, sx * 0.25, ankleY(F) + up, 0.0 - 0.1 * st_), toWorldDir(F, sx * 0.15, 0.1, 1).normalize());
         footFlat(F, side, toWorldDir(F, sx * 0.12, 0, 1).normalize(), clamp(toe * 1.2 + st_ + pd, 0, 1));
       }
@@ -255,9 +280,11 @@ function create(stage, bay, opts) {
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
         const fdir = toWall.clone().addScaledVector(UP, -0.25).normalize();
         const G = local(F, sx * 0.25 * s, 0, 0); G.set(RL.x, RL.y, G.z);
-        const Wt = G.clone().addScaledVector(fdir, -0.07 * hk).addScaledVector(UP, 0.036);
+        const off = clamp(armUp[side], 0, 1);
+        const Wt = G.clone().addScaledVector(fdir, -0.07 * hk - 0.03 * off).addScaledVector(UP, 0.036 + 0.05 * off);
         reach(F, side, Wt, toWorldDir(F, sx * 1, -0.6, -0.2).normalize(), UP.clone().negate().addScaledVector(toWall, 0.25).normalize(), fdir);
-        F.grip(side, 0.72 + 0.2 * g, 0.05, 0.7);
+        F.grip(side, clamp(0.72 + 0.2 * g - 0.7 * off, 0.1, 1), 0.05, 0.7);
+        F.bone['clav' + side].rotation.z += sx * 0.12 * Math.max(0, shr);
       }
     }
     F.breath = 0.3 + 0.7 * dd;
@@ -348,12 +375,15 @@ function create(stage, bay, opts) {
     const r = hit.reaction, R = P.rx;
     P.f.impact(sw.side, r * (0.6 + 0.4 * st.strength) * (cushion() > 0.3 ? 0.4 : 1));
     // (how much of the smack they show: the stoic less, and less again as the fight goes out of them)
-    const m = (0.45 + 0.55 * P.wrig) * lerp(0.35, 1, R.ff), rm = r * m;
-    kickSp('kick', 9 * rm); kickSp('kickO', 3 * rm * Math.random()); kickSp('flinch', 6 * r * lerp(0.5, 1, R.ff)); kickSp('arch', 5 * rm); kickSp('head', 6 * rm); kickSp('lift', 4 * rm);
+    const m = (0.45 + 0.55 * P.wrig) * lerp(0.5, 1, R.ff), rm = r * m, away = sw.side === 'L' ? 1 : -1;
+    kickSp('kick', 10 * rm); kickSp('kickO', 4 * rm * Math.random()); kickSp('flinch', 6 * r * lerp(0.5, 1, R.ff)); kickSp('arch', 5 * rm); kickSp('head', 6 * rm); kickSp('lift', 4 * rm);
     kickSp('toe', 5 * r * lerp(0.5, 1, R.ff)); kickSp('rebound', 6); kickSp('grip', 3 * rm);
-    if (st.position === 'otk') { if (r > 0.5 && Math.random() < 0.08 * R.A * R.A * P.wrig) { kickSp('buck', 6 + 5 * R.A); R.n.bucks++; } }
-    else if (r > 0.5 && Math.random() < 0.28 * R.A * (0.35 + 0.65 * P.wrig)) { kickSp('stamp', 9 * r); R.n.stamps++; }
-    if (st.sound && A && A.ctx) { A.thwack(hit.reaction, cushion() > 0.3); A.voice(hit.reaction * lerp(0.55, 1, R.ff), bandIndex(), false, 0.9, P.pitch); }
+    // (and, until they've stilled, the involuntary: the hips pulling away from the side struck, a hand coming up, the shoulders hunching)
+    kickSp('away', away * 7 * rm * (0.4 + 0.6 * P.wrig) * R.ff); kickSp('shrug', 5 * rm);
+    for (const sd of ['L', 'R']) if (Math.random() < 0.5) kickSp('arm' + sd, 3.5 * rm * R.ff * Math.random());
+    if (st.position === 'otk') { if (r > 0.5 && Math.random() < 0.045 * R.A * R.A * P.wrig) { kickSp('buck', 6 + 5 * R.A); R.n.bucks++; } }
+    else if (P.sex !== 'm' && r > 0.5 && Math.random() < 0.28 * R.A * (0.35 + 0.65 * P.wrig)) { kickSp('stamp', 9 * r); R.n.stamps++; }      // (the men don't stamp)
+    if (st.sound && A && A.ctx) { A.thwack(hit.reaction, cushion() > 0.3); if (Math.random() < lerp(0.45, 1, R.ff)) A.voice(hit.reaction * lerp(0.55, 1, R.ff), bandIndex(), false, 0.9, P.pitch); }
     emit('hit', { hit, side: sw.side, area: st.area, distress: P.pain.distress(), band: BANDS[bandIndex()], hits: P.hits });
     scripted();
   }
@@ -391,7 +421,9 @@ function create(stage, bay, opts) {
     if (P.hits === 1 && !P.said.first) { P.said.first = 1; say('subject', L.react(P.id, 'first'), P); return; }
     const keys = [null, 'flinching', 'struggling', 'edge', 'past'];
     if (b > P.bandSeen && b <= 4) { P.bandSeen = b; if (keys[b] && !P.said[keys[b]]) { P.said[keys[b]] = 1; say('subject', L.react(P.id, keys[b]), P); return; } }
-    if (b >= 2 && sayCool <= 0 && Math.random() < 0.12) say('subject', L.react(P.id, 'plead'), P);
+    // (as the fight goes out of them they say less, and less in words: past halfway to stillness, now and then a breath or a fragment)
+    if (P.rx.ff < 0.5) { if (sayCool <= 0 && Math.random() < 0.05) say('subject', L.react(P.id, 'spent'), P); return; }
+    if (b >= 2 && sayCool <= 0 && Math.random() < 0.12 * (0.4 + 0.6 * P.rx.ff)) say('subject', L.react(P.id, 'plead'), P);
   }
 
   // ── Turns ──

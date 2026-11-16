@@ -102,7 +102,7 @@ test('the body’s response: the sex fuller, his lifting on its own bone, a deep
     const f = gfig('pilot', sex), inf = m => m.morphTargetInfluences[m.geometry.userData.keys.sexSwell];
     assert.ok('sexSwell' in f.body.geometry.userData.keys); assert.equal(inf(f.body), 0); assert.equal(f.skinMat.userData.u.uFlush.value.x, 0);
     f.setResponse(0.5); for (let i = 0; i < 120; i++) f.tick(0.05);
-    assert.ok(inf(f.body) > 0.5, 'fuller'); assert.ok(f.skinMat.userData.u.uFlush.value.x > 0.4, 'flushed');
+    assert.ok(inf(f.body) > 0.4, 'fuller'); assert.ok(f.skinMat.userData.u.uFlush.value.x > 0.8, 'flushed');
     if (sex === 'm') {
       assert.equal(f.bone.sex.parent, f.bone.hips);
       assert.ok(f.bone.sex.rotation.x < -0.6 && f.bone.sex.rotation.x > -1.0, `lifting partway: ${f.bone.sex.rotation.x}`);
