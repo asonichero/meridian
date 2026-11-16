@@ -24,15 +24,25 @@ const PAIN = {
   // (HARSH_HOLD seconds) before it counts, or overshot by a quarter, so a correction can run long without tripping it: since the player is the
   // one who disciplines, this is what the crew member's safe word is called on (js/session.js).
   EDGE: 1, TOO_HARSH: 1.8, HARSH_HOLD: 1.2, HARSH_SPIKE: 1.25,
+  // Up to the edge, distress is the pain they hold against what they can take. Past it, it grows with the pain's logarithm: each step further
+  // takes more than the last, so the stretch from the edge to too harsh is far longer than the way to the edge (too harsh at HARSH_RAW times
+  // the edge's pain, rather than 1.8). A correction can settle well past the edge for a long while, the fight going out of them, without tipping.
+  HARSH_RAW: 4,
   BANDS: [[0.3, 'composed'], [0.6, 'flinching'], [0.9, 'struggling'], [1, 'close to the edge of resistance'], [1.8, 'past the edge of resistance: most receptive'], [Infinity, 'too harsh']],
 };
+
+// Distress from the pain held (as a share of capacity), and back.
+const LOGK = () => (PAIN.TOO_HARSH - PAIN.EDGE) / Math.log(PAIN.HARSH_RAW / PAIN.EDGE);
+const perceive = x => (x <= PAIN.EDGE ? x : PAIN.EDGE + LOGK() * Math.log(x / PAIN.EDGE));
+const rawAt = d => (d <= PAIN.EDGE ? d : PAIN.EDGE * Math.exp((d - PAIN.EDGE) / LOGK()));
 
 function createPain(stats = {}) {
   const st = { tolerance: 0.5, resilience: 0.5, ...stats };
   const P = { stats: st, sting: 0, ache: 0, hits: 0, last: null, dwell: 0, atEdge: false, atLimit: false, tooHarsh: false, peak: 0, over: 0 };
   P.capacity = () => PAIN.CAP * (0.7 + 0.6 * st.tolerance);
   P.level = () => P.sting + P.ache;
-  P.distress = () => P.level() / P.capacity();
+  P.raw = () => P.level() / P.capacity();
+  P.distress = () => perceive(P.raw());
   // How receptive they are to the lesson: little while composed, building as they struggle, fullest from the edge of resistance to half again past it, and gone once it's too harsh.
   P.receptivity = () => { const d = P.distress(), t = Math.max(0, Math.min(1, (d - 0.5) / 0.5)), r = 0.15 + 0.85 * t * t * (3 - 2 * t); return d < PAIN.TOO_HARSH ? r : 0; };
   P.inEdge = () => { const d = P.distress(); return d >= PAIN.EDGE && d < PAIN.TOO_HARSH; };
@@ -73,7 +83,7 @@ function createPain(stats = {}) {
   return P;
 }
 
-const api = { PAIN, createPain };
+const api = { PAIN, createPain, perceive, rawAt };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.Pain = api;
 })(typeof window !== 'undefined' ? window : globalThis);

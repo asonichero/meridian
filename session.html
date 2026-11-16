@@ -296,7 +296,7 @@ function refresh() {
 // the meter: distress against the bar (the band ticks, and the safe-word bar in red)
 { const tr = $('track'), max = 2.0; for (const v of [0.3, 0.6, 0.9, 1.0]) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (v / max * 100) + '%'; tr.append(t); } const h = document.createElement('div'); h.className = 'tick harsh'; h.style.left = (Pain.PAIN.TOO_HARSH / max * 100) + '%'; tr.append(h);
   window.__meter = () => { if (!ses) return; const c = ses.current, d = c ? c.pain.distress() : 0; $('fill').style.width = Math.min(100, d / max * 100) + '%';
-    $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
+    $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}${ses.fight() < 0.3 ? ' · spent' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
 
 // ── Run ──
 const each = dt => { if (ses) ses.update(dt); bay.tick(dt); window.__meter(); };

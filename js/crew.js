@@ -61,6 +61,16 @@ const ROSTER = {
     dept: '#d8d4cc', word: 'Triage', base: 'stern' },
 };
 const IDS = Object.keys(ROSTER);
+// How much they squirm under a correction, 0 (stoic) – 1 (the most wriggly): the smaller they are the more (their height in that translation
+// against the crew's, and their mass), and the more pain they can take, a little the less. body.wriggle, where given, overrides it.
+// (So: Haddad 0.86–0.87, Lindqvist 0.73–0.76, Ashdown 0.73–0.74, Varga 0.63–0.65, Ruel 0.62–0.64, Okafor 0.15, the female and male translations.)
+const H_SPAN = { f: [1.64, 1.78], m: [1.75, 1.9] };
+function wriggle(id, sex) {
+  const r = ROSTER[id]; if (!r) return 0.5; if (r.body.wriggle != null) return r.body.wriggle;
+  const [h0, h1] = H_SPAN[sex] || H_SPAN.f, h = r.body.h[sex] || r.body.h.f, hn = Math.max(0, Math.min(1, (h - h0) / (h1 - h0)));
+  const size = 0.4 * hn + 0.6 * r.body.mass, tol = r.pain && r.pain.tolerance != null ? r.pain.tolerance : 0.5;
+  return Math.max(0.15, Math.min(1, 1.15 - size - 0.5 * (tol - 0.5)));
+}
 const CAPTAIN = { id: 'captain', name: 'Captain', role: 'Captain (Player)', dept: '#c89a3a',
   options: { skin: ['#f0d0b4', '#d6ad8e', '#b88a6a', '#8a5a3e', '#5e3c2a', '#3e281c'], hair: ['#161210', '#3a2a20', '#6a4a2e', '#a8642e', '#c8a46a', '#8a8580'],
     hairStyle: { m: ['crop', 'short', 'shaved', 'curls'], f: ['bun', 'ponytail', 'bob', 'short', 'crop', 'curls'] }, build: { lean: [0.35, 0.25], average: [0.55, 0.4], heavy: [0.8, 0.55] } } };
@@ -83,7 +93,7 @@ function captainSpec(c) {
 // Voice pitch for the babble and cries, by sex (Hz).
 const pitch = (id, sex) => (sex === 'm' ? 128 : 208) + ({ scientist: 4, engineer: -14, pilot: 10, lifesupport: 8, comms: 0, medic: -6 }[id] || 0);
 
-const api = { METERS, ROSTER, IDS, CAPTAIN, PROCTOR, pronouns, figureSpec, captainSpec, pitch };
+const api = { METERS, ROSTER, IDS, CAPTAIN, PROCTOR, pronouns, figureSpec, captainSpec, pitch, wriggle };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.Crew = api;
 })(typeof window !== 'undefined' ? window : globalThis);
