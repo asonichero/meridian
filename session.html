@@ -105,8 +105,8 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
   <h1>Correction test</h1>
   <p class="sub">Choose the room, who's corrected (in order), who witnesses, and how; then begin. The player runs it: runs of smacks on a toggle, pace, strength, where, and soothing between. If it goes too far, the crew member calls their agreed word and it stops.</p>
   <h2>Room</h2>
-  <div class="row seg" id="room"><button data-v="suitbay" class="on">Suit bay</button><button data-v="mess">Galley &amp; mess</button><button data-v="quarters">Crew quarters</button><button data-v="captain">Captain&rsquo;s quarters</button></div>
-  <p class="sub" id="privateNote" style="display:none;margin:6px 0 0">Private quarters: nobody watches here. Witnesses stay outside, and so does anyone waiting their turn.</p>
+  <div class="row seg" id="room"><button data-v="suitbay" class="on">Suit bay</button><button data-v="mess">Galley &amp; mess</button><button data-v="quarters">Crew quarters</button><button data-v="captain">Captain&rsquo;s quarters</button><button data-v="ready">Ready Room</button></div>
+  <p class="sub" id="privateNote" style="display:none;margin:6px 0 0">Private: nobody watches here. Witnesses stay outside, and so does anyone waiting their turn.</p>
   <h2>Time of day</h2>
   <div class="row seg" id="tod"><button data-v="day">Day</button><button data-v="night">Night</button></div>
   <h2>Position</h2>
@@ -163,7 +163,7 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
 
 <script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script><script src="vendor/GLTFLoader.js"></script>
 <script src="js/pain.js"></script><script src="js/audio.js"></script><script src="js/crew.js"></script><script src="js/lines.js"></script>
-<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/capquarters.js"></script><script src="js/session.js"></script>
+<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/capquarters.js"></script><script src="js/readyroom.js"></script><script src="js/session.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
@@ -198,7 +198,8 @@ function drawCaptain() {
 const ROOMS = { suitbay: { build: sc => SuitBay.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the rail']] },
   mess: { build: sc => Mess.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the island'], ['table', 'Over the table']] },
   quarters: { build: sc => Quarters.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the wall']], private: true },
-  captain: { build: sc => CaptainsQuarters.build(sc), pos: [['otk', 'Across the knee (chair)'], ['otk:bed', 'Across the knee (bed)'], ['wall', 'Hands on the desk']], private: true } };
+  captain: { build: sc => CaptainsQuarters.build(sc), pos: [['otk', 'Across the knee (chair)'], ['otk:bed', 'Across the knee (bed)'], ['wall', 'Hands on the desk']], private: true },
+  ready: { build: sc => ReadyRoom.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the desk'], ['table', 'Over the desk']], private: true } };
 if (q.get('room') && ROOMS[q.get('room')]) cfg.room = q.get('room');
 if (!ROOMS[cfg.room]) cfg.room = 'suitbay';
 function drawPos() {
