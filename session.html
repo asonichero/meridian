@@ -199,7 +199,7 @@ const ROOMS = { suitbay: { build: sc => SuitBay.build(sc), pos: [['otk', 'Across
   mess: { build: sc => Mess.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the island'], ['table', 'Over the table']] },
   quarters: { build: sc => Quarters.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the wall']], private: true },
   captain: { build: sc => CaptainsQuarters.build(sc), pos: [['otk', 'Across the knee (chair)'], ['otk:bed', 'Across the knee (bed)'], ['wall', 'Hands on the desk']], private: true },
-  ready: { build: sc => ReadyRoom.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the desk'], ['table', 'Over the desk']], private: true },
+  ready: { build: sc => ReadyRoom.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the desk'], ['table', 'Over the desk']], private: true, afterStays: true },
   hydro: { build: sc => Hydroponics.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the potting bench']] },
   medbay: { build: sc => MedBay.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the exam table'], ['table', 'Over the exam table']] } };
 if (q.get('room') && ROOMS[q.get('room')]) cfg.room = q.get('room');
@@ -313,9 +313,20 @@ function onEvent(type, d) {
   if (type === 'aftercareNow') sayQueue = sayQueue.then(async () => { await aftercareOne(d.result); fade(); ses.next(); });
   refresh();
 }
-// One crew member's aftercare: the cut to the two of them on the bench, and the conversation.
+// One crew member's aftercare: where (here, or, the Captain's choice, the garden bench in hydroponics or their own quarters: a room with no seat
+// for it, the reactor, always one of those; the Ready Room keeps it), the cut to the two of them there, and the conversation.
 async function aftercareOne(r) {
-  fade(); ses.aftercare(r.id); ses.camera(0, 0); refresh();
+  const R = ROOMS[cfg.room], opts = [], who = Crew.ROSTER[r.id].short;
+  if (!R.afterElsewhere) opts.push({ label: 'Stay here', k: null });
+  if (!R.afterStays) { if (cfg.room !== 'hydro') opts.push({ label: 'Take them to hydroponics, the garden bench', k: 'hydro' }); if (cfg.room !== 'quarters') opts.push({ label: `Take them to ${who}'s quarters`, k: 'quarters' }); }
+  let other = null;
+  if (opts.length > 1) {
+    $('say').style.display = 'block'; $('sayWho').textContent = 'Aftercare'; $('sayWho').className = 'who cap'; $('sayTxt').textContent = `Where, with ${who}?`; $('sayNext').style.display = 'none';
+    const o = await choose(opts);
+    if (o.k) { other = ROOMS[o.k].build(stage.scene); other.setLow(cfg.graphics === 'low'); if (other.setTime) other.setTime(cfg.time); }
+  } else if (opts[0] && opts[0].k) { other = ROOMS[opts[0].k].build(stage.scene); other.setLow(cfg.graphics === 'low'); if (other.setTime) other.setTime(cfg.time); }
+  if (other) bay.group.visible = false;
+  fade(); ses.aftercare(r.id, other); ses.camera(0, 0); refresh();
   const P = ses.people.find(p => p.id === r.id);
   const run = async steps => {
     for (const s of steps) {
@@ -325,6 +336,7 @@ async function aftercareOne(r) {
     }
   };
   await run(Lines.after(r.id, r.outcome, r.defiance && r.defiance.to > 0.45 ? 'unbroken' : null)); ses.cared(r.id);
+  if (other) { fade(); stage.scene.remove(other.group); bay.group.visible = true; ses.back(); }
   // (aftercare clears resentment: half of what they carry)
   const v = cfg.rel[r.id]; if (v) { v.resentment = Math.round(v.resentment * 50) / 100; save(); window.drawRel(); }
 }

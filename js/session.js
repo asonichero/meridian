@@ -287,8 +287,8 @@ function create(stage, bay, opts) {
     for (const P of people) {
       // (a private room (crew quarters): nobody watches; whoever isn't in the scene is outside it)
       const inScene = (P === cur && (st.phase === 'turn' || st.phase === 'closing')) || (st.phase === 'after' && P === afterWith);
-      P.f.root.visible = inScene || !bay.private;
-      if (inScene || bay.private) continue;      // (the one in the scene stays in it till the cut)
+      P.f.root.visible = inScene || !(bay.private || away);
+      if (inScene || bay.private || away) continue;      // (the one in the scene stays in it till the cut)
       const F = P.f, i = people.indexOf(P);
       if (P.done && st.between === 'corner' && st.phase === 'turn') {
         // the first in the corner; any after, along the east bulkhead, facing it; feet together, hands on the head, the head bowed
@@ -795,9 +795,13 @@ function create(stage, bay, opts) {
     G.bone.footR.rotation.x += 0.5 * k;      // (the foot easing down, toes pointing)
     G.root.updateMatrixWorld(true);
   }
-  function aftercare(id) {
+  // (aftercare can be taken elsewhere, `other`: another room, built and shown by the page in this one's place; its aftercare seat, its walls and
+  // cameras borrowed, everyone else left behind. back() returns.)
+  let away = null, awayFit = null;
+  function aftercare(id, other) {
     st.phase = 'after'; afterWith = people.find(p => p.id === id); cur = afterWith;
-    after = afterOf(); makeCams();
+    away = other || null; awayFit = away ? fittingsOf(away) : null;
+    after = away ? (away.spots.after || { at: away.spots.bench.at, yaw: away.spots.bench.yaw || 0, seatY: away.spots.bench.seatY, beside: away.spots.bench.beside }) : afterOf(); makeCams();
     afterWith.f.setClothes({ top: 'down', bottoms: 'up', under: 'up' }); emit('state');
   }
 
@@ -813,13 +817,14 @@ function create(stage, bay, opts) {
       ['Their face', [0.2, 1.15, 1.9], [0, 0.9, 0.7]], ['Captain', [-0.6, 1.45, 0.2], [0.5, 1.5, 0]], ['Room', [1.6, 1.9, -2.2], [0, 0.8, 0.3]]],
     after: [['Two-shot', [0.3, 1.0, 1.75], [0.3, 0.85, 0.0]], ['Close', [0.55, 1.05, 1.1], [0.3, 0.95, 0.0]]],
   };
-  const BOUNDS = bay.bounds || { minX: -2.4, maxX: 2.4, minZ: -2.0, maxZ: 2.0 };
+  const boundsOf = b => b.bounds || { minX: -2.4, maxX: 2.4, minZ: -2.0, maxZ: 2.0 };
   const CAMS = {};
   // (rebuilt when the seat across the knee changes, or the aftercare moves to another seat; a seat can give its own)
   function makeCams() {
     const FRAMES = { otk: [OTK.seat, OTK.seatYaw], wall: [wall.at, wall.yaw], table: table ? [table.at, table.yaw] : null, after: [after.at, after.yaw] };
     for (const k in LOCAL_CAMS) {
-      if (!FRAMES[k]) continue; const [at, yaw] = FRAMES[k], own = (k === 'otk' && bench.cams) || (k === 'after' && after.cams) || (bay.cams && bay.cams[k]);
+      if (!FRAMES[k]) continue; const [at, yaw] = FRAMES[k], room = k === 'after' && away ? away : bay, BOUNDS = boundsOf(room);
+      const own = (k === 'otk' && bench.cams) || (k === 'after' && after.cams) || (room.cams && room.cams[k]);
       CAMS[k] = (own || LOCAL_CAMS[k]).map(([n, p, l]) => [n, ...[p, l].map(v => { const w = inFrame(at, yaw, v[0], 0, v[2]); return [clamp(w.x, BOUNDS.minX, BOUNDS.maxX), v[1], clamp(w.z, BOUNDS.minZ, BOUNDS.maxZ)]; })]);
     }
   }
@@ -927,11 +932,14 @@ function create(stage, bay, opts) {
   // ── Whatever stands between the camera and the two in the middle (a fitting of the bay, someone watching) is hidden: moved to a layer the
   // camera doesn't draw, while still casting its shadow. What they're on (the bench, the rug, the deck) and the room's shell stay. ──
   const HIDDEN = 1;
-  bay.group.traverse(o => { if (o.isLight && o.shadow) o.shadow.camera.layers.enable(HIDDEN); });
+  function fittingsOf(b) {
+    b.group.traverse(o => { if (o.isLight && o.shadow) o.shadow.camera.layers.enable(HIDDEN); });
+    return b.group.children.filter(o => !o.isLight).map(o => { const box = new THREE.Box3().setFromObject(o); return { o, box, side: b.sideOf ? b.sideOf.get(o) : null,
+      inWay: box.max.y > 0.62 && [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z].filter(d => d > 2.5).length < 2 }; })
+      .filter(f => !f.box.isEmpty() && !f.o.userData.keep && (f.side || f.inWay));      // (and never what they sit on: a couch with a back as high as a shoulder, that the room marks to keep)
+  }
   // (each with its box, the wall it's on, and whether it's one of the big planes, the room's shell, which nothing can be behind)
-  const fittings = bay.group.children.filter(o => !o.isLight).map(o => { const box = new THREE.Box3().setFromObject(o); return { o, box, side: bay.sideOf ? bay.sideOf.get(o) : null,
-    inWay: box.max.y > 0.62 && [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z].filter(d => d > 2.5).length < 2 }; })
-    .filter(f => !f.box.isEmpty() && !f.o.userData.keep && (f.side || f.inWay));      // (and never what they sit on: a couch with a back as high as a shoulder, that the room marks to keep)
+  const fittings = fittingsOf(bay);
   const hiddenNow = new Map();
   function setHidden(o, h) {
     if (hiddenNow.get(o) === h) return; hiddenNow.set(o, h);
@@ -945,8 +953,8 @@ function create(stage, bay, opts) {
     if (focus.length) add(captain, ['hips', 'chest', 'head']);
     const blocks = box => focus.length && (box.containsPoint(cam) || focus.some(t => { const d = t.distanceTo(cam); _ray.set(cam, t.clone().sub(cam).divideScalar(d)); return _ray.intersectBox(box, _hit) && _hit.distanceTo(cam) < d - 0.05; }));
     // (a whole wall goes, with all that's on it, when the camera comes through it; anything else, if it's in the way)
-    const sides = bay.sidesAt ? bay.sidesAt(cam) : new Set();
-    for (const f of fittings) setHidden(f.o, (f.side && sides.has(f.side)) || (f.inWay && blocks(f.box)));
+    const here = away || bay, sides = here.sidesAt ? here.sidesAt(cam) : new Set();
+    for (const f of (away ? awayFit : fittings)) setHidden(f.o, (f.side && sides.has(f.side)) || (f.inWay && blocks(f.box)));
     // (people: a box round where their bones are now)
     for (const P of people) {
       if (P === cur || (st.phase === 'after' && P === afterWith)) { setHidden(P.f.root, false); continue; }
@@ -971,7 +979,7 @@ function create(stage, bay, opts) {
       if (cur) { say('captain', L.place(cur.id, placeKey())); } camera(0); emit('state'); },
     positions: ['otk', 'wall'].concat(table ? ['table'] : [], Object.keys(bay.spots.seats || {}).map(k => 'otk:' + k)), support: sup.kind,
     dress(o) { if (cur && st.phase === 'turn' && !st.ending) dressTo(o); },
-    endTurn: () => endTurn('done'), callWord, camera, aftercare, update,
+    endTurn: () => endTurn('done'), callWord, camera, aftercare, update, back() { if (!away) return; away = null; awayFit = null; after = afterOf(); makeCams(); },
     distress: () => (cur ? cur.pain.distress() : 0), band: () => (cur ? BANDS[bandIndex()] : ''), harshAt: S.PAIN.TOO_HARSH,
     fight: () => (cur ? cur.rx.fight : 1), agitation: () => (cur ? cur.rx.A : 0),
     defiance: () => (cur ? cur.def : 0), gains: () => (cur ? Object.assign({}, cur.gain) : null),

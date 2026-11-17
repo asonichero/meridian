@@ -184,7 +184,10 @@ function build(scene) {
   const setLow = on => { low = !!on; apply(); }, setTime = t => { time = t === 'night' ? 'night' : 'day'; apply(); };
   apply();
   const { sideOf, sidesAt } = K.roomSides(G, { minX: X0, maxX: X1, minZ: ZS, maxZ: ZH, ht: HT }, [floor, cot]);
-  return { group: G, spots, key, cams: null, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Med bay',
+  // (standing at the exam table's side, their face from across it, low over its top)
+  const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
+    ['Their face', [-0.3, 0.97, 2.1], [0.0, 1.05, 0.55]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [1.05, 1.9, -2.95], [-0.15, 0.8, -0.15]]] };
+  return { group: G, spots, key, cams, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Med bay',
     bounds: { minX: X0 + 0.2, maxX: X1 - 0.2, minZ: ZS + 0.2, maxZ: ZH - 0.2 }, get low() { return low; }, tick() {} };
 }
 
