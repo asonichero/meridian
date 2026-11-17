@@ -8,7 +8,7 @@
 'use strict';
 const pick = a => (Array.isArray(a) ? a[Math.floor(Math.random() * a.length)] : a);
 
-// The Captain placing them, by position (standing, by what they hold: wall, a grab rail; edge, a counter; flat, a bare wall; desk, a desk; potting, the potting bench).
+// The Captain placing them, by position (standing, by what they hold: wall, a grab rail; edge, a counter; flat, a bare wall; desk, a desk; potting, the potting bench; exam, the exam table's side).
 const PLACE = {
   otk: ['Across my knee, {name}.', 'Here. Over my lap.', 'You know where. Across my knee.'],
   wall: ['Hands on the rail, {name}. Feet apart.', 'Face the bulkhead. Grip the rail and hold it.', 'Rail. Both hands. Don’t let go of it.'],
@@ -16,6 +16,7 @@ const PLACE = {
   flat: ['Hands on the wall, {name}. Step back.', 'Palms flat on the wall. Feet apart.', 'Face the wall. Hands on it, and keep them there.'],
   desk: ['Hands on the desk, {name}. Step back. Bend.', 'Palms flat on the desk. Feet apart.', 'Over here. Both hands on the desk, and keep them there.'],
   potting: ['Hands on the potting bench, {name}. Step back. Bend.', 'Palms flat on the bench. Feet apart.', 'Over here. Both hands on the bench, and keep them there.'],
+  exam: ['Hands on the table, {name}. Step back. Bend.', 'Palms flat on the edge of the table. Feet apart.', 'Over here. Both hands on the table, and keep them there.'],
   table: ['Over the table, {name}.', 'Bend over the end of the table. Hold the edges.', 'Here. Chest down on the table.'],
 };
 // The Captain, when defiance gets in the way: a hand back over the seat (hands), the second time and he takes the wrist and holds it at the
@@ -29,6 +30,7 @@ const CAPTAIN = {
   flat: ['Hands back on the wall.', 'Back in position, {name}.', 'Palms on the wall. Stay there.'],
   desk: ['Hands back on the desk.', 'Down. Palms flat, {name}.', 'Back over the desk.'],
   potting: ['Hands back on the bench.', 'Down. Palms flat, {name}.', 'Back over the bench.'],
+  exam: ['Hands back on the table.', 'Down. Palms flat, {name}.', 'Back down, {name}. Hands on the table.'],
   table: ['Back down on the table.', 'Chest down, {name}.', 'Stay down on the table.'],
 };
 

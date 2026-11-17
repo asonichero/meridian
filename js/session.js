@@ -208,6 +208,9 @@ function create(stage, bay, opts) {
   const benchOf = k => (k && bay.spots.seats && bay.spots.seats[k]) || bay.spots.bench;
   let bench = benchOf(st.seat);
   const wall = bay.spots.wall, table = bay.spots.table || null;
+  // (a table that sets itself to them, the med bay's exam table (`table.adjust`: its lowest and highest): its top a hand below the crease of
+  // their hips, so they lie over it the same whatever their height; the room moves it (`table.setTop`). Otherwise its fixed top.)
+  const topFor = F => (table && table.adjust ? clamp((H(F).hips - 0.02) * sc(F) - 0.15 * sc(F), table.adjust[0], table.adjust[1]) : table ? table.top : 0);
   // (each room's own. Across the knee: the seat, the Captain at its end, the bench running on to their left. Standing: what they hold or lean
   // on, ahead of where they stand (rail: a grab rail; edge: a counter's edge, palms flat on its top; wall: palms flat on a wall), and how far
   // they bend to it. Over the table: where its end is, its height and width, and how they hold it (sides, or a desk's far edge). The
@@ -412,7 +415,7 @@ function create(stage, bay, opts) {
       F.bone.hips.position.set(0, hipY / s, hipZ / s);
       // (bent as far as it takes for the chest to lie on the top: past level for the tall, short of it for the short)
       const Lt = (F.bone.spine.position.length() + F.bone.chest.position.length() + F.bone.neck.position.length() * 0.4) * s;
-      const lie = Math.PI / 2 + Math.asin(clamp((hipY - (table.top + 0.12 * s)) / Lt, -0.6, 0.95));
+      const tTop = topFor(F), lie = Math.PI / 2 + Math.asin(clamp((hipY - (tTop + 0.12 * s)) / Lt, -0.6, 0.95));
       const up = 0.15 * ar + 0.6 * uK + 0.45 * rise + 0.1 * dfy;
       F.bone.hips.rotation.set(lie - up, 0.03 * Math.sin(t * 1.1 + ph[2]) * dd * R.ff, 0);
       F.bone.spine.rotation.set(0.03 - 0.04 * ar, 0.06 * gK, 0); F.bone.chest.rotation.set(0.02 - 0.05 * ar, 0.1 * gK, 0);
@@ -433,10 +436,10 @@ function create(stage, bay, opts) {
         let Wt, palm, fdir;
         if (table.grip === 'far') {
           fdir = U.clone().addScaledVector(UP, -0.6).normalize(); palm = UP.clone().negate().addScaledVector(U, 0.3).normalize();
-          Wt = inFrame(table.at, table.yaw, sx * 0.2 * s, table.top + 0.012, table.d + table.len - 0.02).addScaledVector(U, -0.07 * s).addScaledVector(UP, 0.02 + 0.05 * off);
+          Wt = inFrame(table.at, table.yaw, sx * 0.2 * s, tTop + 0.012, table.d + table.len - 0.02).addScaledVector(U, -0.07 * s).addScaledVector(UP, 0.02 + 0.05 * off);
         } else {
           fdir = X.clone().multiplyScalar(sx).addScaledVector(U, 0.35).addScaledVector(UP, -0.25).normalize(); palm = UP.clone().negate();
-          Wt = inFrame(table.at, table.yaw, sx * (table.w / 2 - 0.035), table.top + 0.014, table.d + 0.5 * s).addScaledVector(fdir, -0.06 * s).addScaledVector(UP, 0.02 + 0.06 * off);
+          Wt = inFrame(table.at, table.yaw, sx * (table.w / 2 - 0.035), tTop + 0.014, table.d + 0.5 * s).addScaledVector(fdir, -0.06 * s).addScaledVector(UP, 0.02 + 0.06 * off);
         }
         reach(F, side, Wt, X.clone().multiplyScalar(sx).addScaledVector(UP, 0.5).normalize(), palm, fdir);
         F.grip(side, clamp(0.45 + 0.35 * g - 0.4 * off, 0.1, 0.9), 0.05, 0.6);
@@ -854,6 +857,7 @@ function create(stage, bay, opts) {
       }
       if (st.soothe && !st.swing && !cur.said.soothe && sayCool <= 0) { cur.said.soothe = 1; say('subject', L.react(cur.id, 'soothe'), cur); }
     }
+    if (table && table.setTop) table.setTop(cur && st.position === 'table' && st.phase !== 'after' ? topFor(cur.f) : table.top);      // (the exam table up or down to them, eased by the room)
     if (cur && st.phase !== 'after' && st.phase !== 'over') { if (st.position === 'otk') { poseCaptain(dt); poseSubject(dt); } else { poseSubject(dt); poseCaptain(dt); } poseCaptainHands(dt); captain.setExpr(st.position === 'otk' || st.phase === 'turn' ? 'stern' : 'calm'); }
     else if (st.phase === 'after' && afterWith) {
       // sat side by side: they lean in, the head toward the Captain's shoulder, hands in their lap; the Captain's arm round them, the hand on
