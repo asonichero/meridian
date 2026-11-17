@@ -138,9 +138,9 @@ That suits the GDD's §4 description well: "brushed steel, exposed conduit … b
 23. Is the shift clock real time, or does it advance per action? How long is a shift?
 
 ### I. Evening check-in
-24. What does the Proctor evaluate, and what counts as "performance slipping"?
+24. What does the Proctor evaluate, and what counts as "performance slipping"? *(For now, the day's report in the set-up: an infraction let slide, a correction too harsh, an aftercare skipped, a protocol of the Captain's own missed. The day's loop will fill it in: docs/proctor.md.)*
 25. In Acts I–II the Proctor is voice-only, so what does it "assuming command to hold the player accountable" look like? Is it a reset ordered for the player, a demerit, or a scene? *(Proposed in docs/proctor.md: orders, ordered resets and demerits until hard light; physical accountability from Act III, at the evening check-in.)*
-26. How is the AI's alignment (submissive or dominant) tracked in the alpha, given that embodiment is Act III?
+26. How is the AI's alignment (submissive or dominant) tracked in the alpha, given that embodiment is Act III? *(For now it's set in the set-up: authoritative, balanced or deferential. It shows from Act II, in how the Proctor stands and speaks, and at the check-in in what it does: docs/proctor.md. Tracking it from the Captain's history with the Proctor is still open.)*
 
 ### J. Scope
 27. How long is the alpha: one day, a week, or the end of Act I?
