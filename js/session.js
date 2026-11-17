@@ -800,26 +800,13 @@ function create(stage, bay, opts) {
     if (tN < 0) { tN = 0; sN = clamp(-D / A, 0, 1); } else if (tN > 1) { tN = 1; sN = clamp((B - D) / A, 0, 1); }
     return a.clone().addScaledVector(u, sN).distanceTo(c.clone().addScaledVector(v, tN));
   }
-  // how far the crew member's near leg (their right) is into the Captain's (his left), hip, thigh and calf: 0 when they only touch. With the
-  // leg over his, only the hips.
-  function overlap(Cp, G, draped) {
+  // how far the crew member's near leg (their right) is into the Captain's (his left), hip, thigh and calf: 0 when they only touch
+  function overlap(Cp, G) {
     const rc = limbRadii(Cp), rg = limbRadii(G), j = (F, b) => W_(F, b);
     const cH = j(Cp, 'thighL'), cK = j(Cp, 'shinL'), cA = j(Cp, 'footL'), gH = j(G, 'thighR'), gK = j(G, 'shinR'), gA = j(G, 'footR');
     let o = 1.15 * (rc.thigh + rg.thigh) - Math.hypot(cH.x - gH.x, cH.z - gH.z);      // (the hips, a little broader than the thighs)
-    if (!draped) o = Math.max(o, rc.thigh + rg.thigh - segDist(cH, cK, gH, gK), rc.shin + rg.shin - segDist(cK, cA, gK, gA), rc.thigh + rg.shin - segDist(cH, cK, gK, gA), rc.shin + rg.thigh - segDist(cK, cA, gH, gK));
+    o = Math.max(o, rc.thigh + rg.thigh - segDist(cH, cK, gH, gK), rc.shin + rg.shin - segDist(cK, cA, gK, gA), rc.thigh + rg.shin - segDist(cH, cK, gK, gA), rc.shin + rg.thigh - segDist(cK, cA, gH, gK));
     return o;
-  }
-  // their near leg over his: the knee over his thigh toward the knee, resting on it, the shin hanging down inside it, the foot off the deck
-  function drapeLeg(G, k) {
-    const rc = limbRadii(captain), rg = limbRadii(G), sG = sc(G);
-    const cH = W_(captain, 'thighL'), cK = W_(captain, 'shinL'), top = cH.clone().lerp(cK, 0.7).addScaledVector(UP, rc.thigh + rg.shin * 0.85);
-    const H_ = W_(G, 'thighR'), tl = G.bone.shinR.position.length() * sG, sl = G.bone.footR.position.length() * sG;
-    const K = H_.clone().add(top.sub(H_).setLength(tl)), inward = toWorldDir(captain, -1, 0, 0), fwd = toWorldDir(captain, 0, 0, 1);
-    const A = K.clone().addScaledVector(UP.clone().negate().addScaledVector(inward, 0.35).addScaledVector(fwd, 0.25).normalize(), sl);
-    const A0 = W_(G, 'footR'), K0 = W_(G, 'shinR'); A0.lerp(A, k); K0.lerp(K, k);
-    legTo(G, 'R', A0, K0.sub(H_.clone().lerp(A0, 0.5)).normalize());
-    G.bone.footR.rotation.x += 0.5 * k;      // (the foot easing down, toes pointing)
-    G.root.updateMatrixWorld(true);
   }
   // (aftercare can be taken elsewhere, `other`: another room, built and shown by the page in this one's place; its aftercare seat, its walls and
   // cameras borrowed, everyone else left behind. back() returns.)
@@ -898,16 +885,18 @@ function create(stage, bay, opts) {
       // defiant, the head turned aside and up)
       const G = afterWith.f, Rl = afterWith.rel, resid = clamp((afterWith.def - 0.15) / 0.6, 0, 1), cold = Math.max(resid, clamp(Rl.resentment + afterWith.gain.resentment, 0, 1)), warmth = 1 - cold;
       const close = (1 - (1 - 0.7 * Rl.comfort) * (1 - 0.6 * Rl.submission) * (1 - 0.7 * Rl.desire)) * warmth, lean = Math.max(Rl.submission, Rl.desire) * warmth;
-      // (with desire and comfort both high, their near leg over his: the knee over his thigh, the shin hanging inside it)
-      const drape = sm(0.6, 0.75, Math.min(Rl.desire, Rl.comfort)) * warmth;
-      const at0 = after.beside.clone().add(new V3(-0.06 - 0.2 * close + 0.07 * cold, 0, 0.02 - 0.04 * close).applyQuaternion(yawQ(after.yaw))), yawG = after.yaw - 0.3 - 0.15 * close + 0.2 * cold;
-      const gOpt = { look: 0.3 + 0.22 * lean - 0.3 * resid, lean: 0.1 + 0.06 * lean - 0.08 * cold, roll: 0.14 + 0.1 * lean - 0.12 * cold, headRoll: 0.18 + 0.24 * lean - 0.18 * cold, headYaw: lerp(-0.2 - 0.15 * lean, 0.4, resid), spread: -0.03, seatY: after.seatY };
+      // (with desire and comfort both high, as close as they can sit: their legs turned away from his, so the knees don't meet, and the hips
+      // right up against his; the body twisted back round toward him from the waist)
+      const nestle = sm(0.6, 0.75, Math.min(Rl.desire, Rl.comfort)) * warmth;
+      const turned = after.yaw - 0.3 - 0.15 * close + 0.2 * cold, yawG = lerp(turned, after.yaw + 0.28, nestle), chestTo = turned - 0.1 * nestle;
+      const at0 = after.beside.clone().add(new V3(-0.06 - 0.2 * close + 0.07 * cold, 0, 0.02 - 0.04 * close).applyQuaternion(yawQ(after.yaw)));
+      const gOpt = { look: 0.3 + 0.22 * lean - 0.3 * resid, lean: 0.1 + 0.06 * lean - 0.08 * cold, roll: 0.14 + 0.1 * lean - 0.12 * cold, headRoll: 0.18 + 0.24 * lean - 0.18 * cold, headYaw: lerp(-0.2 - 0.15 * lean, 0.4, resid), spread: -0.03, seatY: after.seatY,
+        twist: (chestTo - yawG) / 1.6, feetZ: -0.03 * nestle };      // (the spine and chest share the turn between them: 1 and 0.6 of it)
       // room for the two of them, measured from their bodies (so the broader get more): side by side, hip to hip and leg to leg, touching but
       // not through each other; moved along the bench away from him till they're clear
       seat(captain, after.at, after.yaw, { lean: 0.02, seatY: after.seatY });
       const away = W_(G, 'hips').sub(W_(captain, 'hips')).setY(0).normalize(); let push = 0;
-      for (let i = 0; i < 5; i++) { seat(G, at0.clone().addScaledVector(away, push), yawG, gOpt); const o = overlap(captain, G, drape > 0.5); if (o <= 0.002) break; push += o; }
-      if (drape > 0.01) drapeLeg(G, drape);
+      for (let i = 0; i < 5; i++) { seat(G, at0.clone().addScaledVector(away, push), yawG, gOpt); const o = overlap(captain, G); if (o <= 0.002) break; push += o; }
       // (the Captain looks at them: the head turned and tipped to their face, the shoulders a little with it. With their head on his shoulder his
       // body angles to take them, leaning a touch away so his head stays clear of theirs, and his face comes round almost to the front, only a
       // little toward them, his eyes on them)
@@ -937,15 +926,7 @@ function create(stage, bay, opts) {
         const pole = toWorldDir(G, 0.4, -0.7, -1).normalize().lerp(toWorldDir(G, -0.35, -1, -0.25).normalize(), rub).normalize();
         reach(captain, 'L', L_.W, pole, L_.n.clone().negate(), L_.f); captain.grip('L', 0.25 - 0.1 * rub, 0.12, 0.25);
       }
-      // (his right: on his own knee; with their leg over his, on their knee instead, reaching across)
-      const nearK = drape;
-      if (nearK < 0.01) onKnee('R', 1);
-      else {
-        const kf0 = toWorldDir(captain, 0.15, -0.2, 1).normalize(), own = W_(captain, 'shinR').addScaledVector(UP, 0.062 * s).addScaledVector(kf0, -0.085 * s);
-        const kf1 = toWorldDir(G, 0.5, -0.2, 0.8).normalize(), theirs = W_(G, 'shinR').addScaledVector(UP, 0.05 * sc(G) + 0.012).addScaledVector(kf1, -0.085 * s);
-        const W = own.lerp(theirs, nearK).addScaledVector(UP, 0.05 * Math.sin(Math.PI * nearK)), kf = kf0.lerp(kf1, nearK).normalize();
-        reach(captain, 'R', W, toWorldDir(captain, -1, -0.4, -0.5).normalize().lerp(toWorldDir(captain, -0.25, -0.7, 0.65).normalize(), nearK).normalize(), UP.clone().negate(), kf); captain.grip('R', 0.3, 0.1, 0.3);
-      }
+      onKnee('R', 1);      // (his right on his own knee)
       if (cold > 0.3) captain.setExpr('caring', { look: eyes, brow: lerp(-0.1, -0.34, cold), browY: lerp(-0.03, -0.08, cold), mc: lerp(0.22, 0.04, cold) });
       else captain.setExpr(Rl.desire > 0.6 ? 'soft' : 'caring', { look: eyes });      // (care, warmth and authority in balance; softer where desire's between them)
     } else { stand(captain, inFrame(bench.at, bench.yaw || 0, 0.3, 0, 0.6), bench.yaw || 0, {}); }
