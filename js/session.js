@@ -345,7 +345,15 @@ function create(stage, bay, opts) {
   const focus = () => (st.position === 'otk' ? bench.at : st.position === 'table' && table ? table.at : wall.at).clone().setY(st.position === 'otk' ? 0.8 : 0.9);
   const HOLDS = ['fold', 'rest', 'clasp', 'rest', 'fold', 'clasp'];
   function poseOthers(t) {
-    let w = 0;
+    // (where each watcher goes: a place that's someone's own (an officer's station) to them, the rest round the others in turn, laps beside
+    // them once they're full)
+    const sceneOf = P => (P === cur && (st.phase === 'turn' || st.phase === 'closing')) || (st.phase === 'after' && P === afterWith);
+    const ws_ = bay.spots.watch, open = ws_.filter(s => !s.for).length ? ws_.filter(s => !s.for) : ws_, placeOf = new Map(); let w = 0;
+    for (const P of people) {
+      if (sceneOf(P) || bay.private || away || (P.done && st.between === 'corner' && st.phase === 'turn')) continue;
+      const own = ws_.find(s => s.for === P.id);
+      placeOf.set(P, own ? { spot: own, lap: 0 } : { spot: open[w % open.length], lap: Math.floor(w++ / open.length) });
+    }
     for (const P of people) {
       // (a private room (crew quarters): nobody watches; whoever isn't in the scene is outside it)
       const inScene = (P === cur && (st.phase === 'turn' || st.phase === 'closing')) || (st.phase === 'after' && P === afterWith);
@@ -367,11 +375,18 @@ function create(stage, bay, opts) {
       }
       // (more of them than the room has places: each lap round them stands beside a place, alternately to either side, never on top of
       // whoever's there)
-      const ws_ = bay.spots.watch, spot = ws_[w % ws_.length], lap = Math.floor(w++ / ws_.length), f = focus(), at = spot.at.clone();
+      const { spot, lap } = placeOf.get(P), f = focus(), at = spot.at.clone();
       if (lap) { const to = new V3(f.x - at.x, 0, f.z - at.z).normalize(); at.addScaledVector(new V3(-to.z, 0, to.x), 0.7 * Math.ceil(lap / 2) * (lap % 2 ? 1 : -1)); }
-      const waiting = !P.done && P.role === 'subject';
-      stand(F, at, Math.atan2(f.x - at.x, f.z - at.z), { weight: i % 2 ? 0.6 : -0.6, look: waiting ? 0.3 : 0.15, headYaw: 0.05 * Math.sin(i * 1.7) });
-      arms(F, waiting ? 'clasp' : HOLDS[i % HOLDS.length]);
+      const waiting = !P.done && P.role === 'subject', toF = Math.atan2(f.x - at.x, f.z - at.z);
+      if (spot.seatY != null && !lap) {
+        // (a seat: one that swivels turned to it; a fixed one, the head and shoulders turned as far as they go)
+        const yawS = spot.swivel ? toF : spot.yaw, d = Math.atan2(Math.sin(toF - yawS), Math.cos(toF - yawS)), turn = clamp(d, -1.2, 1.2);
+        if (spot.chair) spot.chair.rotation.y = yawS - spot.yaw;      // (the chair turned with them)
+        seat(F, at, yawS, { seatY: spot.seatY, look: waiting ? 0.3 : 0.18, twist: 0.3 * turn, headYaw: 0.6 * turn + 0.05 * Math.sin(i * 1.7), lean: 0.04 });
+      } else {
+        stand(F, at, toF, { weight: i % 2 ? 0.6 : -0.6, look: waiting ? 0.3 : 0.15, headYaw: 0.05 * Math.sin(i * 1.7) });
+        arms(F, waiting ? 'clasp' : HOLDS[i % HOLDS.length]);
+      }
       if (P.done) F.setExpr(P.outcome === 'word' ? 'sad' : 'teary'); else F.setExpr(P.role === 'witness' ? 'concerned' : 'shy');
     }
   }

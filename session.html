@@ -96,6 +96,11 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
 }
 /* touch: bigger targets, no keyboard hints */
 @media (hover: none) { kbd { display: none; } button { min-height: 36px; } #bar .lab { font-size: 9px; } }
+/* (at stations on the bridge: none of a correction's controls, only the call and the viewport; the viewport's on the bridge whatever's happening) */
+body.stations #bar .grp:not(.g-call):not(.g-vp), body.stations #meter { display: none; }
+body:not(.stations) #bar .g-call, body:not(.bridge) #bar .g-vp { display: none; }
+#pos button:disabled { opacity: 0.5; cursor: not-allowed; }
+.g-call button, .g-vp button { white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -105,12 +110,16 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
   <h1>Correction test</h1>
   <p class="sub">Choose the room, who's corrected (in order), who witnesses, and how; then begin. The player runs it: runs of smacks on a toggle, pace, strength, where, and soothing between. If it goes too far, the crew member calls their agreed word and it stops.</p>
   <h2>Room</h2>
-  <div class="row seg" id="room"><button data-v="suitbay" class="on">Suit bay</button><button data-v="mess">Galley &amp; mess</button><button data-v="quarters">Crew quarters</button><button data-v="captain">Captain&rsquo;s quarters</button><button data-v="ready">Ready Room</button><button data-v="hydro">Hydroponics</button><button data-v="medbay">Med bay</button><button data-v="reactor">Reactor</button></div>
+  <div class="row seg" id="room"><button data-v="suitbay" class="on">Suit bay</button><button data-v="mess">Galley &amp; mess</button><button data-v="quarters">Crew quarters</button><button data-v="captain">Captain&rsquo;s quarters</button><button data-v="ready">Ready Room</button><button data-v="hydro">Hydroponics</button><button data-v="medbay">Med bay</button><button data-v="reactor">Reactor</button><button data-v="bridge">Bridge</button></div>
   <p class="sub" id="privateNote" style="display:none;margin:6px 0 0">Private: nobody watches here. Witnesses stay outside, and so does anyone waiting their turn.</p>
   <h2>Time of day</h2>
   <div class="row seg" id="tod"><button data-v="day">Day</button><button data-v="night">Night</button></div>
   <h2>Position</h2>
   <div class="row seg" id="pos"></div>
+  <p class="sub" id="lateNote" style="display:none;margin:6px 0 0"></p>
+  <h2>Stage of the story</h2>
+  <div class="row seg" id="story"><button data-v="early" class="on">Early</button><button data-v="late">Late</button></div>
+  <small class="note">Early on, every correction happens behind a sealed hatch. Late in the story, minor ones can happen in situ, in front of the others: on the bridge, at the plot table, the watch carrying on round them.</small>
   <h2>Crew <span style="text-transform:none;letter-spacing:0">(tap: corrected → witness → absent)</span></h2>
   <div class="crew" id="crew"></div>
   <h2>Between turns</h2>
@@ -149,6 +158,8 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
     <div class="grp g-soothe"><span class="lab">Soothe <kbd>S</kbd></span><button id="soothe">Soothe</button></div>
     <div class="grp g-clothes"><span class="lab">Clothes <kbd>T B U</kbd></span><div class="row"><button id="cTop">Top: down</button><button id="cBot">Trousers: up</button><button id="cUnd">Briefs: up</button></div></div>
     <div class="grp g-end"><span class="lab">Turn <kbd>Enter</kbd></span><button id="end">End turn</button></div>
+    <div class="grp g-call"><span class="lab">Ready Room <kbd>R</kbd></span><button id="callIn">Call in…</button></div>
+    <div class="grp g-vp"><span class="lab">Viewport <kbd>V</kbd></span><button id="vp">Open</button></div>
   </div>
   <div id="meter"><div id="track"><div id="fill"></div></div><div id="info"></div></div>
 </div>
@@ -163,7 +174,7 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
 
 <script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script><script src="vendor/GLTFLoader.js"></script>
 <script src="js/pain.js"></script><script src="js/audio.js"></script><script src="js/crew.js"></script><script src="js/lines.js"></script>
-<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/capquarters.js"></script><script src="js/readyroom.js"></script><script src="js/hydroponics.js"></script><script src="js/medbay.js"></script><script src="js/reactor.js"></script><script src="js/session.js"></script>
+<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/capquarters.js"></script><script src="js/readyroom.js"></script><script src="js/hydroponics.js"></script><script src="js/medbay.js"></script><script src="js/reactor.js"></script><script src="js/bridge.js"></script><script src="js/stations.js"></script><script src="js/session.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
@@ -202,18 +213,26 @@ const ROOMS = { suitbay: { build: sc => SuitBay.build(sc), pos: [['otk', 'Across
   ready: { build: sc => ReadyRoom.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the desk'], ['table', 'Over the desk']], private: true, afterStays: true },
   hydro: { build: sc => Hydroponics.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the potting bench']] },
   medbay: { build: sc => MedBay.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the exam table'], ['table', 'Over the exam table']] },
-  reactor: { build: sc => Reactor.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the guard rail']], afterElsewhere: true } };
+  reactor: { build: sc => Reactor.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the guard rail']], afterElsewhere: true },
+  // (the bridge: at stations, no correction, the Captain calling someone into the Ready Room; late in the story, in situ at the plot table, the
+  // bridge crew at their posts watching; aftercare off the bridge, the Ready Room's couch first)
+  bridge: { build: sc => Bridge.build(sc), pos: [['stations', 'At stations'], ['wall', 'At the plot table', 'late']], afterElsewhere: true, afterTo: ['ready', 'hydro', 'quarters'], crew: ['pilot', 'comms', 'scientist'] } };
 if (q.get('room') && ROOMS[q.get('room')]) cfg.room = q.get('room');
 if (!ROOMS[cfg.room]) cfg.room = 'suitbay';
 function drawPos() {
-  const el = $('pos'); el.innerHTML = ''; const list = ROOMS[cfg.room].pos;
+  const el = $('pos'); el.innerHTML = ''; const list = ROOMS[cfg.room].pos, ok = x => !x[2] || cfg.late;
   $('privateNote').style.display = ROOMS[cfg.room].private ? '' : 'none';
-  for (const [v, nm] of list) { const b = document.createElement('button'); b.dataset.v = v; b.textContent = nm; el.append(b); }
-  if (!list.some(x => x[0] === cfg.position)) cfg.position = 'otk';
-  seg('pos', cfg.position, v => { cfg.position = v; save(); if (ses) { fade(); ses.position(v); } drawCams(); });
+  // (a position for late in the story: there, but shut, till the story's there)
+  for (const x of list) { const b = document.createElement('button'); b.dataset.v = x[0]; b.textContent = x[1] + (x[2] && !cfg.late ? ' 🔒' : ''); b.disabled = !ok(x); if (x[2]) b.title = 'Late in the story'; el.append(b); }
+  const shut = list.filter(x => !ok(x)); $('lateNote').style.display = shut.length ? '' : 'none'; $('lateNote').textContent = shut.length ? `${shut.map(x => x[1]).join(', ')}: late in the story (set the stage below).` : '';
+  if (!list.some(x => x[0] === cfg.position && ok(x))) cfg.position = list.find(ok)[0];
+  // (on the bridge, at stations and at the plot table are different scenes: begun again; elsewhere the session moves them)
+  seg('pos', cfg.position, v => { cfg.position = v; save(); if (sta || (ses && v === 'stations')) { fade(); models.then(begin); } else if (ses) { fade(); ses.position(v); } drawCams(); });
 }
 drawPos();
 seg('between', cfg.between, v => { cfg.between = v; save(); if (ses) ses.st.between = v; });
+// (the stage of the story: late opens the in-situ positions; going back early from one of them, back to stations)
+seg('story', cfg.late ? 'late' : 'early', v => { const was = cfg.position; cfg.late = v === 'late'; save(); drawPos(); if ((ses || sta) && cfg.position !== was) { fade(); models.then(begin); } });
 seg('outfit', cfg.outfit, v => { cfg.outfit = v; save(); });
 drawCrew(); drawCaptain();
 // sound levels: each a slider, kept between visits (js/audio.js)
@@ -253,23 +272,56 @@ if (q.get('time')) cfg.time = q.get('time') === 'night' ? 'night' : 'day';
 seg('tod', cfg.time, v => { cfg.time = v; save(); if (bay.setTime) bay.setTime(v); });
 if (bay.setTime) bay.setTime(cfg.time);
 // (another room: the old one taken down, the new one built, and a session in progress begun again there)
-seg('room', cfg.room, v => {
-  if (v === cfg.room) return; cfg.room = v; save(); drawPos();
+function goRoom(v) {
+  if (v === cfg.room) return; cfg.room = v; save(); drawPos(); $('room').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   stage.scene.remove(bay.group); bay = ROOMS[v].build(stage.scene); bay.setLow(cfg.graphics === 'low'); if (bay.setTime) bay.setTime(cfg.time);
-  if (ses) { fade(); models.then(begin); }
-});
+  if (ses || sta) { fade(); models.then(begin); }
+}
+seg('room', cfg.room, goRoom);
 seg('gfx', cfg.graphics || 'full', v => { cfg.graphics = v; save(); stage.setLow(v === 'low'); bay.setLow(v === 'low'); });
-let ses = null;
+let ses = null, sta = null;
+function endAll() {
+  if (ses) { for (const P of ses.people) stage.scene.remove(P.f.root); stage.scene.remove(ses.captain.root); ses = null; window.ses = null; }
+  if (sta) { sta.dispose(); sta = null; window.sta = null; }
+}
 function begin() {
+  if (cfg.room === 'bridge' && cfg.position === 'stations') return beginStations();
   if (!cfg.order.length) { alert('Choose at least one crew member to be corrected.'); return; }
-  if (ses) { for (const P of ses.people) stage.scene.remove(P.f.root); stage.scene.remove(ses.captain.root); }
-  const p = id => ({ id, sex: cfg.sex[id] || 'f', outfit: cfg.outfit });
-  ses = Session.create(stage, bay, { captain: cfg.captain, position: cfg.position, between: cfg.between, queue: cfg.order.map(p), rel: cfg.rel, witnesses: Crew.IDS.filter(id => cfg.roles[id] === 'witness').map(p), sound: !q.get('still') });
+  endAll();
+  // (where a room has its own crew at their posts (the bridge's), they're there, watching, whoever else is)
+  const p = id => ({ id, sex: cfg.sex[id] || 'f', outfit: cfg.outfit }), R = ROOMS[cfg.room];
+  const wit = Crew.IDS.filter(id => !cfg.order.includes(id) && (cfg.roles[id] === 'witness' || (R.crew && R.crew.includes(id))));
+  ses = Session.create(stage, bay, { captain: cfg.captain, position: cfg.position, between: cfg.between, queue: cfg.order.map(p), rel: cfg.rel, witnesses: wit.map(p), sound: !q.get('still') });
   ses.on(onEvent); ses.start(); drawCams(); refresh();
   $('summary').style.display = 'none'; $('word').style.display = 'none';
   if (innerWidth < 900) $('setup').classList.add('closed');
   window.ses = ses;
 }
+// The bridge at stations (js/stations.js): no correction. The bridge crew at their posts, whoever else is in the set-up in the jump seats, on
+// duty (in uniform); the Captain at the plot table. From here the Captain calls someone into the Ready Room.
+function beginStations() {
+  endAll(); const R = ROOMS.bridge, ids = Crew.IDS.filter(id => R.crew.includes(id) || cfg.order.includes(id) || cfg.roles[id] === 'witness');
+  sta = Stations.create(stage, bay, { captain: cfg.captain, crew: ids.map(id => ({ id, sex: cfg.sex[id] || 'f', outfit: 'uniform' })) });
+  window.sta = sta; sta.camera(0, 0); drawCams(); refresh();
+  $('summary').style.display = 'none'; $('word').style.display = 'none'; $('say').style.display = 'none';
+  if (innerWidth < 900) $('setup').classList.add('closed');
+}
+// (the call: whom, the Captain's word and their answer, then the cut to the Ready Room, begun there with them, still in that mode: standing in
+// front of the desk, in uniform)
+let calling = false;
+async function callIn() {
+  if (!sta || calling) return; calling = true;
+  $('say').style.display = 'block'; $('sayWho').textContent = 'Ready Room'; $('sayWho').className = 'who cap'; $('sayTxt').textContent = 'Who comes to the Ready Room?'; $('sayNext').style.display = 'none';
+  const o = await choose(sta.people.map(P => ({ label: `${Crew.ROSTER[P.id].short}, ${Crew.ROSTER[P.id].role.replace(/ \(.*\)$/, '')}`, k: P.id })).concat([{ label: 'Not now', k: null }]));
+  if (!o.k) { $('say').style.display = 'none'; calling = false; return; }
+  const said = Lines.call(o.k); await showLine('captain', 'captain', said.captain, 900); await showLine(o.k, o.k, said.answer, 1200);
+  $('say').style.display = 'none';
+  cfg.order = [o.k]; cfg.roles[o.k] = 'subject'; cfg.position = 'wall'; cfg.outfit = 'uniform'; save();
+  $('outfit').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === 'uniform')); drawCrew();
+  calling = false; fade(); goRoom('ready');
+}
+$('callIn').onclick = () => { audioOn(); callIn(); };
+$('vp').onclick = () => { if (bay.setViewport) { bay.setViewport(!bay.viewport); refresh(); } };
 // (the Blender-built figures load as the page opens; a session begun before they're in waits for them)
 const models = Figure.preload();
 $('begin').onclick = () => { audioOn(); models.then(begin); };
@@ -319,7 +371,8 @@ function onEvent(type, d) {
 async function aftercareOne(r) {
   const R = ROOMS[cfg.room], opts = [], who = Crew.ROSTER[r.id].short;
   if (!R.afterElsewhere) opts.push({ label: 'Stay here', k: null });
-  if (!R.afterStays) { if (cfg.room !== 'hydro') opts.push({ label: 'Take them to hydroponics, the garden bench', k: 'hydro' }); if (cfg.room !== 'quarters') opts.push({ label: `Take them to ${who}'s quarters`, k: 'quarters' }); }
+  const TO = { ready: 'Take them to the Ready Room, the couch', hydro: 'Take them to hydroponics, the garden bench', quarters: `Take them to ${who}'s quarters` };
+  if (!R.afterStays) for (const k of R.afterTo || ['hydro', 'quarters']) if (k !== cfg.room) opts.push({ label: TO[k], k });
   let other = null;
   if (opts.length > 1) {
     $('say').style.display = 'block'; $('sayWho').textContent = 'Aftercare'; $('sayWho').className = 'who cap'; $('sayTxt').textContent = `Where, with ${who}?`; $('sayNext').style.display = 'none';
@@ -327,7 +380,7 @@ async function aftercareOne(r) {
     if (o.k) { other = ROOMS[o.k].build(stage.scene); other.setLow(cfg.graphics === 'low'); if (other.setTime) other.setTime(cfg.time); }
   } else if (opts[0] && opts[0].k) { other = ROOMS[opts[0].k].build(stage.scene); other.setLow(cfg.graphics === 'low'); if (other.setTime) other.setTime(cfg.time); }
   if (other) bay.group.visible = false;
-  fade(); ses.aftercare(r.id, other); ses.camera(0, 0); refresh();
+  fade(); ses.aftercare(r.id, other); ses.camera(0, 0); drawCams(); refresh();
   const P = ses.people.find(p => p.id === r.id);
   const run = async steps => {
     for (const s of steps) {
@@ -337,7 +390,7 @@ async function aftercareOne(r) {
     }
   };
   await run(Lines.after(r.id, r.outcome, r.defiance && r.defiance.to > 0.45 ? 'unbroken' : null)); ses.cared(r.id);
-  if (other) { fade(); stage.scene.remove(other.group); bay.group.visible = true; ses.back(); }
+  if (other) { fade(); stage.scene.remove(other.group); bay.group.visible = true; ses.back(); drawCams(); refresh(); }
   // (aftercare clears resentment: half of what they carry)
   const v = cfg.rel[r.id]; if (v) { v.resentment = Math.round(v.resentment * 50) / 100; save(); window.drawRel(); }
 }
@@ -368,7 +421,11 @@ $('cUnd').onclick = () => ses && ses.dress({ under: ses.current.f.state.under ==
 $('say').addEventListener('click', e => { if (advance && !e.target.closest('button')) advance(); });
 addEventListener('keydown', e => {
   if (advance && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); advance(); return; }      // (the aftercare's lines: on)
-  if (!ses || e.target.tagName === 'INPUT') return; const k = e.key;
+  if (e.target.tagName === 'INPUT') return;
+  if (/^[1-9]$/.test(e.key) && window.__choose && window.__choose[+e.key - 1]) { window.__choose[+e.key - 1](); return; }
+  if ((e.key === 'v' || e.key === 'V') && bay.setViewport) { $('vp').click(); return; }
+  if (sta) { if (e.key === 'c' || e.key === 'C') { sta.camera(sta.st.cam + 1); drawCams(); } else if (e.key === 'r' || e.key === 'R') { audioOn(); callIn(); } return; }
+  if (!ses) return; const k = e.key;
   if (k === ' ') { e.preventDefault(); audioOn(); ses.run(); }
   else if (k === '[') bump('pace', -STEP); else if (k === ']') bump('pace', STEP); else if (k === '-') bump('strength', -STEP); else if (k === '=' || k === '+') bump('strength', STEP);
   else if (k === 'd' || k === 'D') cyc('side', ['alt', 'L', 'R']); else if (k === 'a' || k === 'A') cyc('area', ses.AREAS);
@@ -377,8 +434,11 @@ addEventListener('keydown', e => {
   else if (k === 'Enter') ses.endTurn(); else if (k === 'c' || k === 'C') { ses.camera(ses.st.cam + 1); drawCams(); }
   else if (/^[1-4]$/.test(k) && window.__choose && window.__choose[+k - 1]) window.__choose[+k - 1]();
 });
-function drawCams() { const el = $('cams'); el.innerHTML = ''; if (!ses) return; const set = ses.CAMS[ses.st.phase === 'after' ? 'after' : ses.st.position]; set.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = ses.st.cam === i ? 'on' : ''; b.onclick = () => { ses.camera(i); drawCams(); }; el.append(b); }); }
+function drawCams() { const el = $('cams'); el.innerHTML = ''; if (sta) { sta.cams.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = sta.st.cam === i ? 'on' : ''; b.onclick = () => { sta.camera(i); drawCams(); }; el.append(b); }); return; } if (!ses) return; const set = ses.CAMS[ses.st.phase === 'after' ? 'after' : ses.st.position]; set.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = ses.st.cam === i ? 'on' : ''; b.onclick = () => { ses.camera(i); drawCams(); }; el.append(b); }); }
 function refresh() {
+  document.body.classList.toggle('stations', !!sta); document.body.classList.toggle('bridge', cfg.room === 'bridge' && bay.group.visible);
+  if (bay.setViewport) $('vp').textContent = bay.viewport ? 'Shut' : 'Open';
+  if (sta) { $('whoNm').textContent = 'The bridge'; $('whoSub').textContent = 'At stations'; $('whoWord').textContent = ''; return; }
   if (!ses) return; const st = ses.st, c = ses.current;
   $('run').textContent = st.running ? 'Stop run' : 'Start run'; $('run').classList.toggle('on', st.running); $('run').disabled = !c || st.phase !== 'turn' || ses.busy;
   // (while the Captain's dressing them, or finishing, the controls wait for it)
@@ -393,7 +453,7 @@ function refresh() {
     $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}${c.def0 > 0.05 ? ` · defiance <b>${Math.round(ses.defiance() * 100)}%</b>` : ''}${ses.fight() < 0.3 ? ' · spent' : ''}${ses.st.ending ? ' · finishing' : ses.st.act || ses.st.actQ.length ? ' · dressing' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
 
 // ── Run ──
-const each = dt => { if (ses) ses.update(dt); bay.tick(dt); window.__meter(); };
+const each = dt => { if (ses) ses.update(dt); if (sta) sta.update(dt); bay.tick(dt); window.__meter(); };
 // (on a phone the camera's picture is centred in what the controls leave visible, above them or beside them; on a desktop it stays centred)
 const small = matchMedia('(max-width: 760px), (max-height: 520px)');
 const insets = () => { const r = $('bar').getBoundingClientRect(); stage.setInsets(!small.matches ? {} : r.left > innerWidth * 0.3 ? { right: Math.max(0, innerWidth - r.left) } : { bottom: Math.max(0, innerHeight - r.top) }); };

@@ -8,7 +8,7 @@
 'use strict';
 const pick = a => (Array.isArray(a) ? a[Math.floor(Math.random() * a.length)] : a);
 
-// The Captain placing them, by position (standing, by what they hold: wall, a grab rail; edge, a counter; flat, a bare wall; desk, a desk; potting, the potting bench; exam, the exam table's side).
+// The Captain placing them, by position (standing, by what they hold: wall, a grab rail; edge, a counter; flat, a bare wall; desk, a desk; potting, the potting bench; exam, the exam table's side; plot, the bridge's plot table, in situ late in the story, the watch carrying on round them).
 const PLACE = {
   otk: ['Across my knee, {name}.', 'Here. Over my lap.', 'You know where. Across my knee.'],
   wall: ['Hands on the rail, {name}. Feet apart.', 'Face the bulkhead. Grip the rail and hold it.', 'Rail. Both hands. Don’t let go of it.'],
@@ -17,6 +17,7 @@ const PLACE = {
   desk: ['Hands on the desk, {name}. Step back. Bend.', 'Palms flat on the desk. Feet apart.', 'Over here. Both hands on the desk, and keep them there.'],
   potting: ['Hands on the potting bench, {name}. Step back. Bend.', 'Palms flat on the bench. Feet apart.', 'Over here. Both hands on the bench, and keep them there.'],
   exam: ['Hands on the table, {name}. Step back. Bend.', 'Palms flat on the edge of the table. Feet apart.', 'Over here. Both hands on the table, and keep them there.'],
+  plot: ['Plot table, {name}. Hands on the edge. Bend.', 'Here. Palms flat on the plot. Feet apart.', 'Both hands on the table, {name}. The watch carries on.'],
   table: ['Over the table, {name}.', 'Bend over the end of the table. Hold the edges.', 'Here. Chest down on the table.'],
 };
 // The Captain, when defiance gets in the way: a hand back over the seat (hands), the second time and he takes the wrist and holds it at the
@@ -31,6 +32,7 @@ const CAPTAIN = {
   desk: ['Hands back on the desk.', 'Down. Palms flat, {name}.', 'Back over the desk.'],
   potting: ['Hands back on the bench.', 'Down. Palms flat, {name}.', 'Back over the bench.'],
   exam: ['Hands back on the table.', 'Down. Palms flat, {name}.', 'Back down, {name}. Hands on the table.'],
+  plot: ['Hands back on the plot.', 'Down, {name}. Palms on the edge.', 'Back over the table. Eyes on the plot.'],
   table: ['Back down on the table.', 'Chest down, {name}.', 'Stay down on the table.'],
 };
 
@@ -211,7 +213,20 @@ function after(id, outcome, mood) {
   ];
 }
 
-const api = { PLACE, CAPTAIN, REACT, AFTER, APPROACH, ORDERS, place, captain, react, after };
+// On the bridge, at stations: the Captain calling someone into the Ready Room, and their answer, each in their own voice (the pilot handing
+// the helm to the Proctor first).
+const CALL = ['{name}. Ready Room.', '{name}, with me. Ready Room.', 'A word, {name}. My ready room.'];
+const ANSWER = {
+  scientist: ['Now? I— yes. Of course, Captain.', 'Logging the survey. Coming.'],
+  engineer: ['Aye, Captain.', 'Captain.'],
+  pilot: ['Proctor, you have the helm. …Yes, Captain.', 'Handing over. Proctor has the helm. Coming.'],
+  lifesupport: ['Yes, Captain.', 'Oh— yes. Yes, Captain.'],
+  comms: ['Board to the Proctor. Coming, Captain.', 'Understood. On my way.'],
+  medic: ['Is that a request? …No. Coming.', 'Captain.'],
+};
+function call(id) { return { captain: fill(pick(CALL), id), answer: fill(pick(ANSWER[id] || ['Captain.']), id) }; }
+
+const api = { PLACE, CAPTAIN, REACT, AFTER, APPROACH, ORDERS, CALL, ANSWER, place, captain, react, after, call };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.Lines = api;
 })(typeof window !== 'undefined' ? window : globalThis);
