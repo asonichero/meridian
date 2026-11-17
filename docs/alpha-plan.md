@@ -25,7 +25,7 @@ What the GDD says about stakes and progression:
 - **Under-correction** (minor infractions ignored) leads to skipped pre-checks, uncalibrated suit seals and ignored thermal warnings, and ends in **catastrophic equipment failure or decompression: game over** (§7.2).
 - **Over-correction** (harsh discipline on exhausted crew, or a misdiagnosed trap) spikes Resentment and Stress, and ends in **cognitive freezing, sabotage or human error during a crisis: game over** (§7.2).
 - **Public boundary** (§7.1): early in the game, **every correction must happen behind sealed hatches**, because public discipline causes big Resentment spikes. Late in the game, minor infractions move to in-situ public resets on the bridge or in the galley.
-- **The AI ("The Proctor")** (§6): in Acts I–II it's a voice in the earpiece. It monitors telemetry, delivers historical protocols, points out subtle infractions, and learns and mirrors the player's language and leniency. In Act III and later it appears as a hard-light hologram. It is the **only one who can discipline the Player**. When it's embodied, it leans **submissive** or **dominant** depending on the player's interaction history.
+- **The AI ("The Proctor")** (§6; decided since: docs/proctor.md): in Act I it's a voice in the earpiece; in Act II a projected hologram (Sefa builds the projectors); in Act III hard light (the Proctor finds it, the Captain clears it). It monitors telemetry, delivers historical protocols, points out subtle infractions, and learns and mirrors the player's language and leniency. In Act III and later it appears as a hard-light hologram. It is the **only one who can discipline the Player**. When it's embodied, it leans **submissive** or **dominant** depending on the player's interaction history.
 
 ### What the alpha needs (from the above)
 
@@ -81,7 +81,7 @@ What the GDD says about stakes and progression:
 - **Implements:** unlocked through the narrative with the ship's AI as the Captain learns. The test has the hand only.
 - **Control:** the player controls when runs begin and end (a toggle, not numbered runs), pace and strength, plus soothing on chosen areas. Some scripted responses per character. A conversation follows each correction, giving aftercare through dialogue and an instruction to the crew member.
 - **Witnesses and turns:** corrections can have other crew as witnesses, or several crew members disciplined in turn, as redlessons does.
-- **Cast:** the player chooses the crew's gender balance and the AI's gender, plus basic customisation for their own character. Each crew member has a baseline body type, translated to male or female. The rest is drafted (`js/crew.js`) for review.
+- **Cast:** the player chooses the Captain's gender and look, who the Captain is drawn to (setting the crew's genders by default, with a slider for the balance), and the Proctor's gender (male, female or non-gendered: docs/proctor.md). Each crew member has a baseline body type, translated to male or female. The rest is drafted (`js/crew.js`) for review.
 - **Assets:** allowed. For now everything is still made in code.
 - **First milestone:** a playable correction scene to test the control scheme, models and style (`session.html`).
 
@@ -106,7 +106,7 @@ That suits the GDD's §4 description well: "brushed steel, exposed conduit … b
 ### B. Cast
 4. Names, ages, genders and pronouns, and appearances for the six crew and the Captain.
 5. Is the Captain a fixed character, or is the player character customisable (look, gender)?
-6. The Proctor's voice, persona and name: is it just "The Proctor"?
+6. The Proctor's voice, persona and name: is it just "The Proctor"? *(Drafted in docs/proctor.md, for review.)*
 
 ### C. Consent framing
 7. redlessons builds consent into the engine: each subject's **safe word** ends a session at once, there's an **amber** check-in, and subjects **ask** to be taken in hand. Does Meridian keep safe words, and what are they? Is there an onboarding step where each crew member agrees to the archaic protocol (the GDD calls early game "Private Onboarding"), or is the Captain's authority enough by itself?
@@ -139,7 +139,7 @@ That suits the GDD's §4 description well: "brushed steel, exposed conduit … b
 
 ### I. Evening check-in
 24. What does the Proctor evaluate, and what counts as "performance slipping"?
-25. In Acts I–II the Proctor is voice-only, so what does it "assuming command to hold the player accountable" look like? Is it a reset ordered for the player, a demerit, or a scene?
+25. In Acts I–II the Proctor is voice-only, so what does it "assuming command to hold the player accountable" look like? Is it a reset ordered for the player, a demerit, or a scene? *(Proposed in docs/proctor.md: orders, ordered resets and demerits until hard light; physical accountability from Act III, at the evening check-in.)*
 26. How is the AI's alignment (submissive or dominant) tracked in the alpha, given that embodiment is Act III?
 
 ### J. Scope

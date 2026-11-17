@@ -229,7 +229,7 @@ def arm_profile():
 # the shoulder joint: the trunk's measured shoulder line, in from the deltoid's outer edge
 SH_Y = ym(shoulder_py + 22)
 SH_X = 0.135
-SH_XS = {'f': 0.135, 'm': 0.152}
+SH_XS = {'f': 0.135, 'm': 0.152, 'n': 0.1435}
 ABD = math.radians(13)       # (the arms hang a little out from the sides, clear of the hips, as at rest they do)
 def arm_axis(sx):
     J = np.array([sx * SH_X, SH_Y, -0.01]); d = np.array([sx * math.sin(ABD), -math.cos(ABD), 0.0]); e1 = np.array([sx * math.cos(ABD), math.sin(ABD), 0.0])
@@ -240,8 +240,8 @@ HIP_Y = ym(crotch_py) + 0.075; CROTCH_Y = ym(crotch_py); KNEE_Y = ym(knee_py); A
 ELBOW_Y = SH_Y - ARM_LEN * 0.53 * math.cos(ABD)
 _toe, _heel = side_ext(sole - 8)
 FOOT_LEN = zm(_toe) + 0.055
-HAND_K = {'f': 1.0, 'm': 1.1}
-DELT_R = {'f': 0.038, 'm': 0.04}
+HAND_K = {'f': 1.0, 'm': 1.1, 'n': 1.05}
+DELT_R = {'f': 0.038, 'm': 0.04, 'n': 0.039}
 print('hip', round(HIP_Y, 3), 'knee', round(KNEE_Y, 3), 'shoulder', round(SH_Y, 3), 'elbow', round(ELBOW_Y, 3), 'wrist', round(WRIST_Y, 3), 'foot', round(FOOT_LEN, 3))
 print('arm length', round(ARM_LEN, 3), 'hand', round(HAND_LEN, 3), 'rows', len(TORSO), len(LEG), len(ARM))
 
@@ -269,6 +269,14 @@ def male(P, part):
     # (the thighs' tops flatter behind, as the seat is)
     if part == 'leg': return scaled(P, lambda r: (0.97 - 0.05 * ss(ym(knee_py), ym(crotch_py), r['y']), 0.98, 0.95 - 0.07 * ss(ym(crotch_py + 80), ym(crotch_py), r['y']), 0.66))
     if part == 'arm': return scaled(P, lambda r: (1.16, 1.16, 1.16, 1))
+# ── The non-gendered, derived (the Proctor, if it's chosen so: docs/proctor.md): halfway between her and him in every width, no bust and no
+# pecs, the seat's forms between hers and his; no sex at all, the crotch smooth, as the rest of it is ─────────────────────────────────────
+def andro(P, part):
+    M = male(P, part); out = []
+    for r, m in zip(P, M):
+        lob = [(a, w, mm * (0.0 if (part == 'torso' and a > 0) else 0.83)) for a, w, mm in r['lobes']]
+        out.append(dict(r, rx=(r['rx'] + m['rx']) / 2, zF=(r['zF'] + m['zF']) / 2, zB=(r['zB'] + m['zB']) / 2, lobes=lob))
+    return out
 def bust_variant(P, k, spread=0.0, drop=0.0, widen=1.0, apart=0.55, round_=1.0):
     """The torso with the bust's pair of forms k times the size: spread `spread` (m) further up and down, sitting `drop` lower, `widen` times
     wider round the chest, set `apart` (radians from the middle), and fuller in profile (round_ > 1: rounder, less peaked, still easing out to
@@ -650,6 +658,7 @@ def sex_parts(sex, T, k=(1.0, 1.0, 1.0)):
     crease), the slit between them where they meet. His: the scrotum and penis, hanging, their roots well up
     in the body so they join it without a crease; k: (girth, length, scrotum) for the shape keys toward smaller or larger. Returns the forms
     to join to the body, a field to cut from it, and how softly they're joined. Simple, soft forms, as the rest is."""
+    if sex == 'n': return None, None, 0.0
     if sex == 'f':
         # (the two folds meeting in a crease, the inner form in it; k with her response: see her_folds)
         outer, inner = her_folds(k)
@@ -743,7 +752,7 @@ def build(sex):
     global SH_X
     SH_X = SH_XS[sex]          # (a man's shoulders broader: his arms hang further out)
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    torso, leg, arm = (TORSO, LEG, ARM) if sex == 'f' else (male(TORSO, 'torso'), male(LEG, 'leg'), male(ARM, 'arm'))
+    torso, leg, arm = (TORSO, LEG, ARM) if sex == 'f' else (andro(TORSO, 'torso'), andro(LEG, 'leg'), andro(ARM, 'arm')) if sex == 'n' else (male(TORSO, 'torso'), male(LEG, 'leg'), male(ARM, 'arm'))
     F = body_field(torso, leg, arm, sex)
     V, Fc = march(F)
     me = bpy.data.meshes.new('Body'); body = bpy.data.objects.new('Body', me); bpy.context.scene.collection.objects.link(body)
@@ -775,7 +784,7 @@ def build(sex):
     for pgn in body.data.polygons: pgn.use_smooth = True
     body.shape_key_add(name='Basis')
     for v, fns in VARIANTS.items():
-        if (v.startswith('bust') and sex == 'm') or (v in ('sexLarge', 'sexSmall') and sex == 'f'): continue
+        if (v.startswith('bust') and sex != 'f') or (v in ('sexLarge', 'sexSmall') and sex == 'f') or (v.startswith('sex') and sex == 'n'): continue
         sk = fns.get('sex', (1.0, 1.0, 1.0)); sk = sk[sex] if isinstance(sk, dict) else sk
         Fv = body_field(fns['torsoP'](torso) if 'torsoP' in fns else scaled(torso, fns['torso']), scaled(leg, fns['leg']), scaled(arm, fns['arm']), sex, sk)
         t_v = along(Fv, X, Nrm)
@@ -823,6 +832,7 @@ def sex_weights(body, X, label, sex, torso, leg):
     the thighs. His penis, from where it leaves the body to the tip, then
     goes onto its own bone for the lift, all of it from where it leaves the body (so it lifts straight)."""
     parts = sex_parts(sex, Surface(torso))[0]
+    if parts is None: return      # (none: the automatic weights as they are)
     k = ss(-0.015, -0.002, parts(X))
     w = np.zeros(len(X)); vg = body.vertex_groups; hips = vg['hips'].index; gs = vg.get('sex'); thL = vg['thighL'].index; thR = vg['thighR'].index
     if sex == 'm':
@@ -1042,7 +1052,7 @@ def garments(sex, torso, leg, arm, body, label, rig):
         zp = front_z(Surface(torso), CROTCH_Y + 0.025); PC = np.array([0.0, CROTCH_Y + 0.014, zp - 0.022]); PR = np.array([0.042, 0.056, 0.03])
         pouch = lambda P: (1 - np.linalg.norm((P - PC) / PR, axis=1)) * PR.min()
         briefs_f = (lambda b: lambda P: smax(b(P), pouch(P), 0.03))(briefs_f)
-    else:      # (hers: the gusset carried down round her forms and back under them, and the front smooth over the folds' length, at their fullest)
+    elif sex == 'f':      # (hers: the gusset carried down round her forms and back under them, and the front smooth over the folds' length, at their fullest)
         GC = np.array([0.0, CROTCH_Y - 0.006, 0.02]); GR = np.array([0.026, 0.026, 0.036])
         gus = lambda P: (1 - np.linalg.norm((P - GC) / GR, axis=1)) * GR.min()
         folds_full = her_folds((1.25, 1.25, 1.0))[0]
@@ -1158,7 +1168,7 @@ def export(sex, objs):
     print('exported', path, round(os.path.getsize(path) / 1e6, 2), 'MB')
 
 if __name__ == '__main__':
-    only = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else ['f', 'm']
+    only = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else ['f', 'm', 'n']
     # (how the models sit against the turnaround they were measured from: for model.html's overlay)
     try: prev = json.load(open(os.path.join(OUT, 'meridian_meta.json')))
     except Exception: prev = {}

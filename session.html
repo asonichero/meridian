@@ -132,6 +132,14 @@ body:not(.stations) #bar .g-call, body:not(.bridge) #bar .g-vp { display: none; 
   <div class="row" id="chair" style="margin-top:6px"></div>
   <div class="row" id="cstyle" style="margin-top:6px"></div>
   <div class="row seg" id="cbuild" style="margin-top:6px"><button data-v="lean">Lean</button><button data-v="average" class="on">Average</button><button data-v="heavy">Heavy</button></div>
+  <h2>Drawn to</h2>
+  <div class="row seg" id="drawn"><button data-v="women">Women</button><button data-v="men">Men</button><button data-v="both">Both</button></div>
+  <div class="vols" style="margin-top:6px"><label>The crew</label><input type="range" id="balance" min="0" max="6" step="1"><span class="pct" id="balanceV" style="width:auto"></span></div>
+  <small class="note">Sets the crew's genders: all six the gender you're drawn to (an even split, drawn to both). The slider changes how many are women; any of them can still be changed in the list above.</small>
+  <h2>The Proctor</h2>
+  <div class="row seg" id="psex"><button data-v="m">Male</button><button data-v="f">Female</button><button data-v="n">Non-gendered</button></div>
+  <div class="row seg" id="ppres" style="margin-top:6px"><button data-v="voice">Voice (Act I)</button><button data-v="projected">Projected (Act II)</button><button data-v="hardlight">Hard light (Act III)</button></div>
+  <small class="note">The ship's AI. A voice at first; in Act II an image in light, always clothed; in Act III hard light, solid, its anatomy its form (non-gendered: none, in either form). For now it's seen on the bridge at stations.</small>
   <h2>Relationship</h2>
   <div class="row"><select id="relWho" class="pick"></select></div>
   <div class="vols" id="rel" style="margin-top:6px"></div>
@@ -193,7 +201,7 @@ function drawCrew() {
     const rb = document.createElement('button'); rb.textContent = role === 'subject' ? `Corrected #${n + 1}` : role === 'witness' ? 'Witness' : 'Absent'; rb.className = role === 'absent' ? '' : 'on';
     rb.onclick = () => { const nx = role === 'subject' ? 'witness' : role === 'witness' ? 'absent' : 'subject'; cfg.roles[id] = nx; cfg.order = cfg.order.filter(x => x !== id); if (nx === 'subject') cfg.order.push(id); save(); drawCrew(); };
     const sb = document.createElement('button'); sb.textContent = cfg.sex[id] === 'm' ? '♂' : '♀'; sb.title = 'Gender';
-    sb.onclick = () => { cfg.sex[id] = cfg.sex[id] === 'm' ? 'f' : 'm'; save(); drawCrew(); };
+    sb.onclick = () => { cfg.sex[id] = cfg.sex[id] === 'm' ? 'f' : 'm'; save(); drawCrew(); if (window.drawBalance) drawBalance(); };
     el.append(nm, rb, sb);
   }
 }
@@ -235,6 +243,21 @@ seg('between', cfg.between, v => { cfg.between = v; save(); if (ses) ses.st.betw
 seg('story', cfg.late ? 'late' : 'early', v => { const was = cfg.position; cfg.late = v === 'late'; save(); drawPos(); if ((ses || sta) && cfg.position !== was) { fade(); models.then(begin); } });
 seg('outfit', cfg.outfit, v => { cfg.outfit = v; save(); });
 drawCrew(); drawCaptain();
+// (who the Captain's drawn to sets the crew's genders: all the one, or an even split for both; the slider moves how many are women, the first
+// so many in this order; the list's own toggles still change anyone)
+const WOMEN_FIRST = ['scientist', 'pilot', 'comms', 'lifesupport', 'medic', 'engineer'];
+const womenNow = () => Crew.IDS.filter(id => cfg.sex[id] === 'f').length;
+window.drawBalance = () => { const k = womenNow(); $('balance').value = k; $('balanceV').textContent = `${k} women · ${Crew.IDS.length - k} men`; };
+const setBalance = k => { WOMEN_FIRST.forEach((id, i) => (cfg.sex[id] = i < k ? 'f' : 'm')); save(); drawCrew(); drawBalance(); };
+if (!cfg.drawn) cfg.drawn = womenNow() === Crew.IDS.length ? 'women' : womenNow() === 0 ? 'men' : 'both';
+seg('drawn', cfg.drawn, v => { cfg.drawn = v; setBalance(v === 'women' ? 6 : v === 'men' ? 0 : 3); });
+$('balance').oninput = () => setBalance(+$('balance').value);
+drawBalance();
+// (the Proctor: its form, and how it's there; seen for now on the bridge at stations)
+cfg.proctor = Object.assign({ sex: 'n', presence: 'voice' }, cfg.proctor);
+const proctorAgain = () => { save(); if (typeof sta !== 'undefined' && sta) { fade(); models.then(begin); } };
+seg('psex', cfg.proctor.sex, v => { cfg.proctor.sex = v; proctorAgain(); });
+seg('ppres', cfg.proctor.presence, v => { cfg.proctor.presence = v; proctorAgain(); });
 // sound levels: each a slider, kept between visits (js/audio.js)
 { const el = $('vols');
   for (const [k, nm] of [['master', 'Master'], ['sfx', 'Effects'], ['voice', 'Voices'], ['music', 'Music'], ['amb', 'Ambience']]) {
@@ -300,8 +323,10 @@ function begin() {
 // The bridge at stations (js/stations.js): no correction. The bridge crew at their posts, whoever else is in the set-up in the jump seats, on
 // duty (in uniform); the Captain at the plot table. From here the Captain calls someone into the Ready Room.
 function beginStations() {
+  // (the Proctor's body loaded first, if it's seen and it's one not yet in: the non-gendered)
+  const pro = cfg.proctor; if (pro.presence !== 'voice' && !Figure.models().includes(pro.sex)) { Figure.need(pro.sex).then(() => beginStations()); return; }
   endAll(); const R = ROOMS.bridge, ids = Crew.IDS.filter(id => R.crew.includes(id) || cfg.order.includes(id) || cfg.roles[id] === 'witness');
-  sta = Stations.create(stage, bay, { captain: cfg.captain, crew: ids.map(id => ({ id, sex: cfg.sex[id] || 'f', outfit: 'uniform' })) });
+  sta = Stations.create(stage, bay, { captain: cfg.captain, crew: ids.map(id => ({ id, sex: cfg.sex[id] || 'f', outfit: 'uniform' })), proctor: pro });
   window.sta = sta; sta.camera(0, 0); drawCams(); refresh();
   $('summary').style.display = 'none'; $('word').style.display = 'none'; $('say').style.display = 'none';
   if (innerWidth < 900) $('setup').classList.add('closed');

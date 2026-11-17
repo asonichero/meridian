@@ -228,6 +228,11 @@ function build(scene) {
   box(0.04, 0.8, 1.5, steelDark, X0 + 0.02, 1.7, 2.3); plane(1.4, 0.72, basic(graph('PROCTOR  ·  WATCH', 'trace')), X0 + 0.042, 1.7, 2.3, 0, Math.PI / 2);
   for (let i = 0; i < 3; i++) { const z = -0.7 + i * 0.75; box(0.42, 1.95, 0.7, std({ color: srgb('#8a2a24'), roughness: 0.5, metalness: 0.3 }), X1 - 0.21, 0.975, z); box(0.012, 0.6, 0.04, steel, X1 - 0.425, 1.2, z + 0.25, { noCast: true }); box(0.012, 0.1, 0.3, glowW, X1 - 0.425, 1.8, z, { noCast: true, detail: true }); }
 
+  // ── Sefa's projector for the Proctor (Act II on: docs/proctor.md), in the ceiling over the plot table's port end, built from the lost
+  // array's optics: a dark housing, its lens the bridge's blue ──
+  const PRX = PW / 2 + 0.62, PRZ = PZ + 0.2;
+  cyl(0.11, 0.13, 0.12, steelDark, PRX, HT - 0.06, PRZ, null, 16, { noCast: true }); cyl(0.06, 0.06, 0.012, glowB, PRX, HT - 0.125, PRZ, null, 16, { noCast: true, detail: true });
+
   // ── The ceiling's lights: long panels down each side over the stations, a ring round the well ──
   for (const x of [-2.6, 2.6]) { box(0.5, 0.03, 3.0, steelDark, x, HT - 0.015, -1.4); box(0.42, 0.012, 2.9, glowW, x, HT - 0.034, -1.4, { noCast: true }); }
   for (const x of [-3.2, 3.2]) { box(0.5, 0.03, 1.8, steelDark, x, HT - 0.015, 2.4); box(0.42, 0.012, 1.7, glowW, x, HT - 0.034, 2.4, { noCast: true }); }
@@ -265,7 +270,7 @@ function build(scene) {
     // (the bridge crew stay at their posts, each officer at their own, swivelled to it; anyone else in the jump seats)
     watch: [helmS, sensS, survS].map(s => ({ at: s.at, yaw: s.yaw, seatY: s.seatY, swivel: true, for: s.for, chair: s.chair })).concat(jumpS),
     corner: { at: new V3(X0 + 0.45, 0, 2.3), yaw: -Math.PI / 2, next: { base: new V3(0, 0, 0), step: new V3(0, 0, -0.85), yaw: -Math.PI / 2 } },
-    stations: { helm: helmS, sensors: sensS, survey: survS, jump: jumpS, plot: { at: capAt, yaw: Math.PI, edge: [[-0.32, PY + 0.012, PZ + PD / 2 - 0.05], [0.32, PY + 0.012, PZ + PD / 2 - 0.05]].map(a => new V3(...a)) } },
+    stations: { helm: helmS, sensors: sensS, survey: survS, jump: jumpS, proctor: { at: new V3(PRX, 0, PRZ), yaw: -Math.PI / 2 }, plot: { at: capAt, yaw: Math.PI, edge: [[-0.32, PY + 0.012, PZ + PD / 2 - 0.05], [0.32, PY + 0.012, PZ + PD / 2 - 0.05]].map(a => new V3(...a)) } },
   };
   // (its cameras: at the plot table, from across the bridge and over the stations; the stations scene's own, as world points)
   const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.25, -1.15], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.3, -0.7], [0, 0.88, 0]],

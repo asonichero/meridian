@@ -959,11 +959,12 @@ const OUTFITS = {
 // patterns number them.
 const TOPS = { henley: 0, thermal: 2, open: 3, waistcoat: 4, cardigan: 5, tee: 6, sweatervest: 7 }, LEGS = { canvas: 0, joggers: 1, chinos: 2, work: 3, combat: 4, pressed: 5 };
 const SHOES = { boots: 0, soft: 1, deck: 2, work: 3, sneakers: 4, flats: 5, loafers: 6 };
-function outfitOf(spec) { const O = OUTFITS[spec.outfit] || OUTFITS.uniform; return spec.outfit === 'offduty' && spec.off ? Object.assign({}, O, spec.off) : O; }
+// (and spec.wear over either: someone who wears the uniform in colours of their own, the Proctor)
+function outfitOf(spec) { let O = OUTFITS[spec.outfit] || OUTFITS.uniform; if (spec.outfit === 'offduty' && spec.off) O = Object.assign({}, O, spec.off); return spec.wear ? Object.assign({}, O, spec.wear) : O; }
 function dress(F, spec, S, BI, w, torsoW, legW, armW) {
   for (const k in F.clothes) { const m = F.clothes[k]; for (const x of [m, m.userData.hull]) if (x) { x.parent.remove(x); x.geometry.dispose(); } }
   F.clothes = {};
-  const O = OUTFITS[spec.outfit] || OUTFITS.uniform, st = F.state;
+  const O = outfitOf(spec), st = F.state;
   const add = (key, BB, m) => { const sm = skinned(F, BB.geometry(), m); sm.castShadow = true; sm.receiveShadow = false; F.clothes[key] = sm; ink(sm, INK_W, F); return sm; };
   let hide = 0; const H = r => { hide |= 1 << r; };
 
@@ -1099,10 +1100,10 @@ function surfaceGeo(fn, NU, NV) {
   g.setIndex(idx); g.computeVertexNormals(); weldSeams(g); return g;
 }
 function buildHead(F, spec, S) {
-  const K = FACE, HS = HEAD_SCALE, k = HEAD_K * (spec.headScale || HS), Hs = headShape(K.jaw * (S.f ? 1 : 1.06));
+  const K = FACE, HS = HEAD_SCALE, k = HEAD_K * (spec.headScale || HS), Hs = headShape(K.jaw * (S.f ? 1 : spec.sex === 'n' ? 1.03 : 1.06));
   const H = new THREE.Group(); H.scale.setScalar(k); H.position.set(0, -0.012 - Hs.chin * k * 0.92, 0.012); F.bone.head.add(H); F.head = H;
   const P = { skin: spec.skin, lips: spec.lips || shade(spec.skin, S.f ? -0.22 : -0.12), eyes: spec.eyes, hair: spec.hair, hairDk: shade(spec.hair, -0.35), beard: shade(spec.hair, -0.2) };
-  const MAN = !S.f, OLD = (spec.age || 0) >= 45;
+  const MAN = !S.f, OLD = (spec.age || 0) >= 45, ANDRO = spec.sex === 'n';      // (non-gendered: between the two, neither's marks)
   const skinM = tmat(spec.skin, { rim: '#6a5048', rimK: 0.5 });
   const head = new THREE.Mesh(surfaceGeo(Hs.point, 40, 40), skinM); head.castShadow = true; H.add(head); ink(head, 0.06);
   for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), skinM); e.scale.set(0.24 * K.earSize, 0.44 * K.earSize, 0.34 * K.earSize); e.position.set(sx * (Hs.at(0).w - 0.04), 0, -0.1); H.add(e); ink(e, 0.05); }
@@ -1134,7 +1135,7 @@ function buildHead(F, spec, S) {
       fx.restore();
     }
     const ly = -0.5 * shut * K.eyeH, ar = 0.4 * K.eyeW, br = 0.4 * 0.72 * K.eyeH;
-    fx.strokeStyle = INKC; fx.lineCap = 'round'; fx.lineWidth = (MAN ? 0.065 : 0.1) * U;
+    fx.strokeStyle = INKC; fx.lineCap = 'round'; fx.lineWidth = (ANDRO ? 0.08 : MAN ? 0.065 : 0.1) * U;
     const sq = (E.sq || 0) > 0.5 && shut > 0.6;
     fx.beginPath(); if (sq) fx.ellipse(px(cx), py(cy + ly + 0.62 * br), ar * U, br * 0.7 * U, 0, 0.2, Math.PI - 0.2); else fx.ellipse(px(cx), py(cy + ly), ar * U, br * U, 0, Math.PI + 0.15, 2 * Math.PI - 0.15); fx.stroke();
     if (MAN) return;
@@ -1145,7 +1146,7 @@ function buildHead(F, spec, S) {
     const by = K.browY + E.browY, inX = sx * (K.eyeX - 0.3 * K.eyeW), outX = sx * (K.eyeX + 0.42 * K.eyeW), inY = by + E.brow * 0.3, outY = by - 0.06 - E.brow * 0.08;
     fx.strokeStyle = P.hairDk; fx.lineCap = 'round';
     for (let i = 0; i < 6; i++) { const t0 = i / 6, t1 = (i + 1) / 6, at = t => [lerp(inX, outX, t), lerp(inY, outY, t) + 0.09 * Math.sin(Math.PI * t)];
-      const [x0, y0] = at(t0), [x1, y1] = at(t1); fx.lineWidth = lerp(0.105, 0.045, t1) * U * (MAN ? 1.55 : 1); fx.beginPath(); fx.moveTo(px(x0), py(y0)); fx.lineTo(px(x1), py(y1)); fx.stroke(); }
+      const [x0, y0] = at(t0), [x1, y1] = at(t1); fx.lineWidth = lerp(0.105, 0.045, t1) * U * (ANDRO ? 1.25 : MAN ? 1.55 : 1); fx.beginPath(); fx.moveTo(px(x0), py(y0)); fx.lineTo(px(x1), py(y1)); fx.stroke(); }
   }
   function drawMouth(E) {
     const s_ = E.ms * K.mouthSize, w = E.mw * s_, cy = -1.2 + K.mouthY, c = E.mc, o = E.mo * s_, l = -w / 2, r = w / 2, cornerY = cy + c * 0.12;
@@ -1159,7 +1160,7 @@ function buildHead(F, spec, S) {
     } else {
       fx.strokeStyle = lipsDk; fx.lineCap = 'round'; fx.lineWidth = 0.045 * U;
       fx.beginPath(); fx.moveTo(px(l), py(cornerY)); fx.quadraticCurveTo(px(0), py(upMid + (upMid - cornerY)), px(r), py(cornerY)); fx.stroke();
-      fx.fillStyle = P.lips; fx.globalAlpha = MAN ? 0.3 : 0.75; fx.beginPath(); fx.ellipse(px(0), py(cy - 0.08 - c * 0.03), w * 0.22 * U, 0.045 * U, 0, 0, 7); fx.fill(); fx.globalAlpha = 1;
+      fx.fillStyle = P.lips; fx.globalAlpha = ANDRO ? 0.5 : MAN ? 0.3 : 0.75; fx.beginPath(); fx.ellipse(px(0), py(cy - 0.08 - c * 0.03), w * 0.22 * U, 0.045 * U, 0, 0, 7); fx.fill(); fx.globalAlpha = 1;
     }
   }
   function paintFace(E, open) {
@@ -1244,6 +1245,7 @@ const EXPRS = {
 const flatExpr = name => { const e = EXPRS[name] || EXPRS.calm, m = MOUTHS[e.mouth] || MOUTHS.flat; return Object.assign({ brow: 0, browY: 0, open: 0.95, look: 0, blush: 0, tears: 0, ms: 1, sq: 0 }, e, m); };
 const SEX_REST = 0.46, _sq = new THREE.Quaternion(), _sv = new V3(), _tuckOff = new V3(0, 0.065, 0.035);      // (his, at rest, hangs this far forward of straight down)
 function tickFace(F, dt) {
+  tickPresence(F, dt);
   F.t += dt;
   const kk = 1 - Math.exp(-dt * 8), x = F.expr, to = F.exprTo;
   for (const key in to) if (typeof to[key] === 'number') x[key] = lerp(x[key] == null ? to[key] : x[key], to[key], kk);
@@ -1305,6 +1307,16 @@ function preload(base) {
     .then(meta => Promise.all(['f', 'm'].map(sx => fetch(base + 'meridian_' + sx + '.glb').then(r => r.arrayBuffer()).then(buf => adopt(meta, sx, buf)))))
     .then(() => true).catch(e => { console.warn('Figure: the Blender-built models did not load; building the figures in code.', e); GLB.sex = {}; return false; });
   return GLB.ready;
+}
+// (another of them, when it's needed and not before: the non-gendered body, 'n', only for the Proctor if it's chosen so)
+function need(sx, base) {
+  base = base == null ? 'models/' : base;
+  if (GLB.sex[sx]) return Promise.resolve(true);
+  return (GLB.ready || preload(base)).then(ok => {
+    if (!ok || GLB.sex[sx]) return ok;
+    const meta = GLB.meta; if (!meta || !meta[sx]) return false;
+    return fetch(base + 'meridian_' + sx + '.glb').then(r => r.arrayBuffer()).then(buf => adopt(meta, sx, buf)).then(() => true).catch(e => { console.warn('Figure: no model for ' + sx, e); return false; });
+  });
 }
 function adopt(meta, sx, buf) {
   GLB.meta = meta;
@@ -1519,7 +1531,7 @@ function makeGLB(spec, T) {
     const swell = clamp(r * (spec.sex === 'f' ? 0.9 : 1.2), 0, 1), u = clamp((r - 0.12) / 0.88, 0, 1);
     F.resp.r = r; F.resp.lift = 2.0 * u * u * (3 - 2 * u);
     if (Math.abs((F.keys.sexSwell || 0) - swell) > 0.004) { F.keys.sexSwell = swell; F.root.traverse(m => { if (m.isSkinnedMesh && m.morphTargetInfluences) setKeys(m, F.keys); }); }
-    skinM.userData.u.uFlush.value.set(spec.sex === 'm' ? 0 : clamp(r * 1.7, 0, 1), T.L.crotch, 0.0, spec.sex === 'm' ? 1 : 0);      // (his takes no tint: only hers flushes)
+    skinM.userData.u.uFlush.value.set(spec.sex !== 'f' ? 0 : clamp(r * 1.7, 0, 1), T.L.crotch, 0.0, spec.sex === 'm' ? 1 : 0);      // (his takes no tint: only hers flushes; none for the non-gendered, with nothing there)
     skinM.userData.u.uFlushC.value.set(clamp((o.chest || 0) * 1.8, 0, 1), T.L.armpit - 0.07, T.L.neck + 0.015, 1);
     F.blushAdd = o.blush || 0;
   };
@@ -1619,6 +1631,55 @@ function aim(obj, X, Y) {
   setWorldQuat(obj, new THREE.Quaternion().setFromRotationMatrix(_m.makeBasis(x, y, z)));
 }
 
-const api = { tmat, ink, dqs, grip, FINGERS, make, preload, adopt, models: () => Object.keys(GLB.sex), EXPRS, MOUTHS, HEAD_SCALE, OUTFITS, SPOTS, ik2, aim, setWorldQuat, mat, paint, srgb, shade, R };
+// ── Presence: how a figure is there (the Proctor: docs/proctor.md) ──
+// 'projected': an image in light, the bridge's blue: drawn in lines with gaps between them (the same lines for every surface, so nothing under
+// its clothes ever shows through them), brighter toward its edges, flickering a little, casting no shadow, its outline the same light;
+// 'hardlight': solid, in its own colours, with a faint blue light at its edges; 'solid': as anyone. Each of its materials is swapped for a
+// copy of its own that adds this (sharing the original's uniforms, so marks, hiding and the rest still reach it); 'solid' puts them back.
+const HOLO_LIT = `
+{ float fres_ = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));
+  if (uHolo > 0.5) {
+    if (mod(floor(gl_FragCoord.y * 0.5) + floor(uHoloT * 14.0), 3.0) < 1.0) discard;
+    float lum_ = dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11));
+    gl_FragColor.rgb = (uHoloTint * (0.22 + 1.15 * lum_) + uHoloTint * pow(fres_, 2.0) * 1.3) * uHoloK;
+  } else gl_FragColor.rgb += uHoloTint * pow(fres_, 5.0) * 0.16 * uHard; }`;
+const HOLO_FLAT = `
+{ if (uHolo > 0.5) { if (mod(floor(gl_FragCoord.y * 0.5) + floor(uHoloT * 14.0), 3.0) < 1.0) discard;
+    float lum_ = dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11)); gl_FragColor.rgb = uHoloTint * (0.2 + 1.2 * lum_) * uHoloK; } }`;
+const HOLO_INK = `
+{ if (uHolo > 0.5) { if (mod(floor(gl_FragCoord.y * 0.5) + floor(uHoloT * 14.0), 3.0) < 1.0) discard; gl_FragColor.rgb = uHoloTint * 1.4 * uHoloK; } }`;
+function presence(F, mode) {
+  const H = F.holo || (F.holo = { u: { uHolo: { value: 0 }, uHard: { value: 0 }, uHoloT: { value: 0 }, uHoloK: { value: 1 }, uHoloTint: { value: srgb('#5ad8e0') } }, made: new Map(), mode: 'solid' });
+  const of = m => {
+    if (H.made.has(m)) return H.made.get(m);
+    const c = m.clone(), prev = m.onBeforeCompile, key0 = m.customProgramCacheKey, lit = !m.isMeshBasicMaterial, inked = m.isMeshBasicMaterial && m.side === THREE.BackSide;      // (its outline: the light itself)
+    c.userData = m.userData;
+    c.onBeforeCompile = (sh, r) => {
+      if (prev) prev.call(m, sh, r); Object.assign(sh.uniforms, H.u);
+      sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uHolo, uHard, uHoloT, uHoloK; uniform vec3 uHoloTint;\nvoid main() {')
+        .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n' + (lit ? HOLO_LIT : inked ? HOLO_INK : HOLO_FLAT));
+    };
+    c.customProgramCacheKey = () => 'holo' + (lit ? 1 : inked ? 2 : 0) + '|' + (key0 ? key0.call(m) : '');
+    H.made.set(m, c); return c;
+  };
+  F.root.traverse(o => {
+    if (!o.isMesh) return;
+    if (!o.userData.mat0) { o.userData.mat0 = o.material; o.userData.cast0 = o.castShadow; }
+    const m0 = o.userData.mat0;
+    o.material = mode === 'solid' ? m0 : Array.isArray(m0) ? m0.map(of) : of(m0);
+    o.castShadow = mode === 'projected' ? false : o.userData.cast0;
+  });
+  H.mode = mode; H.u.uHolo.value = mode === 'projected' ? 1 : 0; H.u.uHard.value = mode === 'hardlight' ? 1 : 0;
+}
+// (its light alive: the lines drifting up, now and then a stutter)
+function tickPresence(F, dt) {
+  const H = F.holo; if (!H || H.mode === 'solid') return;
+  H.u.uHoloT.value += dt; H.t = (H.t || 0) - dt;
+  if (H.t <= 0) { H.t = 1.5 + Math.random() * 5; H.glitch = 0.12 + Math.random() * 0.12; }
+  H.glitch = Math.max(0, (H.glitch || 0) - dt);
+  H.u.uHoloK.value = (H.glitch > 0 ? 0.55 + 0.45 * Math.random() : 1) * (0.94 + 0.06 * Math.sin(H.u.uHoloT.value * 9.0));
+}
+
+const api = { presence, tickPresence, need, tmat, ink, dqs, grip, FINGERS, make, preload, adopt, models: () => Object.keys(GLB.sex), EXPRS, MOUTHS, HEAD_SCALE, OUTFITS, SPOTS, ik2, aim, setWorldQuat, mat, paint, srgb, shade, R };
 root.Figure = api;
 })(typeof window !== 'undefined' ? window : globalThis);

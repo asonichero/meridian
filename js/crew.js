@@ -102,9 +102,16 @@ function wriggle(id, sex) {
 const CAPTAIN = { id: 'captain', name: 'Captain', role: 'Captain (Player)', dept: '#c89a3a',
   options: { skin: ['#f0d0b4', '#d6ad8e', '#b88a6a', '#8a5a3e', '#5e3c2a', '#3e281c'], hair: ['#161210', '#3a2a20', '#6a4a2e', '#a8642e', '#c8a46a', '#8a8580'],
     hairStyle: { m: ['crop', 'short', 'shaved', 'curls'], f: ['bun', 'ponytail', 'bob', 'short', 'crop', 'curls'] }, build: { lean: [0.35, 0.25], average: [0.55, 0.4], heavy: [0.8, 0.55] } } };
-const PROCTOR = { id: 'proctor', name: 'The Proctor', role: 'Ship’s AI', onlyDisciplinesPlayer: true };
+// The Proctor (docs/proctor.md): the ship's archival AI. A voice in Act I; in Act II projected, an image in light (Sefa's projectors, from the
+// lost array's optics); in Act III hard light, solid, once the Captain clears it. Male, female or non-gendered, as the player chooses
+// (sex 'm', 'f' or 'n': non-gendered, neither's characteristics in either form). Its look, drafted: an adult of no particular age, composed;
+// dark hair kept short or tied back; the bridge's blue in its eyes. It wears the ship's duty cut in its own colours, from the archive's
+// proctor (a dark gown, white bands at the throat): near-black, the seam along the closure and the flash and cuffs white, no department, no rank.
+const PROCTOR = { id: 'proctor', name: 'The Proctor', role: 'Ship’s AI', onlyDisciplinesPlayer: true,
+  look: { skin: '#d2b6a2', hair: '#23252b', hairStyle: { m: 'crop', f: 'bun', n: 'crop' }, eyes: '#5fc8d4' }, h: { m: 1.85, f: 1.74, n: 1.79 },
+  dept: '#e6ecee', wear: { tunic: '#1d222b', trousers: '#191c22', edge: '#e6ecee', belt: '#121418', under: '#2a2e36' } };
 
-const PRONOUNS = { m: { they: 'he', them: 'him', their: 'his', They: 'He' }, f: { they: 'she', them: 'her', their: 'her', They: 'She' } };
+const PRONOUNS = { m: { they: 'he', them: 'him', their: 'his', They: 'He' }, f: { they: 'she', them: 'her', their: 'her', They: 'She' }, n: { they: 'it', them: 'it', their: 'its', They: 'It' } };
 const pronouns = sex => PRONOUNS[sex] || PRONOUNS.f;
 // A crew member as a figure: their body type in the chosen sex, their look, and an outfit ('uniform' or 'offduty': their own, `off`).
 function figureSpec(id, sex, outfit) {
@@ -118,10 +125,16 @@ function captainSpec(c) {
   return { sex: c.sex, height: c.sex === 'f' ? 1.753 : 1.88, mass, fat, skin: c.skin, hair: c.hair, hairStyle: c.hairStyle, eyes: '#4a5a6a',
     beard: c.sex === 'm' && c.beard, outfit: c.outfit || 'uniform', dept: CAPTAIN.dept, bust: 0.45, size: 1 };
 }
+// The Proctor as a figure: its form ('m', 'f' or 'n'), its look, in its uniform.
+function proctorSpec(p) {
+  const sex = (p && p.sex) || 'n', L = PROCTOR.look;
+  return { sex, height: PROCTOR.h[sex] || PROCTOR.h.n, mass: 0.5, fat: 0.3, skin: L.skin, hair: L.hair, hairStyle: L.hairStyle[sex] || 'crop', eyes: L.eyes,
+    beard: false, outfit: 'uniform', dept: PROCTOR.dept, wear: PROCTOR.wear, bust: sex === 'f' ? 0.4 : 0, age: 40 };
+}
 // Voice pitch for the babble and cries, by sex (Hz).
-const pitch = (id, sex) => (sex === 'm' ? 128 : 208) + ({ scientist: 4, engineer: -14, pilot: 10, lifesupport: 8, comms: 0, medic: -6 }[id] || 0);
+const pitch = (id, sex) => (sex === 'm' ? 128 : sex === 'n' ? 168 : 208) + ({ scientist: 4, engineer: -14, pilot: 10, lifesupport: 8, comms: 0, medic: -6, proctor: -10 }[id] || 0);
 
-const api = { METERS, ROSTER, IDS, CAPTAIN, PROCTOR, pronouns, figureSpec, captainSpec, pitch, wriggle };
+const api = { METERS, ROSTER, IDS, CAPTAIN, PROCTOR, pronouns, figureSpec, captainSpec, proctorSpec, pitch, wriggle };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.Crew = api;
 })(typeof window !== 'undefined' ? window : globalThis);

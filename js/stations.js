@@ -3,8 +3,12 @@
 // Captain standing at the plot table behind them, hands on its edge. Each at their screen, now and then a glance at the viewscreen or back
 // at the Captain. From here the Captain calls someone into the Ready Room (the page cuts there and begins it, still in that mode).
 //
-//   const s = Stations.create(stage, bridge, { captain, crew: [{ id, sex, outfit }] })
-//   s.update(dt) · s.camera(i, ms) → its name · s.cams · s.st.cam · s.people [{ id, f, station }] · s.captain · s.dispose()
+// The Proctor (docs/proctor.md), once it has a presence: at the plot table's port end under Sefa's projector, composed, hands behind its
+// back, its eyes on the Captain and the plot by turns. Projected (Act II) it's the image, clothed, hovering a finger's breadth off the deck;
+// in hard light (Act III), solid. As a voice (Act I) there's nothing to see.
+//
+//   const s = Stations.create(stage, bridge, { captain, crew: [{ id, sex, outfit }], proctor: { sex, presence } })
+//   s.update(dt) · s.camera(i, ms) → its name · s.cams · s.st.cam · s.people [{ id, f, station }] · s.captain · s.proctor · s.dispose()
 (function (root) {
 'use strict';
 const THREE = root.THREE, V3 = THREE.Vector3, UP = new V3(0, 1, 0);
@@ -24,6 +28,9 @@ function create(stage, bay, opts) {
   });
   captain.setExpr('calm');
   const st = { t: 0, cam: 0 };
+  const pro = opts.proctor && opts.proctor.presence && opts.proctor.presence !== 'voice' && S.proctor ? opts.proctor : null;
+  const proctor = pro ? Fg.make(C.proctorSpec({ sex: pro.sex })) : null;
+  if (proctor) { scene.add(proctor.root); Fg.presence(proctor, pro.presence === 'hardlight' ? 'hardlight' : 'projected'); proctor.setClothes({ top: 'down', bottoms: 'up', under: 'up' }); proctor.setExpr('calm'); }
 
   // A hand flat on a surface: the palm on the point, the fingers along `fwd`, the wrist a hand's length back; or round a grip (the palm in
   // toward the other hand, the fingers wrapped forward).
@@ -63,14 +70,21 @@ function create(stage, bay, opts) {
     const left = toWorldDir(captain, 1, 0, 0), fwd = toWorldDir(captain, 0, 0, 1), edge = S.plot.edge.slice().sort((a, b) => b.dot(left) - a.dot(left));
     for (const [side, sx, at] of [['L', 1, edge[0]], ['R', -1, edge[1]]]) flat(captain, side, at.clone().addScaledVector(fwd, 0.02 * cs), fwd.clone().addScaledVector(left, -sx * 0.2).normalize(), toWorldDir(captain, sx * 0.8, -0.5, -0.5).normalize());
     captain.root.updateMatrixWorld(true);
+    // (the Proctor: standing easy, hands clasped behind it, the head turning between the Captain and the plot; projected, just off the deck)
+    if (proctor) {
+      const sp = S.proctor, toCap = W_(captain, 'head'), a = Math.atan2(toCap.x - sp.at.x, toCap.z - sp.at.z) - sp.yaw, w = 0.5 + 0.5 * Math.sin(st.t * 0.13 + 1.3);
+      P.stand(proctor, sp.at, sp.yaw, { weight: 0.15, wide: 0.12, look: 0.05 + 0.3 * (1 - w), headYaw: Math.atan2(Math.sin(a), Math.cos(a)) * 0.8 * w });
+      P.arms(proctor, 'rest'); if (pro.presence !== 'hardlight') proctor.root.position.y += 0.012;
+      proctor.root.updateMatrixWorld(true);
+    }
   }
 
-  const cams = bay.stationCams;
+  const cams = bay.stationCams.concat(proctor ? [['Proctor', [S.proctor.at.x - 1.75, 1.55, S.proctor.at.z - 0.9], [S.proctor.at.x, 1.45, S.proctor.at.z]]] : []);
   function camera(i, ms) { st.cam = ((i % cams.length) + cams.length) % cams.length; const [, p, l] = cams[st.cam]; stage.go(new V3(...p), new V3(...l), ms == null ? 900 : ms); return cams[st.cam][0]; }
-  function update(dt) { pose(dt); captain.tick(dt); for (const Q of people) Q.f.tick(dt); }
-  function dispose() { scene.remove(captain.root); for (const Q of people) scene.remove(Q.f.root); }
+  function update(dt) { pose(dt); captain.tick(dt); for (const Q of people) Q.f.tick(dt); if (proctor) proctor.tick(dt); }
+  function dispose() { scene.remove(captain.root); for (const Q of people) scene.remove(Q.f.root); if (proctor) scene.remove(proctor.root); }
   pose(0);
-  return { st, captain, people, cams, camera, update, dispose };
+  return { st, captain, people, proctor, cams, camera, update, dispose };
 }
 
 root.Stations = { create };

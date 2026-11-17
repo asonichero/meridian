@@ -21,7 +21,8 @@ a { color: var(--dim); }
   <h1>Figures</h1>
   <h2>Crew member</h2><select id="who"></select>
   <h2>Translated as</h2><div class="row" id="sex"><button data-v="f">Female</button><button data-v="m">Male</button></div>
-  <h2>Outfit</h2><div class="row" id="outfit"><button data-v="uniform">Uniform</button><button data-v="offduty">Off duty</button></div>
+  <div id="presRow"><h2>Presence</h2><div class="row" id="pres"></div><p style="margin:6px 0 0;color:var(--dim);font-size:12px" id="presNote"></p></div>
+  <div id="outfitRow"><h2>Outfit</h2><div class="row" id="outfit"><button data-v="uniform">Uniform</button><button data-v="offduty">Off duty</button></div></div>
   <h2>Clothes</h2><div class="row"><button id="cTop"></button><button id="cBot"></button><button id="cUnd"></button></div>
   <h2>The Captain</h2><div class="row" id="csex"></div><div class="row" id="coutfit" style="margin-top:5px"></div>
   <h2>Pose</h2><div class="row" id="pose"></div>
@@ -42,9 +43,12 @@ a { color: var(--dim); }
 // the bench and a rail. ?who=pilot&sex=f&outfit=uniform&clothes=down,up,up&csex=m&coutfit=uniform&pose=rest&def=0&sub=0&des=0&com=0&expr=calm&resp=0&view=three&spin=1
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search), V3 = THREE.Vector3;
 const cfg = { who: q.get('who') || 'pilot', sex: q.get('sex') || 'f', outfit: q.get('outfit') || 'uniform', pose: q.get('pose') || 'rest', expr: q.get('expr') || 'calm', resp: +(q.get('resp') || 0),
-  view: q.get('view') || 'three', spin: !!q.get('spin'), clothes: (q.get('clothes') || 'down,up,up').split(','),
+  view: q.get('view') || 'three', spin: !!q.get('spin'), clothes: (q.get('clothes') || 'down,up,up').split(','), pres: q.get('pres') || 'projected',
   cap: { sex: q.get('csex') || 'm', outfit: q.get('coutfit') || 'uniform' }, rel: { defiance: +(q.get('def') || 0), submission: +(q.get('sub') || 0), desire: +(q.get('des') || 0), comfort: +(q.get('com') || 0) } };
-if (!Crew.ROSTER[cfg.who]) cfg.who = 'pilot';
+// (the Proctor too: ?who=proctor&sex=n&pres=hardlight — its form, male, female or non-gendered, and how it's there: projected, always clothed,
+// or hard light, its clothes its own to take off, and under them the form chosen; docs/proctor.md)
+const PRO = () => cfg.who === 'proctor';
+if (!Crew.ROSTER[cfg.who] && !PRO()) cfg.who = 'pilot';
 
 // ── The space: a soft backdrop and floor, lit from three sides ──
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -82,7 +86,7 @@ const BY_SESSION = { otk: 'otk', wall: 'wall', after: 'otk' };
 let F = null, C = null, ses = null;      // (the crew member and the Captain; or, across the knee, at the rail and in the aftercare, a correction's)
 const dressed = { top: 'down', bottoms: 'up', under: 'up' }, worn = () => ({ top: cfg.clothes[0], bottoms: cfg.clothes[1], under: cfg.clothes[2] });
 // (the asexual crew member has no desire to speak of: it stays at nothing for them, whatever the slider says)
-const asexual = () => !!Crew.ROSTER[cfg.who].dynamic.asexual, desire = () => asexual() ? 0 : cfg.rel.desire;
+const asexual = () => PRO() || !!Crew.ROSTER[cfg.who].dynamic.asexual, desire = () => asexual() ? 0 : cfg.rel.desire;
 const relFor = () => ({ submission: cfg.rel.submission, comfort: cfg.rel.comfort, desire: desire(), defiance: cfg.rel.defiance });      // (across the knee and at the rail: how defiant they are coming to it; in the aftercare, what's left of it)
 function clear() {
   for (const G of [F, C]) if (G) scene.remove(G.root);
@@ -91,6 +95,16 @@ function clear() {
 }
 function build() {
   clear();
+  if (PRO()) {
+    if (BY_SESSION[cfg.pose]) cfg.pose = 'rest';
+    if (!['m', 'f', 'n'].includes(cfg.sex)) cfg.sex = 'n';
+    if (!Figure.models().includes(cfg.sex)) { Figure.need(cfg.sex).then(ok => { if (ok) build(); }); return; }      // (the non-gendered body, the first time it's wanted)
+    F = Figure.make(Crew.proctorSpec({ sex: cfg.sex })); scene.add(F.root);
+    Figure.presence(F, cfg.pres === 'hardlight' ? 'hardlight' : 'projected'); F.setClothes(cfg.pres === 'hardlight' ? worn() : dressed);
+    C = Figure.make(Crew.captainSpec({ sex: cfg.cap.sex, outfit: cfg.cap.outfit })); scene.add(C.root); C.setClothes(dressed);
+    bench.visible = rail.visible = false; F.setExpr(cfg.expr); refresh(); return;
+  }
+  if (cfg.sex === 'n') cfg.sex = 'f';
   if (BY_SESSION[cfg.pose]) {
     ses = Session.create(STAGE, BAY, { captain: { sex: cfg.cap.sex, outfit: cfg.cap.outfit }, position: BY_SESSION[cfg.pose], between: 'aside', queue: [{ id: cfg.who, sex: cfg.sex, outfit: cfg.outfit }], witnesses: [],
       rel: { [cfg.who]: relFor() }, sound: false });
@@ -100,7 +114,7 @@ function build() {
     F = Figure.make(Crew.figureSpec(cfg.who, cfg.sex, cfg.outfit)); scene.add(F.root); F.setClothes(worn());
     C = Figure.make(Crew.captainSpec({ sex: cfg.cap.sex, outfit: cfg.cap.outfit })); scene.add(C.root); C.setClothes(dressed);
   }
-  for (const G of [F, C]) G.root.traverse(o => { if (o.isMesh) o.castShadow = o.castShadow !== false; });
+  for (const G of [F, C]) G.root.traverse(o => { if (o.isMesh) o.castShadow = o.castShadow !== false; });      // (the crew's; the Proctor's projected image casts none)
   bench.visible = cfg.pose === 'otk' || cfg.pose === 'after'; rail.visible = cfg.pose === 'wall';
   F.setExpr(cfg.expr); refresh();
 }
@@ -135,6 +149,7 @@ function view(name) {
 // ── The panel ──
 const seg = (id, items, cur, fn) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const b = document.createElement('button'); b.textContent = label; b.className = v === cur ? 'on' : ''; b.onclick = () => fn(v); el.append(b); } };
 for (const id of Crew.IDS) { const o = document.createElement('option'); o.value = id; o.textContent = `${Crew.ROSTER[id].name} · ${Crew.ROSTER[id].role}`; $('who').append(o); }
+{ const o = document.createElement('option'); o.value = 'proctor'; o.textContent = `${Crew.PROCTOR.name} · ${Crew.PROCTOR.role}`; $('who').append(o); }
 // where the crew member is with the Captain: defiance, submission, desire, comfort (the stance they take; across the knee and at the rail,
 // how they take it: defiant, the head up, looking back at the Captain, slow to settle; desire flushing them as the body responds; in the
 // aftercare, how close they sit and whether they lean in, or, defiance left, sit apart with their arms folded). Desire is greyed out for the
@@ -156,17 +171,21 @@ $('expr').onchange = () => { cfg.expr = $('expr').value; F.setExpr(cfg.expr); };
 // (the body's response, 0–1, as a session would drive it: ?resp=0.5 — the corrections so far go as far as half)
 $('resp').value = Math.round(cfg.resp * 100); $('respV').textContent = $('resp').value + '%';
 $('resp').oninput = () => { cfg.resp = $('resp').value / 100; $('respV').textContent = $('resp').value + '%'; };
-const flip = (i, a, b) => { cfg.clothes[i] = cfg.clothes[i] === a ? b : a; if (cfg.pose !== 'after') F.setClothes(worn()); refresh(); };
+const flip = (i, a, b) => { if (PRO() && cfg.pres !== 'hardlight') return; cfg.clothes[i] = cfg.clothes[i] === a ? b : a; if (cfg.pose !== 'after') F.setClothes(worn()); refresh(); };
 $('cTop').onclick = () => flip(0, 'down', 'up'); $('cBot').onclick = () => flip(1, 'up', 'down'); $('cUnd').onclick = () => flip(2, 'up', 'down');
 $('spin').onclick = () => { cfg.spin = !cfg.spin; refresh(); };
 $('hide').onclick = () => $('panel').classList.toggle('closed');
 function refresh() {
   $('who').value = cfg.who; $('expr').value = cfg.expr;
-  seg('sex', [['f', 'Female'], ['m', 'Male']], cfg.sex, v => { cfg.sex = v; build(); });
+  seg('sex', PRO() ? [['m', 'Male'], ['f', 'Female'], ['n', 'Non-gendered']] : [['f', 'Female'], ['m', 'Male']], cfg.sex, v => { cfg.sex = v; build(); });
   seg('outfit', [['uniform', 'Uniform'], ['offduty', 'Off duty']], cfg.outfit, v => { cfg.outfit = v; build(); });
+  seg('pres', [['projected', 'Projected (Act II)'], ['hardlight', 'Hard light (Act III)']], cfg.pres, v => { cfg.pres = v; build(); });
+  $('presRow').style.display = PRO() ? '' : 'none'; $('outfitRow').style.display = PRO() ? 'none' : '';
+  $('presNote').textContent = cfg.pres === 'hardlight' ? 'Solid; its clothes can come off, and its anatomy is its form' + (cfg.sex === 'n' ? ': none, smooth.' : '.') : 'An image in light: always clothed.';
+  for (const id of ['cTop', 'cBot', 'cUnd']) $(id).disabled = PRO() && cfg.pres !== 'hardlight';
   seg('csex', [['m', 'Male'], ['f', 'Female']], cfg.cap.sex, v => { cfg.cap.sex = v; build(); });
   seg('coutfit', [['uniform', 'Uniform'], ['offduty', 'Off duty']], cfg.cap.outfit, v => { cfg.cap.outfit = v; build(); });
-  seg('pose', POSES, cfg.pose, v => { const was = !!BY_SESSION[cfg.pose]; cfg.pose = v; if (was || BY_SESSION[v]) build(); bench.visible = v === 'otk' || v === 'after'; rail.visible = v === 'wall'; view(cfg.view); });
+  seg('pose', PRO() ? POSES.filter(p => !BY_SESSION[p[0]]) : POSES, cfg.pose, v => { const was = !!BY_SESSION[cfg.pose]; cfg.pose = v; if (was || BY_SESSION[v]) build(); bench.visible = v === 'otk' || v === 'after'; rail.visible = v === 'wall'; view(cfg.view); });
   seg('views', VIEWS.map(v => [v[0], v[1]]), cfg.view, view);
   $('cTop').textContent = 'Top: ' + (cfg.clothes[0] === 'up' ? 'raised' : 'down'); $('cBot').textContent = 'Trousers: ' + (cfg.clothes[1] === 'down' ? 'lowered' : 'up');
   $('cUnd').textContent = 'Briefs: ' + (cfg.clothes[2] === 'down' ? 'lowered' : 'up'); $('spin').classList.toggle('on', cfg.spin);
