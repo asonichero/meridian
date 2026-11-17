@@ -272,6 +272,53 @@ function create(stage, bay, opts) {
   // How far the hand is raised, 0 … 1, by the swing's phase (for the shoulder and the torso turning into it).
   function raiseOf(sw) { if (!sw) return 0; const ph = swingPhase(sw); const at = x => (x === 'raised' ? 1 : 0); return lerp(at(ph.from), at(ph.to), ph.e); }
   // The Captain, for the position: seated on the bench (across the knee), or standing at the subject's left, a little behind (at the wall).
+  // (standing: the Captain placed by his fit, { back: the step toward their legs, turn: toward their legs from facing their side, lean and
+  // crouch beyond his own, inn: closer in to them })
+  function placeCaptain(fit, up_, rz) {
+    const F = captain, s_ = sc(cur.f), hipZ = cur.f.bone.hips.position.z * s_;
+    const at = local(cur.f, (0.44 - fit.inn) * s_, 0, hipZ + 0.04 - fit.back * s_); at.y = 0;
+    const a = -0.1 + (fit.turn || 0), face = toWorldDir(cur.f, -Math.cos(a), 0, Math.sin(a)).normalize(), yaw = Math.atan2(face.x, face.z);      // (turned toward their legs as he steps back)
+    stand(F, at, yaw, { weight: 0.25, wide: 0.22 + 0.08 * fit.crouch, crouch: 0.22 + fit.crouch - 0.06 * up_, lean: 0.34 + fit.lean - 0.08 * rz - 0.26 * up_, look: 0.45 + 0.2 * fit.lean - 0.15 * up_, headYaw: 0.1 + 0.15 * up_, arms: null });
+    F.bone.spine.rotation.y += 0.1 - 0.12 * rz; F.bone.chest.rotation.y += 0.06 - 0.08 * rz;
+    F.root.updateMatrixWorld(true);
+  }
+  // (his fit: tried over a few steps back, leans and crouches, the one that reaches both spots of the area with his arm a little short of
+  // straight, and asks least of him; again when the area, the position or who it is changes, or they've moved)
+  const capFit = { back: 0.1, turn: 0, lean: 0, crouch: 0, inn: 0, who: null };
+  let capFitKey = '', capFitWant = null;
+  function capFitFor() {
+    const hp = W_(cur.f, 'hips'), key = [cur.id, st.position, st.area].join(':'), same = capFitWant && capFitKey === key;
+    if (same && (capFitWant.at.distanceTo(hp) < 0.04 || st.t - capFitWant.t < 1)) return capFitWant;      // (moved: looked at again, at most once a second)
+    const F = captain, cs = sc(F), arm = (F.bone.foreArmR.position.length() + F.bone.handR.position.length()) * cs * 0.93;
+    const spots = ['L', 'R'].map(sd => contactFor(st.area + sd).W);
+    // (and his head kept clear of them: not down over their back beside their head)
+    const them = ['head', 'neck', 'chest'].map(b => W_(cur.f, b)), clear = 0.32 * cs;
+    const cost = fit => { placeCaptain(fit, 0, 0); const sh = W_(F, 'upperArmR'), short = Math.max(...spots.map(T => sh.distanceTo(T) - arm)), hd = W_(F, 'head');
+      const near = them.reduce((m, p) => Math.max(m, clear - hd.distanceTo(p)), 0);
+      return 10 * Math.max(0, short) + 8 * near + 0.6 * fit.lean + 0.3 * fit.crouch + 0.15 * fit.back + 0.15 * fit.turn + 0.5 * fit.inn; };      // (a step back and round first, then down at the knees, then over)
+    // (from a short step back and his own stance, a little more of whichever helps most, till nothing does)
+    const STEP = { back: 0.06, turn: 0.1, lean: 0.08, crouch: 0.08, inn: 0.04 }, MAX = { back: 0.7, turn: 0.8, lean: 0.6, crouch: 1.0, inn: 0.14 };
+    // (from beside them, and from further back and round toward their legs, since a step back only pays once he's turned with it: the best of each)
+    const PAIRS = [['back', 'turn']];
+    // (a step more or less of whichever helps most, till nothing does; when they've only moved, from where he is)
+    const MOVES = Object.keys(STEP).map(q => [q]).concat(PAIRS).flatMap(qs => [[qs, 1], [qs, -1]]);
+    let best = null, bc = 1e9;
+    const starts = same ? [capFitWant] : [{ back: 0.1, turn: 0 }, { back: 0.3, turn: 0.4 }, { back: 0.5, turn: 0.7 }];
+    for (const s0 of starts) {
+      let fit = { back: s0.back, turn: s0.turn, lean: s0.lean || 0, crouch: s0.crouch || 0, inn: s0.inn || 0 }, fc = cost(fit);
+      for (let it = 0; it < 30; it++) {
+        let pick = null, pc = fc;
+        for (const [qs, sg] of MOVES) { if (sg < 0 && !same) continue;      // (from a fresh start only ever more)
+          if (qs.some(q => fit[q] + sg * STEP[q] > MAX[q] + 1e-6 || fit[q] + sg * STEP[q] < -1e-6)) continue;
+          const t = Object.assign({}, fit); for (const q of qs) t[q] += sg * STEP[q]; const c = cost(t); if (c < pc - 1e-4) { pc = c; pick = t; }
+        }
+        if (!pick) break; fit = pick; fc = pc;
+      }
+      if (fc < bc) { bc = fc; best = fit; }
+    }
+    capFitKey = key; capFitWant = Object.assign(best, { at: hp.clone(), t: st.t });
+    return capFitWant;
+  }
   function poseCaptain(dt) {
     const F = captain, rz = sp.raise.to(raiseOf(st.swing), dt);
     if (st.phase === 'after') { seat(F, after.at, after.yaw, { look: 0.05, lean: -0.02, seatY: after.seatY }); return; }
@@ -280,14 +327,14 @@ function create(stage, bay, opts) {
       // torso turning a touch more into it, and leans in as the hand comes down
       seat(F, OTK.seat, OTK.seatYaw, { lean: 0.08 - 0.03 * rz, twist: -0.1 - 0.05 * rz, roll: 0.02 * rz, look: 0.45 - 0.08 * rz, headYaw: -0.25, headRoll: 0.05, spread: 0.03 });
     } else {
-      // right beside them at their left, facing their side (turned a little toward the seat): hips level with theirs, feet planted wide either
-      // side of their nearest foot, knees a little bent, leaning in; the left hand on their back, the right at the seat
-      const hipZ = cur.f.bone.hips.position.z * sc(cur.f), at = local(cur.f, 0.44 * sc(cur.f), 0, hipZ + 0.04); at.y = 0;
-      const face = toWorldDir(cur.f, -1, 0, -0.1).normalize(), yaw = Math.atan2(face.x, face.z);
+      // beside them at their left, facing their side (turned a little toward the seat), a step back toward their legs (to his right) from their
+      // hips, so what he strikes is in front of him rather than behind; feet planted wide, knees a little bent, leaning in. His left hand on their
+      // waist, which leaves his shoulders free to come down and in. How far back, how low, how far over and how close: fitted to them and the
+      // area, the least of each that brings both its spots (left and right) within his arm's reach, and eased to as it changes.
       // (and as a defiant one comes up off the rail, or stands taller to it, he straightens to give them room)
-      const up_ = Math.max(cur.rx.upK, 0.6 * cur.def);
-      stand(F, at, yaw, { weight: 0.25, wide: 0.22, crouch: 0.22 - 0.06 * up_, lean: 0.34 - 0.08 * rz - 0.26 * up_, look: 0.45 - 0.15 * up_, headYaw: 0.1 + 0.15 * up_, arms: null });
-      F.bone.spine.rotation.y += 0.1 - 0.12 * rz; F.bone.chest.rotation.y += 0.06 - 0.08 * rz;
+      const up_ = Math.max(cur.rx.upK, 0.6 * cur.def), want = capFitFor(), k = 1 - Math.exp(-dt * 3);
+      for (const q of ['back', 'turn', 'lean', 'crouch', 'inn']) capFit[q] += (want[q] - capFit[q]) * (capFit.who === cur ? k : 1);
+      capFit.who = cur; placeCaptain(capFit, up_, rz);
     }
     F.bone.clavR.rotation.z = -0.08 * rz; F.bone.clavR.rotation.y = 0.06 * rz;
     F.root.updateMatrixWorld(true);
@@ -562,10 +609,11 @@ function create(stage, bay, opts) {
       reach(F, 'L', LW, elbowAt.sub(sh.clone().lerp(LW, 0.5)).normalize(), bk.n.clone().negate(), fing);
       F.grip('L', 0.22, 0.15, 0.2);
     } else {
-      // (the arm resting along their shoulders: the forearm across the top of their back, the hand on the far shoulder, the fingers over it)
-      const sh = cur.f.surface('shoulderR', { p: new V3(), n: new V3() }, cloth), over = toWorldDir(cur.f, -1, 0, 0.35), fing = over.clone().addScaledVector(sh.n, -over.dot(sh.n)).normalize();
-      reach(F, 'L', sh.p.clone().addScaledVector(sh.n, 0.014).addScaledVector(fing, -0.06 * cs), UP.clone().negate().addScaledVector(toWorldDir(cur.f, 0, 0, 1), 0.3).normalize(), sh.n.clone().negate(), fing);
-      F.grip('L', 0.34, 0.1, 0.3);
+      // (the hand on their waist, the near side: the palm on it, the fingers over the top toward their spine, the elbow out and down at his side)
+      const wa = cur.f.surface('sideL', { p: new V3(), n: new V3() }, cloth), sp_ = cur.f.surface('back', { p: new V3(), n: new V3() }, cloth).p;
+      const fing = sp_.sub(wa.p).addScaledVector(toWorldDir(cur.f, 0, 0, 1), 0.04); fing.addScaledVector(wa.n, -fing.dot(wa.n)).normalize();
+      reach(F, 'L', wa.p.clone().addScaledVector(wa.n, 0.014).addScaledVector(fing, -0.07 * cs), toWorldDir(F, 0.7, -0.6, -0.3).normalize(), wa.n.clone().negate(), fing);
+      F.grip('L', 0.3, 0.1, 0.3);
     }
     // the right: by the swing, or soothing, or resting just above the seat
     const key = spotOf(sw ? sw.side : (st.side === 'alt' ? st.nextSide : st.side), st.area), c = contactFor(key);
