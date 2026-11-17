@@ -1,6 +1,6 @@
 // Project Meridian — a visit, as it's seen (day.html; docs/day.md): whoever's in the room where they'd be at this hour, and the Captain with
-// them. At work, at what they work at (Okafor at the reactor's guard rail, Haddad at the potting bench, Ruel at the exam table), the Captain at
-// their left; at a meal, seated round the mess table, a plate and a mug each, the Captain at the fore end of the spine-side bench; off duty of
+// them. At work, at what they work at (Okafor at the reactor's guard rail, Haddad at the potting bench), the Captain at their left; Ruel at
+// their desk in the med bay; at a meal, seated round the mess table, a plate and a mug each, the Captain at the fore end of the spine-side bench; off duty of
 // an evening, Ashdown and Okafor on the mess sofa, Varga at the table with the day's readings; at the desk, the Captain in the Ready Room's
 // chair; waking, and turning in, on the edge of the bed. Everyone looks at whoever's speaking (the one speaking at the Captain), now and then
 // away; a line can set a face. (The bridge has its own scene: js/stations.js; the evening report its own: js/checkin.js.)
@@ -44,10 +44,21 @@ function layout(room, bay, here, o) {
     out.cap = onSofa.length ? { at: new V3(2.6, 0, -0.95), yaw: Math.PI, how: 'stand' } : { at: new V3(1.8, 0, 0.0), yaw: face(new V3(1.8, 0, 0), out.people[0].at), how: 'stand' };
     return out;
   }
+  if (room === 'medbay' && here.length) {
+    // (Ruel at their desk against the fore wall, the baselines terminal in front of them; the Captain standing beside it, turned to them)
+    const at = new V3(-1.62, 0, -1.75), e = new V3(-2.02, 0.765, -1.75);
+    here.forEach((id, i) => out.people.push(i ? { id, at: new V3(-1.0, 0, -2.3), yaw: -Math.PI / 4, how: 'stand' } : { id, at, yaw: -Math.PI / 2, how: 'seat', seatY: 0.49, hands: [e.clone().add(new V3(0, 0, 0.18)), e.clone().add(new V3(0, 0, -0.18))], lean: 0.08 }));
+    const c = new V3(-1.45, 0, -0.85); out.cap = { at: c, yaw: face(c, at), how: 'stand' }; out.camFrom = 'front';
+    return out;
+  }
   if (room === 'reactor' || room === 'hydro' || room === 'medbay') {
     // (whoever works here at what they work at; anyone else beside them)
     here.forEach((id, i) => { const p = atWork(S.wall); if (i) { p.at.addScaledVector(leftOf(p.yaw), -0.75 * i); p.hands = null; p.how = 'stand'; } out.people.push(Object.assign({ id }, p)); });
     out.cap = here.length ? capBeside(out.people[0], 1.0, 0.25) : { at: S.wall.at.clone(), yaw: S.wall.yaw, how: 'stand' };
+    // (the reactor's core fills the middle of the room: seen from the walkway's outer side, the core behind them)
+    if (room === 'reactor') out.camSide = 'out';
+    // (elsewhere, from across what they work at: their face, the Captain's three-quarter)
+    else if (here.length) out.camFrom = 'front';
     return out;
   }
   if (room === 'ready') {
@@ -63,8 +74,9 @@ function layout(room, bay, here, o) {
     out.cap = { at, yaw: Math.PI / 2, how: 'seat', seatY: 0.485, hands: [e.clone().add(new V3(0, 0, 0.17)), e.clone().add(new V3(0, 0, -0.17))], lean: 0.1 };
     return out;
   }
-  // (anywhere else (the suit bay): the Captain in the middle of it, anyone there at the watch spots)
-  out.cap = { at: new V3(0.2, 0, 0.1), yaw: Math.PI * 0.85, how: 'stand' };
+  // (anywhere else (the suit bay): the Captain in front of the suit alcoves, looking them over; anyone there at the watch spots)
+  out.cap = { at: new V3(-1.0, 0, -0.75), yaw: Math.PI, how: 'stand' };
+  if (room === 'suitbay' && !here.length) out.cams = [['Suits', new V3(0.75, 1.65, 0.95), new V3(-1.05, 1.15, -1.9)], ['You', new V3(-0.35, 1.6, -2.0), new V3(-1.0, 1.5, -0.75)], ['Room', new V3(1.9, 2.0, 1.6), new V3(-0.8, 0.8, -1.0)]];
   here.forEach((id, i) => { const w = S.watch[i % S.watch.length]; out.people.push({ id, at: w.at.clone(), yaw: face(w.at, out.cap.at), how: 'stand' }); });
   return out;
 }
@@ -124,9 +136,10 @@ function create(stage, bay, o) {
     const capH = L.cap.at.clone().setY(L.cap.how === 'seat' ? 1.15 : 1.6), main = people[0];
     const mid = main ? capH.clone().lerp(main.at.clone().setY(main.how === 'seat' ? 1.15 : 1.55), 0.5) : capH.clone().addScaledVector(fwdOf(L.cap.yaw), 0.8);
     const across = main ? main.at.clone().sub(L.cap.at).setY(0).normalize() : fwdOf(L.cap.yaw);
-    let side = new V3(-across.z, 0, across.x); if (side.dot(mid.clone().setY(0).negate()) < 0) side.negate();      // (toward the middle of the room)
+    let side = new V3(-across.z, 0, across.x); if ((side.dot(mid.clone().setY(0).negate()) < 0) !== (L.camSide === 'out')) side.negate();      // (toward the middle of the room, or away from it)
+    if (L.camFrom === 'front' && main) side = fwdOf(main.yaw).multiplyScalar(0.85).addScaledVector(leftOf(main.yaw), 0.5).normalize();
     if (L.people.length > 2) cams.push(['Table', mid.clone().addScaledVector(side, 2.6).add(new V3(0, 0.9, 0)).addScaledVector(across, -0.4), mid.clone().add(new V3(0, -0.25, 0))]);
-    cams.push(['Two-shot', mid.clone().addScaledVector(side, 1.9).add(new V3(0, 0.15, 0)), mid.clone()]);
+    cams.push(['Two-shot', mid.clone().addScaledVector(side, 2.2).add(new V3(0, 0.15, 0)), mid.clone()]);
     if (main) {
       const mH = main.at.clone().setY(main.how === 'seat' ? 1.15 : 1.55);
       cams.push([main.id === 'captain' ? 'Them' : C.ROSTER[main.id].short, capH.clone().addScaledVector(across, -0.55).addScaledVector(side, 0.35).add(new V3(0, 0.08, 0)), mH]);
@@ -141,6 +154,7 @@ function create(stage, bay, o) {
       cams.push(['Room', capH.clone().addScaledVector(f, 2.9).addScaledVector(l, -1.1).add(new V3(0, 0.75, 0)), capH.clone().addScaledVector(f, 0.4).add(new V3(0, -0.5, 0))]);
     }
   }
+  if (L.cams) { cams.length = 0; for (const c of L.cams) cams.push(c); }
   function camera(i, ms) { st.cam = ((i % cams.length) + cams.length) % cams.length; const [, p, l] = cams[st.cam]; stage.go(p.clone(), l.clone(), ms == null ? 900 : ms); return cams[st.cam][0]; }
   // (a wall the camera's come through goes, with all that's on it, as in a correction: drawn on a layer the camera doesn't see, its shadow
   // still cast)

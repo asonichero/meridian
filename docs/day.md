@@ -82,7 +82,8 @@ Each step of the routine is a short scene in that room, and anywhere else is an 
 
 **On screen:**
 - **The staging:**
-  - at work: at what they work at (Okafor's guard rail, Haddad's potting bench, Ruel's exam table), with the Captain at their left;
+  - at work: at what they work at (Okafor at the reactor's guard rail, Haddad at the potting bench), with the Captain at their left; Ruel
+    at their desk in the med bay;
   - at meals: round the mess table, a plate and a mug each, the Captain at the fore end of the spine-side bench;
   - on the bridge: at stations (`js/stations.js`);
   - the evening report: in front of the Ready Room desk (`js/checkin.js`).

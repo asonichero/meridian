@@ -139,7 +139,11 @@ const CSS = `
 .dp svg .cap circle { fill: none; stroke: var(--amber); stroke-width: 2.4; } .dp svg .cap text { fill: var(--amber); font: 700 8px var(--mono); }
 @media (max-width: 860px) { .dp-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; overflow-y: auto; } .dp-map { border-right: 0; border-bottom: 1px solid var(--rule); } .dp-side { overflow: visible; } }
 @media (max-width: 560px) { .dp { border-radius: 18px; } .dp-top { padding: 10px 14px 8px; } .dp-top h1 { font-size: 20px; } .dp-top .clk b { font-size: 24px; } .dp-bot { flex-wrap: wrap; } .dp-bot .who { width: 100%; } }
-@media (max-height: 520px) { .dp-top { padding: 6px 14px 6px; } .dp-top h1 { font-size: 18px; } .dp-top .clk b { font-size: 20px; } }
+@media (max-width: 560px) { .dp-top #dpEb, .dp-top .ld { display: none; } }
+/* (a phone on its side: the plan beside the day, not above it; the header and the Proctor's line a single row each) */
+@media (max-height: 520px) and (orientation: landscape) { .dp-top { padding: 6px 14px; align-items: center; } .dp-top h1 { font-size: 18px; } .dp-top .clk b { font-size: 20px; } .dp-top #dpEb { display: none; }
+  .dp-body { grid-template-columns: minmax(0, 1fr) 210px; grid-template-rows: none; overflow: hidden; } .dp-map { border-right: 1px solid var(--rule); border-bottom: 0; } .dp-map svg { min-width: 0; }
+  .dp-side { overflow-y: auto; padding: 8px 12px; } .dp-steps { font-size: 12px; } .dp-bot { padding: 6px 12px; flex-wrap: nowrap; } .dp-bot .who { width: auto; } }
 `;
 
 function create(parent, cb) {
@@ -185,7 +189,7 @@ function create(parent, cb) {
   function warn(s, m) { const n = D().next(s); if (n.kind !== 'free' && n.kind !== 'step') return ''; const end = s.t + m, st = n.step; return st.id !== 'lights' && end > st.until ? ` · you’d miss ${st.name.toLowerCase()}` : end > st.at && n.kind === 'free' ? ` · runs into ${st.name.toLowerCase()}` : ''; }
   function show(o) {
     cur = o; const s = o.state, n = o.next, st = D().STEPS;
-    $('dpDay').textContent = `Day ${s.day} · ${D().light(s.t) === 'day' ? 'ship’s day' : 'ship’s night'}`; $('dpClk').textContent = D().clock(s.t);
+    $('dpDay').innerHTML = `Day ${s.day}<span class="ld"> · ${D().light(s.t) === 'day' ? 'ship’s day' : 'ship’s night'}</span>`; $('dpClk').textContent = D().clock(s.t);
     $('dpX').style.display = o.canClose ? '' : 'none';
     // the routine, each step with how it went (or that it's now)
     $('dpSteps').innerHTML = st.map(x => {

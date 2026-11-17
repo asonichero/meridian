@@ -237,7 +237,8 @@ function visit(room, x) {
       { choose: ASK.map(a => ({ label: a.label, style: a.style, fx: { [id]: a.fx }, then: [{ who: id, text: V[a.k], expr: a.k === 'you' ? 'smile' : 'calm' }] })) }];
   };
   if (here.length === 1) return talk(here[0]);
-  return [{ choose: here.map(id => ({ label: `Talk to ${sur(id)}`, style: null, then: talk(id) })).concat([{ label: 'Leave them to it.', style: 'brisk', then: [] }]) }];
+  const names = here.map(sur), list = names.length === 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return [{ prompt: `${list} are here.`, choose: here.map(id => ({ label: `Talk to ${sur(id)}`, style: null, then: talk(id) })).concat([{ label: 'Leave them to it.', style: 'brisk', then: [] }]) }];
 }
 
 // ── The Proctor between: what it suggests next ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -296,7 +297,7 @@ function resolve(steps, x) {
     for (const [k, v] of Object.entries(f)) for (const id of k === 'all' ? x.here : [k === 'w0' ? x.w0 : k === 'w1' ? x.w1 : k]) out[id] = v;
     return out; };
   const go = list => list.filter(ok).map(s => s.choose
-    ? { choose: s.choose.filter(ok).map(c => Object.assign({}, c, { label: fill(c.label, x), fx: fx(c.fx), then: go(c.then || []) })) }
+    ? { prompt: s.prompt ? fill(s.prompt, x) : null, choose: s.choose.filter(ok).map(c => Object.assign({}, c, { label: fill(c.label, x), fx: fx(c.fx), then: go(c.then || []) })) }
     : Object.assign({}, s, { text: fill(s.text, x) }));
   return go(steps);
 }
