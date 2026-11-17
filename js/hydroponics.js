@@ -203,7 +203,11 @@ function build(scene) {
   apply();
   const { sideOf, sidesAt } = K.roomSides(G, { minX: X0, maxX: X1, minZ: ZS, maxZ: ZH, ht: HT }, [floor, deck, gb]);
   let t = 0;
-  return { group: G, spots, key, cams: null, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Hydroponics',
+  // (at the potting bench the aft wall is close on their right: the side view from behind and to the right, high; their face from low at
+  // the bench's aft end)
+  const cams = { wall: [['Side', [-0.675, 1.45, -0.53], [0.05, 0.95, 0.35]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
+    ['Their face', [-0.68, 0.95, 0.72], [0.05, 1.05, 0.5]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [1.05, 1.9, -2.95], [-0.15, 0.8, -0.15]]] };
+  return { group: G, spots, key, cams, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Hydroponics',
     bounds: { minX: X0 + 0.2, maxX: X1 - 0.2, minZ: ZS + 0.2, maxZ: ZH - 0.2 }, get low() { return low; },
     tick(dt) { t += dt; for (const m of mist) { m.position.x += m.userData.v * dt; if (m.position.x > NX - 0.3) m.position.x = X0 + 0.6; m.material.opacity = 0.05 + 0.03 * Math.sin(t * 0.4 + m.position.z); } } };
 }
