@@ -193,16 +193,22 @@ function build(scene) {
   const viewL = new THREE.PointLight(srgb('#cfe0f0'), 0.8, 3, 2); viewL.position.set(X1 - 0.5, VY, sz); G.add(viewL);
   const doorL = new THREE.PointLight(srgb('#5ad8e0'), 0.4, 1.6, 2); doorL.position.set(MX, 2.0, ZS + 0.3); G.add(doorL);
 
-  // ── Where things happen ──
+  // ── Where things happen; their cameras where the room needs its own (the low table, the desk, its lamp and terminal in the way) ──
+  const otkCams = face => [['Side', [0.05, 1.2, 2.4], [0.05, 0.76, 0.3]], ['Behind', [-1.4, 1.3, 0.67], [-0.05, 0.72, 0.3]], ['Seat', [-0.46, 1.5, 1.07], [-0.1, 0.82, 0.35]],
+    ['Their face', ...face], ['Captain', [0.3, 0.92, 0.95], [0.0, 1.18, 0.1]], ['Room', [1.5, 1.9, 1.5], [0.0, 0.7, 0.25]]];
   const spots = {
     // (across the knee on the armless chair, facing the settee: they lie across the lap, the head toward the spine side, the legs toward the
     // hull, clear of the low table)
-    bench: { at: new V3(CX - 0.04, 0, CZ), yaw: Math.PI / 2, turn: 0, seatY: 0.48 },
+    // (their face from low at the Captain's left, beside the low table rather than under it)
+    bench: { at: new V3(CX - 0.04, 0, CZ), yaw: Math.PI / 2, turn: 0, seatY: 0.48, cams: otkCams([[0.62, 0.36, 0.75], [0.3, 0.55, 0.36]]) },
     seats: {
       // (or perched on the edge of the bed, facing into the room: they lie along it in front, the head toward the pillows, the near arm up on
       // the mattress; and the aftercare stays on the bed, side by side on its edge)
+      // (the desk stands in front of the bed: the side and room views come from across the room, aft, rather than from over it)
       bed: { at: new V3(-1.6, 0, BZ + 0.13), yaw: Math.PI, turn: 0, seatY: MT - 0.02, rest: { y: MT, edge: 0.11 },
-        after: { at: new V3(-1.3, 0, BZ + 0.11), yaw: Math.PI, seatY: MT - 0.02, beside: new V3(-1.92, 0, BZ + 0.11) } },
+        cams: otkCams([[0.42, 0.36, 1.05], [0.24, 0.55, 0.36]]).map(c => c[0] === 'Side' ? ['Side', [-1.8, 1.25, 1.7], [0.05, 0.76, 0.3]] : c[0] === 'Room' ? ['Room', [-1.6, 1.95, 1.9], [0.1, 0.7, 0.25]] : c),
+        after: { at: new V3(-1.3, 0, BZ + 0.11), yaw: Math.PI, seatY: MT - 0.02, beside: new V3(-1.92, 0, BZ + 0.11),
+          cams: [['Two-shot', [-1.3, 1.05, 1.6], [0.3, 0.85, 0.0]], ['Close', [-0.75, 1.05, 1.05], [0.3, 0.95, 0.0]]] } },
     },
     // (standing at the desk's front edge, palms flat on it, bent well forward; the Captain at their left)
     wall: { at: new V3(DX1 + 0.85, 0, dz), yaw: -Math.PI / 2, support: { kind: 'edge', y: DY + 0.01, d: 0.85, bend: 0.95, lines: 'desk' } },
@@ -235,7 +241,10 @@ function build(scene) {
   const setLow = on => { low = !!on; apply(); }, setTime = t => { time = t === 'night' ? 'night' : 'day'; apply(); };
   apply();
   const { sideOf, sidesAt } = K.roomSides(G, { minX: X0, maxX: X1, minZ: ZS, maxZ: ZH, ht: HT }, [floor, bed]);
-  return { group: G, spots, key, cams: null, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Captain’s quarters', private: true,
+  // (at the desk, their face from across it, the Captain's side of it, clear of the terminal and the lamp)
+  const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
+    ['Their face', [0.5, 1.12, 2.0], [0.0, 1.0, 0.55]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [1.05, 1.9, -2.95], [-0.15, 0.8, -0.15]]] };
+  return { group: G, spots, key, cams, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Captain’s quarters', private: true,
     bounds: { minX: X0 + 0.15, maxX: X1 - 0.15, minZ: ZS + 0.15, maxZ: ZH - 0.15 }, get low() { return low; }, tick() {} };
 }
 
