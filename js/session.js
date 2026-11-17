@@ -939,13 +939,36 @@ function create(stage, bay, opts) {
   // ── Whatever stands between the camera and the two in the middle (a fitting of the bay, someone watching) is hidden: moved to a layer the
   // camera doesn't draw, while still casting its shadow. What they're on (the bench, the rug, the deck) and the room's shell stay. ──
   const HIDDEN = 1;
+  // (each piece of furniture is one thing: the room's loose parts that touch, a desk's top and legs, a chair's seat and back, gathered into one
+  // piece and hidden or shown together. The shell (walls, deck, ceiling) and the long runs along it (rails, ribs, pipes, the dado) stay as they
+  // are, so nothing joins up through them; so does whatever the room built as one piece already (a group). A piece goes with a wall when its
+  // biggest part does.)
   function fittingsOf(b) {
     b.group.traverse(o => { if (o.isLight && o.shadow) o.shadow.camera.layers.enable(HIDDEN); });
-    return b.group.children.filter(o => !o.isLight).map(o => { const box = new THREE.Box3().setFromObject(o); return { o, box, side: b.sideOf ? b.sideOf.get(o) : null,
-      inWay: box.max.y > 0.62 && [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z].filter(d => d > 2.5).length < 2 }; })
-      .filter(f => !f.box.isEmpty() && !f.o.userData.keep && (f.side || f.inWay));      // (and never what they sit on: a couch with a back as high as a shoulder, that the room marks to keep)
+    const kids = b.group.children.filter(o => !o.isLight), bx = kids.map(o => new THREE.Box3().setFromObject(o));
+    const dims = x => [x.max.x - x.min.x, x.max.y - x.min.y, x.max.z - x.min.z], vol = x => { const d = dims(x); return d[0] * d[1] * d[2]; };
+    const R = new THREE.Box3(); bx.forEach(x => { if (!x.isEmpty()) R.union(x); }); const ht = R.max.y;
+    const hugs = x => { const d = dims(x), nx = x.min.x < R.min.x + 0.25 || x.max.x > R.max.x - 0.25, nz = x.min.z < R.min.z + 0.25 || x.max.z > R.max.z - 0.25;
+      return (d[0] > 1.8 && nz) || (d[2] > 1.8 && nx) || (nx && d[0] < 0.12) || (nz && d[2] < 0.12); };      // (a run along a wall, or a panel flat on one)
+    const loose = kids.map((o, i) => { const x = bx[i], d = dims(x); return !x.isEmpty() && !o.isGroup && !o.userData.keep && x.max.y > 0.06 && x.max.y < ht - 0.12 && d[1] < 0.85 * ht && d.filter(v => v > 1.5).length < 2 && !hugs(x) && !(Math.max(...d) > 1.2 && d.filter(v => v < 0.12).length >= 2); });
+    const up = kids.map((_, i) => i), find = i => { while (up[i] !== i) i = up[i] = up[up[i]]; return i; }, grown = bx.map(x => x.clone().expandByScalar(0.004));
+    for (let i = 0; i < kids.length; i++) if (loose[i]) for (let j = i + 1; j < kids.length; j++) if (loose[j] && grown[i].intersectsBox(grown[j])) up[find(j)] = find(i);
+    const pieces = new Map(); kids.forEach((o, i) => { const r = find(i); if (!pieces.has(r)) pieces.set(r, []); pieces.get(r).push(i); });
+    return [...pieces.values()].map(ix => { const box = new THREE.Box3(); for (const i of ix) box.union(bx[i]);
+      const big = ix.reduce((a, i) => (vol(bx[i]) > vol(bx[a]) ? i : a), ix[0]), d = dims(box);
+      return { os: ix.map(i => kids[i]), box, side: b.sideOf ? b.sideOf.get(kids[big]) || null : null, keep: ix.some(i => kids[i].userData.keep), inWay: box.max.y > 0.62 && d.filter(v => v > 2.5).length < 2 }; })
+      .filter(f => !f.box.isEmpty() && !f.keep && (f.side || f.inWay));      // (and never what they sit on: a couch with a back as high as a shoulder, that the room marks to keep)
   }
-  // (each with its box, the wall it's on, and whether it's one of the big planes, the room's shell, which nothing can be behind)
+  // (what the scene in hand is on, never hidden: the seat across the knee, what they hold or lean on standing (a wall is the shell, and goes
+  // as it always has), the table they're over; in aftercare, the seat the two share)
+  function inScene(f) {
+    const at = [];
+    if (st.phase === 'after') at.push(new V3(after.at.x, after.seatY - 0.03, after.at.z));
+    else if (st.position === 'otk') at.push(new V3(bench.at.x, bench.seatY - 0.03, bench.at.z));
+    else if (st.position === 'wall' && sup.kind !== 'wall') at.push(inFrame(wall.at, wall.yaw || 0, 0, sup.y - 0.02, sup.d + 0.02));
+    else if (st.position === 'table' && table) at.push(inFrame(table.at, table.yaw || 0, 0, topFor(cur ? cur.f : captain) - 0.03, table.d + 0.3));
+    return at.some(p => f.box.distanceToPoint(p) < 0.03);
+  }
   const fittings = fittingsOf(bay);
   const hiddenNow = new Map();
   function setHidden(o, h) {
@@ -961,7 +984,7 @@ function create(stage, bay, opts) {
     const blocks = box => focus.length && (box.containsPoint(cam) || focus.some(t => { const d = t.distanceTo(cam); _ray.set(cam, t.clone().sub(cam).divideScalar(d)); return _ray.intersectBox(box, _hit) && _hit.distanceTo(cam) < d - 0.05; }));
     // (a whole wall goes, with all that's on it, when the camera comes through it; anything else, if it's in the way)
     const here = away || bay, sides = here.sidesAt ? here.sidesAt(cam) : new Set();
-    for (const f of (away ? awayFit : fittings)) setHidden(f.o, (f.side && sides.has(f.side)) || (f.inWay && blocks(f.box)));
+    for (const f of (away ? awayFit : fittings)) { const h = !inScene(f) && ((f.side && sides.has(f.side)) || (f.inWay && blocks(f.box))); for (const o of f.os) setHidden(o, h); }
     // (people: a box round where their bones are now)
     for (const P of people) {
       if (P === cur || (st.phase === 'after' && P === afterWith)) { setHidden(P.f.root, false); continue; }
@@ -971,7 +994,7 @@ function create(stage, bay, opts) {
   }
 
   const api = { limbRadii: F => limbRadii(F),
-    st, captain, people, queue, witnesses, BANDS, AREAS, CAMS, bench, RESP, get captainResponse() { return capResp; },
+    st, captain, people, queue, get fittings() { return fittings; }, witnesses, BANDS, AREAS, CAMS, bench, RESP, get captainResponse() { return capResp; },
     setRel(id, v) { const P = people.find(p => p.id === id); if (P) setRel(P, v); },
     get current() { return cur; },
     on: fn => listeners.push(fn),

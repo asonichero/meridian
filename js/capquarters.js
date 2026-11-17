@@ -149,8 +149,9 @@ function build(scene) {
   box(0.02, 0.01, dl, brass, DX1 + 0.002, DY - 0.03, dz, { noCast: true, detail: true });
   box(0.1, 0.02, 0.2, steelDark, DX0 + 0.14, DY + 0.01, dz - 0.22); box(0.02, 0.18, 0.28, steelDark, DX0 + 0.12, DY + 0.1, dz - 0.22, { ry: 0 });
   plane(0.25, 0.17, new THREE.MeshBasicMaterial({ map: slateTex }), DX0 + 0.132, DY + 0.1, dz - 0.22, 0, Math.PI / 2);
-  cyl(0.06, 0.07, 0.022, brass, DX0 + 0.14, DY + 0.011, DZ1 - 0.15, null, 16, { detail: true }); cyl(0.007, 0.007, 0.3, brass, DX0 + 0.14, DY + 0.16, DZ1 - 0.15, null, 8, { detail: true });
-  const dShade = cyl(0.045, 0.09, 0.09, std({ color: srgb('#2e4a3e'), roughness: 0.4, metalness: 0.2, side: THREE.DoubleSide }), DX0 + 0.19, DY + 0.31, DZ1 - 0.15, [0, 0, -0.5], 16, { detail: true }); dShade.castShadow = false;
+  const dLamp = new THREE.Group(); G.add(dLamp);      // (a thing of its own on the desk: it can go when it's in the way, while the desk stays)
+  cyl(0.06, 0.07, 0.022, brass, DX0 + 0.14, DY + 0.011, DZ1 - 0.15, null, 16, { detail: true, to: dLamp }); cyl(0.007, 0.007, 0.3, brass, DX0 + 0.14, DY + 0.16, DZ1 - 0.15, null, 8, { detail: true, to: dLamp });
+  const dShade = cyl(0.045, 0.09, 0.09, std({ color: srgb('#2e4a3e'), roughness: 0.4, metalness: 0.2, side: THREE.DoubleSide }), DX0 + 0.19, DY + 0.31, DZ1 - 0.15, [0, 0, -0.5], 16, { detail: true, to: dLamp }); dShade.castShadow = false;
   box(0.2, 0.03, 0.28, std({ color: srgb('#5a2a1e'), roughness: 0.7 }), dx + 0.06, DY + 0.015, dz + 0.12, { detail: true });      // (the log)
   cyl(0.005, 0.005, 0.14, std({ color: srgb('#1a1a1a'), roughness: 0.3, metalness: 0.5 }), dx + 0.06, DY + 0.035, dz - 0.08, [0, 0.6, Math.PI / 2], 6, { detail: true });
   // (the writing chair behind it: wood, a leather seat, a low back)
