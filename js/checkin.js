@@ -68,7 +68,7 @@ const positionFor = v => (v.severity < 0.34 ? 'wall' : v.severity < 0.67 ? 'tabl
 function driver(ses, v, o) {
   // (what's owed, as how far it takes them: a little, to flinching; more, to struggling; most, close to the edge; never past it. The pace and
   // strength firmer the more is owed.)
-  const st = { mood: 'accept', goal: clamp(0.4 + 0.6 * v.severity, 0.35, 0.98), cap: 160, asked: 0, waiting: false, dressed: 0, pause: 1.6, runStart: 0, runLen: 8, done: false };
+  const st = { mood: 'accept', goal: clamp(0.4 + 0.6 * v.severity, 0.35, 0.98), cap: 200, asked: 0, waiting: false, dressed: 0, pause: 1.6, runStart: 0, runLen: 8, done: false, best: 0, since: 0 };
   const position = positionFor(v);
   ses.set({ pace: clamp(1.0 + 0.5 * v.severity, 1, 1.5), strength: clamp(1.0 + 0.5 * v.severity, 1, 1.5), area: 'sitspot', side: 'alt', soothe: false });
   function update(dt) {
@@ -83,7 +83,11 @@ function driver(ses, v, o) {
     if (D >= st.goal || hits >= st.cap) { st.done = true; ses.run(false); ses.set({ soothe: true }); setTimeout(() => ses.endTurn(), 2400); return; }
     // (a short pause between runs, the hand only resting there; soothing only once it's close to the edge, and not for pushing back)
     if (ses.st.running) {
-      if (hits - st.runStart >= st.runLen) { ses.run(false); st.pause = st.mood === 'defy' ? 0.8 : 1.2 + 0.5 * Math.random(); if (st.mood !== 'defy' && D > 0.8) ses.set({ soothe: true }); }
+      if (hits - st.runStart >= st.runLen) {
+        ses.run(false); st.pause = st.mood === 'defy' ? 0.8 : 1.2 + 0.5 * Math.random(); if (st.mood !== 'defy' && D > 0.8) ses.set({ soothe: true });
+        // (and if it's stopped getting anywhere short of what's owed, the pace a little quicker, as anyone giving it would)
+        if (D > st.best + 0.02) { st.best = D; st.since = hits; } else if (hits - st.since > 18) { st.since = hits; ses.set({ pace: clamp(ses.st.pace + 0.1, 1, 1.8) }); }
+      }
     } else {
       st.pause -= dt;
       if (st.pause <= 0) { ses.set({ soothe: false }); st.runStart = hits; st.runLen = 7 + Math.floor(Math.random() * 5); ses.run(true); }
