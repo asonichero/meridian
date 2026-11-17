@@ -100,7 +100,10 @@ small.note { display: block; color: var(--dim); font-size: 11px; line-height: 1.
 body.stations #bar .grp:not(.g-call):not(.g-vp), body.stations #meter { display: none; }
 body:not(.stations) #bar .g-call, body:not(.bridge) #bar .g-vp { display: none; }
 #pos button:disabled { opacity: 0.5; cursor: not-allowed; }
-.g-call button, .g-vp button { white-space: nowrap; }
+.g-call button, .g-vp button, .g-myword button { white-space: nowrap; }
+/* (the Proctor correcting the Captain: none of the controls but the Captain's word) */
+body.reversed #bar .grp:not(.g-myword) { display: none; } body:not(.reversed) #bar .g-myword { display: none; }
+body.checkin #bar, body.checkin #meter { display: none; }
 </style>
 </head>
 <body>
@@ -139,7 +142,14 @@ body:not(.stations) #bar .g-call, body:not(.bridge) #bar .g-vp { display: none; 
   <h2>The Proctor</h2>
   <div class="row seg" id="psex"><button data-v="m">Male</button><button data-v="f">Female</button><button data-v="n">Non-gendered</button></div>
   <div class="row seg" id="ppres" style="margin-top:6px"><button data-v="voice">Voice (Act I)</button><button data-v="projected">Projected (Act II)</button><button data-v="hardlight">Hard light (Act III)</button></div>
-  <small class="note">The ship's AI. A voice at first; in Act II an image in light, always clothed; in Act III hard light, solid, its anatomy its form (non-gendered: none, in either form). For now it's seen on the bridge at stations.</small>
+  <small class="note">The ship's AI. A voice at first; in Act II an image in light, always clothed; in Act III hard light, solid, its anatomy its form (non-gendered: none, in either form). Seen on the bridge at stations, and at the evening check-in (the Ready Room).</small>
+  <div class="row seg" id="plean" style="margin-top:6px"><button data-v="authoritative">Authoritative</button><button data-v="balanced">Balanced</button><button data-v="deferential">Deferential</button></div>
+  <small class="note">Its leaning, from the Captain's history with it (set here for now). Authoritative, it holds the Captain to account; deferential, it offers to stand in for corrections the Captain missed or mishandled; balanced, the Captain chooses.</small>
+  <div class="row" style="margin-top:6px;align-items:center;gap:8px"><span id="pclear" style="font-size:12px;color:var(--dim)"></span><button id="punclear">Withdraw clearance</button></div>
+  <h2>The day's report</h2>
+  <div class="row" style="align-items:center;gap:6px"><span style="font-size:12px;color:var(--dim)">About</span><select id="rcrew" class="pick"></select></div>
+  <div class="row" id="report" style="margin-top:6px;flex-wrap:wrap"></div>
+  <small class="note">What the Proctor goes through at the evening check-in, until the day's loop fills it in: what the Captain let slide, mishandled, or missed of their own.</small>
   <h2>Relationship</h2>
   <div class="row"><select id="relWho" class="pick"></select></div>
   <div class="vols" id="rel" style="margin-top:6px"></div>
@@ -167,6 +177,7 @@ body:not(.stations) #bar .g-call, body:not(.bridge) #bar .g-vp { display: none; 
     <div class="grp g-clothes"><span class="lab">Clothes <kbd>T B U</kbd></span><div class="row"><button id="cTop">Top: down</button><button id="cBot">Trousers: up</button><button id="cUnd">Briefs: up</button></div></div>
     <div class="grp g-end"><span class="lab">Turn <kbd>Enter</kbd></span><button id="end">End turn</button></div>
     <div class="grp g-call"><span class="lab">Ready Room <kbd>R</kbd></span><button id="callIn">Call in…</button></div>
+    <div class="grp g-myword"><span class="lab">Your word <kbd>W</kbd></span><button id="myWord">Say it</button></div>
     <div class="grp g-vp"><span class="lab">Viewport <kbd>V</kbd></span><button id="vp">Open</button></div>
   </div>
   <div id="meter"><div id="track"><div id="fill"></div></div><div id="info"></div></div>
@@ -182,12 +193,12 @@ body:not(.stations) #bar .g-call, body:not(.bridge) #bar .g-vp { display: none; 
 
 <script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script><script src="vendor/GLTFLoader.js"></script>
 <script src="js/pain.js"></script><script src="js/audio.js"></script><script src="js/crew.js"></script><script src="js/lines.js"></script>
-<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/capquarters.js"></script><script src="js/readyroom.js"></script><script src="js/hydroponics.js"></script><script src="js/medbay.js"></script><script src="js/reactor.js"></script><script src="js/bridge.js"></script><script src="js/stations.js"></script><script src="js/session.js"></script>
+<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/capquarters.js"></script><script src="js/readyroom.js"></script><script src="js/hydroponics.js"></script><script src="js/medbay.js"></script><script src="js/reactor.js"></script><script src="js/bridge.js"></script><script src="js/stations.js"></script><script src="js/checkin.js"></script><script src="js/session.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
 const KEY = 'meridian:session:v1';
-const cfg = Object.assign({ room: 'suitbay', time: 'day', position: 'otk', between: 'corner', outfit: 'uniform', roles: { pilot: 'subject', engineer: 'witness' }, sex: { scientist: 'f', engineer: 'm', pilot: 'f', lifesupport: 'm', comms: 'f', medic: 'm' },
+const cfg = Object.assign({ room: 'suitbay', time: 'day', position: 'otk', between: 'corner', outfit: 'uniform', roles: { pilot: 'subject', engineer: 'witness' }, sex: { scientist: 'f', engineer: 'm', pilot: 'f', lifesupport: 'm', comms: 'm', medic: 'f' },
   order: ['pilot'], captain: { sex: 'm', skin: '#b88a6a', hair: '#3a2a20', hairStyle: 'crop', build: 'average', beard: true } }, (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } })());
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* no storage */ } };
 const seg = (id, val, fn) => { const el = $(id); el.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === val); b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); }; }); };
@@ -218,7 +229,8 @@ const ROOMS = { suitbay: { build: sc => SuitBay.build(sc), pos: [['otk', 'Across
   mess: { build: sc => Mess.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the island'], ['table', 'Over the table']] },
   quarters: { build: sc => Quarters.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the wall']], private: true },
   captain: { build: sc => CaptainsQuarters.build(sc), pos: [['otk', 'Across the knee (chair)'], ['otk:bed', 'Across the knee (bed)'], ['wall', 'Hands on the desk']], private: true },
-  ready: { build: sc => ReadyRoom.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the desk'], ['table', 'Over the desk']], private: true, afterStays: true },
+  // (the Ready Room also holds the evening check-in: the Captain reporting to the Proctor, js/checkin.js)
+  ready: { build: sc => ReadyRoom.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'Hands on the desk'], ['table', 'Over the desk'], ['checkin', 'Evening check-in']], private: true, afterStays: true },
   hydro: { build: sc => Hydroponics.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the potting bench']] },
   medbay: { build: sc => MedBay.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the exam table'], ['table', 'Over the exam table']] },
   reactor: { build: sc => Reactor.build(sc), pos: [['otk', 'Across the knee'], ['wall', 'At the guard rail']], afterElsewhere: true },
@@ -235,7 +247,11 @@ function drawPos() {
   const shut = list.filter(x => !ok(x)); $('lateNote').style.display = shut.length ? '' : 'none'; $('lateNote').textContent = shut.length ? `${shut.map(x => x[1]).join(', ')}: late in the story (set the stage below).` : '';
   if (!list.some(x => x[0] === cfg.position && ok(x))) cfg.position = list.find(ok)[0];
   // (on the bridge, at stations and at the plot table are different scenes: begun again; elsewhere the session moves them)
-  seg('pos', cfg.position, v => { cfg.position = v; save(); if (sta || (ses && v === 'stations')) { fade(); models.then(begin); } else if (ses) { fade(); ses.position(v); } drawCams(); });
+  // (and the evening check-in is a scene of its own; once a correction's begun from it, the positions move it, unless the Proctor's the one
+  // correcting: it decides)
+  seg('pos', cfg.position, v => { const was = cfg.position; cfg.position = v; save();
+    if (sta || v === 'stations' || v === 'checkin' || (was === 'checkin' && !ses)) { fade(); models.then(begin); }
+    else if (ses && ses.correctorId !== 'proctor') { fade(); ses.position(v); } drawCams(); });
 }
 drawPos();
 seg('between', cfg.between, v => { cfg.between = v; save(); if (ses) ses.st.between = v; });
@@ -243,9 +259,10 @@ seg('between', cfg.between, v => { cfg.between = v; save(); if (ses) ses.st.betw
 seg('story', cfg.late ? 'late' : 'early', v => { const was = cfg.position; cfg.late = v === 'late'; save(); drawPos(); if ((ses || sta) && cfg.position !== was) { fade(); models.then(begin); } });
 seg('outfit', cfg.outfit, v => { cfg.outfit = v; save(); });
 drawCrew(); drawCaptain();
-// (who the Captain's drawn to sets the crew's genders: all the one, or an even split for both; the slider moves how many are women, the first
-// so many in this order; the list's own toggles still change anyone)
-const WOMEN_FIRST = ['scientist', 'pilot', 'comms', 'lifesupport', 'medic', 'engineer'];
+// (who the Captain's drawn to sets the crew's genders: all the one, or an even split for both (Kit, Morgan and Rowan women; Noor, Sam and Sefa
+// men); the slider moves how many are women, the first so many in this order: up from the split Noor, then Sam, then Sefa turn female; down
+// from it Rowan, then Morgan, then Kit turn male. The list's own toggles still change anyone.)
+const WOMEN_FIRST = ['pilot', 'medic', 'scientist', 'lifesupport', 'engineer', 'comms'];
 const womenNow = () => Crew.IDS.filter(id => cfg.sex[id] === 'f').length;
 window.drawBalance = () => { const k = womenNow(); $('balance').value = k; $('balanceV').textContent = `${k} women · ${Crew.IDS.length - k} men`; };
 const setBalance = k => { WOMEN_FIRST.forEach((id, i) => (cfg.sex[id] = i < k ? 'f' : 'm')); save(); drawCrew(); drawBalance(); };
@@ -258,6 +275,20 @@ cfg.proctor = Object.assign({ sex: 'n', presence: 'voice' }, cfg.proctor);
 const proctorAgain = () => { save(); if (typeof sta !== 'undefined' && sta) { fade(); models.then(begin); } };
 seg('psex', cfg.proctor.sex, v => { cfg.proctor.sex = v; proctorAgain(); });
 seg('ppres', cfg.proctor.presence, v => { cfg.proctor.presence = v; proctorAgain(); });
+// (its leaning, for now set here; whether it's been cleared for hard light, with the Captain's word; and the day's report it goes through)
+cfg.proctor.lean = cfg.proctor.lean || 'balanced';
+seg('plean', cfg.proctor.lean, v => { cfg.proctor.lean = v; save(); });
+window.drawClear = () => { $('pclear').textContent = cfg.proctor.cleared ? `Cleared for hard light. Your word: “${cfg.captainWord}”.` : 'Not yet cleared for hard light: it will ask, at the first check-in in hard light.'; $('punclear').style.display = cfg.proctor.cleared ? '' : 'none'; };
+$('punclear').onclick = () => { cfg.proctor.cleared = false; save(); drawClear(); };
+drawClear();
+cfg.report = Object.assign({ crew: 'pilot', slide: true, harsh: false, care: false, protocol: false }, cfg.report);
+for (const id of Crew.IDS) { const o = document.createElement('option'); o.value = id; o.textContent = Crew.ROSTER[id].name; $('rcrew').append(o); }
+$('rcrew').value = cfg.report.crew; $('rcrew').onchange = () => { cfg.report.crew = $('rcrew').value; save(); };
+{ const el = $('report');
+  for (const [k, nm] of [['slide', 'Let an infraction slide'], ['harsh', 'A correction too harsh'], ['care', 'Skipped an aftercare'], ['protocol', 'Missed a protocol (own)']]) {
+    const b = document.createElement('button'); b.textContent = nm; const draw = () => b.classList.toggle('on', !!cfg.report[k]); draw();
+    b.onclick = () => { cfg.report[k] = !cfg.report[k]; save(); draw(); }; el.append(b);
+  } }
 // sound levels: each a slider, kept between visits (js/audio.js)
 { const el = $('vols');
   for (const [k, nm] of [['master', 'Master'], ['sfx', 'Effects'], ['voice', 'Voices'], ['music', 'Music'], ['amb', 'Ambience']]) {
@@ -306,9 +337,11 @@ let ses = null, sta = null;
 function endAll() {
   if (ses) { for (const P of ses.people) stage.scene.remove(P.f.root); stage.scene.remove(ses.captain.root); ses = null; window.ses = null; }
   if (sta) { sta.dispose(); sta = null; window.sta = null; }
+  if (typeof checkinRun !== 'undefined') { checkinRun++; disposeStaging(); drv = null; chk = null; window.drv = null; }
 }
 function begin() {
   if (cfg.room === 'bridge' && cfg.position === 'stations') return beginStations();
+  if (cfg.room === 'ready' && cfg.position === 'checkin') return beginCheckin();
   if (!cfg.order.length) { alert('Choose at least one crew member to be corrected.'); return; }
   endAll();
   // (where a room has its own crew at their posts (the bridge's), they're there, watching, whoever else is)
@@ -347,6 +380,105 @@ async function callIn() {
 }
 $('callIn').onclick = () => { audioOn(); callIn(); };
 $('vp').onclick = () => { if (bay.setViewport) { bay.setViewport(!bay.viewport); refresh(); } };
+
+// ── The evening check-in (js/checkin.js; docs/proctor.md): the Captain reports to the Proctor in the Ready Room ──
+// (stg: the two of them before anything happens; drv: the Proctor at work, when it's correcting the Captain; chk: this check-in, its verdict
+// and how it went. A new check-in, or anything else begun, ends one in progress.)
+let stg = null, drv = null, chk = null, checkinRun = 0;
+const askChoose = (who, text, options) => { $('say').style.display = 'block'; $('sayWho').textContent = who; $('sayWho').className = 'who cap'; $('sayTxt').textContent = text; $('sayNext').style.display = 'none'; return choose(options); };
+// (the Captain's word, typed: kept for every check-in after)
+function askWord() {
+  return new Promise(res => {
+    $('say').style.display = 'block'; $('sayWho').textContent = 'Your word'; $('sayWho').className = 'who cap'; $('sayTxt').textContent = 'The word that stops it, whatever is happening. Kept for every check-in after.'; $('sayNext').style.display = 'none';
+    const el = $('choices'); el.innerHTML = ''; const i = document.createElement('input'); i.type = 'text'; i.maxLength = 24; i.placeholder = 'Your word'; i.className = 'pick';
+    const b = document.createElement('button'); b.textContent = 'Set it';
+    const go = () => { const w = i.value.trim(); if (!w) return; el.innerHTML = ''; window.__word = null; res(w[0].toUpperCase() + w.slice(1)); };
+    b.onclick = go; i.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') go(); }; el.append(i, b); i.focus();
+    window.__word = w => { i.value = w; go(); };
+  });
+}
+async function beginCheckin() {
+  const pro = cfg.proctor, seen = pro.presence !== 'voice', hard = pro.presence === 'hardlight', lean = pro.lean || 'balanced';
+  if (seen && !Figure.models().includes(pro.sex)) await Figure.need(pro.sex);
+  endAll(); const run = checkinRun, alive = () => run === checkinRun;
+  Lines.setCtx({ crew: Crew.ROSTER[cfg.report.crew].short }); Lines.setWord('captain', cfg.captainWord || '');
+  stg = Checkin.staging(stage, bay, { captain: cfg.captain, proctor: seen ? { sex: pro.sex, presence: hard && pro.cleared ? 'hardlight' : 'projected' } : null, lean });
+  chk = { v: Checkin.verdict(cfg.report), lean, mode: null }; window.stg = stg; window.chk = chk;
+  stg.camera(0, 0); drawCams(); refresh();
+  $('summary').style.display = 'none'; $('word').style.display = 'none';
+  if (innerWidth < 900) $('setup').classList.add('closed');
+  const say = t => showLine('proctor', 'proctor', t, 'click');
+  // (in hard light and not yet cleared: it asks first, the first time; cleared, the Captain's word, and it forms)
+  if (hard && !pro.cleared) {
+    await say(Lines.clear.intro()); if (!alive()) return; await say(Lines.clear.ask(lean)); if (!alive()) return; await say(Lines.clear.terms()); if (!alive()) return;
+    const o = await askChoose('The Proctor', 'Clear it for hard light?', [{ label: 'Clear it, on those terms', k: 'yes' }, { label: 'Clear it, but never in my quarters', k: 'never' }, { label: 'Not yet', k: 'no' }]);
+    if (!alive()) return;
+    if (o.k === 'no') await say(Lines.clear.refused(lean));
+    else {
+      await say(Lines.clear.word()); const w = await askWord(); if (!alive()) return;
+      cfg.captainWord = w; pro.cleared = true; pro.quarters = o.k === 'never' ? 'never' : 'invited'; save(); window.drawClear(); Lines.setWord('captain', w);
+      stg.form(); await say(Lines.clear.done(lean));
+    }
+  }
+  if (!alive()) return;
+  // (the day: by its leaning; deferential, framed as where the Captain might have done better)
+  await say(Lines.checkin.open(lean)); if (!alive()) return;
+  const v = chk.v;
+  if (!v.items.length) { await say(Lines.checkin.none(lean)); return endCheckin(run); }
+  if (lean === 'deferential') await say(Lines.checkin.better());
+  for (const k of v.items) { await say(Lines.checkin.item(k)); if (!alive()) return; }
+  // (before hard light, or not cleared: an order, a reset, a demerit)
+  if (!(hard && pro.cleared)) { await say(Lines.checkin.order(lean)); return endCheckin(run); }
+  let mode = 'take';
+  if (lean !== 'authoritative') {
+    const offers = v.items.filter(k => k !== 'protocol'), crew = Crew.ROSTER[cfg.report.crew].short;
+    if (lean === 'deferential' && !offers.length) { await say(Lines.checkin.order(lean)); return endCheckin(run); }
+    for (const k of offers) { await say(Lines.checkin.offer(k)); if (!alive()) return; }
+    if (lean === 'balanced') await say(Lines.checkin.balance());
+    const opts = (lean === 'balanced' ? [{ label: 'Take it from the Proctor', k: 'take' }] : []).concat(offers.length ? [{ label: `Have it stand in for ${crew}`, k: 'give' }] : [], [{ label: 'Not tonight', k: null }]);
+    const o = await askChoose('You', lean === 'balanced' ? 'Which?' : 'Its offer:', opts); if (!alive()) return;
+    if (!o.k) { await say(Lines.checkin.declined(lean)); return endCheckin(run); }
+    mode = o.k;
+  } else await say(Lines.checkin.owed(lean));
+  if (!alive()) return;
+  $('say').style.display = 'none'; fade();
+  if (mode === 'take') beginReversed(); else beginSurrogate();
+}
+function endCheckin(run) {
+  if (run !== checkinRun) return;
+  $('say').style.display = 'none'; const S = $('summary'); S.style.display = 'block';
+  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">The check-in</h2><p style="margin:0 0 8px">${chk && chk.v.items.length ? 'Gone through, and closed for tonight.' : 'A clean day.'}</p><button onclick="begin()">Again</button>`;
+}
+// (the roles reversed: the Proctor corrects the Captain, the player choosing only how the Captain takes it, and able to call their word)
+function beginReversed() {
+  const pro = cfg.proctor, v = chk.v; disposeStaging();
+  ses = Session.create(stage, bay, { captain: cfg.captain, position: Checkin.positionFor(v), between: 'aside',
+    queue: [{ id: 'captain', sex: cfg.captain.sex, spec: Crew.captainSpec(cfg.captain), profile: Crew.captainProfile(cfg.captain, cfg.captainWord), pitch: pitchOf('captain'), wriggle: 0.35 }],
+    rel: { captain: { submission: 0.35, comfort: 0.45, desire: 0, defiance: 0.1, resentment: 0 } }, witnesses: [],
+    corrector: { id: 'proctor', spec: Crew.proctorSpec({ sex: pro.sex }), presence: 'hardlight', response: false },
+    voice: Lines.checkin.voice(() => (drv ? drv.mood : 'accept')), sound: !q.get('still') });
+  ses.on(onEvent); ses.start(); window.ses = ses;
+  drv = Checkin.driver(ses, v, { ask: i => { sayQueue = sayQueue.then(() => askResponse(i)); } }); window.drv = drv; chk.mode = 'take';
+  drawCams(); refresh();
+}
+// (twice as it goes, how the Captain takes it: their own words, then the Proctor's, then on)
+async function askResponse(i) {
+  const o = await askChoose('You', i === 0 ? 'How do you take it?' : 'And now?', [{ label: 'Take it', k: 'accept' }, { label: 'Push back', k: 'defy' }, { label: 'Say nothing', k: 'silent' }]);
+  if (o.k !== 'silent') await showLine('captain', 'captain', Lines.react('captain', o.k), 900);
+  await showLine('proctor', 'proctor', Lines.checkin.respond(o.k), 1100);
+  $('say').style.display = 'none'; if (drv) drv.respond(o.k);
+}
+// (deferential: the Proctor stands in, in hard light, for whoever was owed; the Captain gives it, as any correction)
+function beginSurrogate() {
+  const pro = cfg.proctor; disposeStaging();
+  ses = Session.create(stage, bay, { captain: cfg.captain, position: 'wall', between: 'aside',
+    queue: [{ id: 'proctor', sex: pro.sex, spec: Crew.proctorSpec({ sex: pro.sex }), presence: 'hardlight', profile: Crew.proctorProfile(), pitch: pitchOf('proctor'), wriggle: 0.2 }],
+    rel: { proctor: { submission: 0.7, comfort: 0.6, desire: 0, defiance: 0, resentment: 0 } }, witnesses: [], sound: !q.get('still') });
+  ses.on(onEvent); ses.start(); window.ses = ses; chk.mode = 'give';
+  drawCams(); refresh();
+}
+function disposeStaging() { if (stg) { stg.dispose(); stg = null; window.stg = null; } }
+$('myWord').onclick = () => { if (ses && ses.correctorId === 'proctor') ses.callWord(); };
 // (the Blender-built figures load as the page opens; a session begun before they're in waits for them)
 const models = Figure.preload();
 $('begin').onclick = () => { audioOn(); models.then(begin); };
@@ -357,12 +489,16 @@ let sayTimer = null, sayQueue = Promise.resolve();
 // A line in the dialogue box, typed out. hold: how long it stays once typed (during a correction), or 'click' (the aftercare's lines: it waits
 // for a click on the box, or Space or Enter; a click while it's typing finishes it first), or 'choices' (it stays up, the choices under it).
 let advance = null;
+// (who's who, by id: a crew member, the Captain, or the Proctor)
+const nameOf = id => (id === 'captain' ? 'Captain' : id === 'proctor' ? 'The Proctor' : Crew.ROSTER[id].short);
+const pitchOf = id => (id === 'captain' ? (cfg.captain.sex === 'm' ? 140 : 200) : id === 'proctor' ? Crew.pitch('proctor', cfg.proctor.sex) : Crew.pitch(id, cfg.sex[id]));
+const wordOf = id => (id === 'captain' ? cfg.captainWord : id === 'proctor' ? Crew.PROCTOR.word : Crew.ROSTER[id].word);
 function showLine(who, id, text, hold) {
   return new Promise(res => {
-    const box = $('say'), nm = id === 'captain' ? 'Captain' : Crew.ROSTER[id].short;
+    const box = $('say'), nm = nameOf(id);
     box.style.display = 'block'; $('sayWho').textContent = nm; $('sayWho').className = 'who' + (id === 'captain' ? ' cap' : ''); $('choices').innerHTML = ''; $('sayNext').style.display = 'none';
     const el = $('sayTxt'); el.textContent = ''; let i = 0; clearInterval(sayTimer);
-    if (window.GameAudio && GameAudio.ctx) GameAudio.speak(id, text, Math.min(3, text.length * 0.035), { pitch: id === 'captain' ? (cfg.captain.sex === 'm' ? 140 : 200) : Crew.pitch(id, cfg.sex[id]) });
+    if (window.GameAudio && GameAudio.ctx) GameAudio.speak(id, text, Math.min(3, text.length * 0.035), { pitch: pitchOf(id) });
     const typed = () => {
       clearInterval(sayTimer); el.textContent = text;
       if (hold === 'click') { $('sayNext').style.display = 'block'; box.classList.add('wait'); advance = () => { advance = null; $('sayNext').style.display = 'none'; box.classList.remove('wait'); res(); }; }
@@ -384,8 +520,8 @@ function onEvent(type, d) {
   if (type === 'turn') fade();
   if (type === 'say') sayQueue = sayQueue.then(() => showLine(d.who, d.id, d.text, 900));
   // (what the correction left: its resentment carried till aftercare clears it)
-  if (type === 'turnEnd') { const v = cfg.rel[d.id] = Object.assign({ submission: 0, desire: 0, comfort: 0, defiance: Crew.ROSTER[d.id].meters.wilfulness, resentment: 0 }, cfg.rel[d.id]); v.resentment = Math.min(1, (v.resentment || 0) + d.resentment); save(); window.drawRel(); }
-  if (type === 'word') { const w = $('word'); w.textContent = `${Crew.ROSTER[d.id].short} called their word: “${d.word}”. It stops.`; w.style.display = 'block'; setTimeout(() => (w.style.display = 'none'), 4200); }
+  if (type === 'turnEnd' && Crew.ROSTER[d.id]) { const v = cfg.rel[d.id] = Object.assign({ submission: 0, desire: 0, comfort: 0, defiance: Crew.ROSTER[d.id].meters.wilfulness, resentment: 0 }, cfg.rel[d.id]); v.resentment = Math.min(1, (v.resentment || 0) + d.resentment); save(); window.drawRel(); }
+  if (type === 'word') { const w = $('word'); w.textContent = d.id === 'captain' ? `You called your word: “${d.word}”. It stops.` : `${nameOf(d.id)} called ${d.id === 'proctor' ? 'its' : 'their'} word: “${d.word}”. It stops.`; w.style.display = 'block'; setTimeout(() => (w.style.display = 'none'), 4200); }
   if (type === 'done') sayQueue = sayQueue.then(() => aftercareAll(d.results));
   // (a safe word: straight to their aftercare, then on with whoever's left)
   if (type === 'aftercareNow') sayQueue = sayQueue.then(async () => { await aftercareOne(d.result); fade(); ses.next(); });
@@ -394,7 +530,7 @@ function onEvent(type, d) {
 // One crew member's aftercare: where (here, or, the Captain's choice, the garden bench in hydroponics or their own quarters: a room with no seat
 // for it, the reactor, always one of those; the Ready Room keeps it), the cut to the two of them there, and the conversation.
 async function aftercareOne(r) {
-  const R = ROOMS[cfg.room], opts = [], who = Crew.ROSTER[r.id].short;
+  const R = ROOMS[cfg.room], opts = [], who = nameOf(r.id);
   if (!R.afterElsewhere) opts.push({ label: 'Stay here', k: null });
   const TO = { ready: 'Take them to the Ready Room, the couch', hydro: 'Take them to hydroponics, the garden bench', quarters: `Take them to ${who}'s quarters` };
   if (!R.afterStays) for (const k of R.afterTo || ['hydro', 'quarters']) if (k !== cfg.room) opts.push({ label: TO[k], k });
@@ -410,11 +546,12 @@ async function aftercareOne(r) {
   const run = async steps => {
     for (const s of steps) {
       if (s.choose) { const o = await choose(s.choose); r.choice = r.choice || []; r.choice.push(o.order || o.label); await run(o.then); continue; }
-      const id = s.who === 'captain' ? 'captain' : r.id; if (s.expr && P) P.f.setExpr(s.expr);
+      const id = s.who === 'captain' ? (ses.correctorId || 'captain') : r.id; if (s.expr) { if (s.who === 'captain') ses.captain.setExpr(s.expr); else if (P) P.f.setExpr(s.expr); }
       await showLine(s.who, id, s.text, steps[steps.indexOf(s) + 1] && steps[steps.indexOf(s) + 1].choose ? 'choices' : 'click');
     }
   };
-  await run(Lines.after(r.id, r.outcome, r.defiance && r.defiance.to > 0.45 ? 'unbroken' : null)); ses.cared(r.id);
+  // (the Captain, after the Proctor's held them to account: the Proctor's aftercare, the player choosing the Captain's words)
+  await run(r.id === 'captain' ? Lines.checkinAfter(r.outcome, chk ? chk.v.items : []) : Lines.after(r.id, r.outcome, r.defiance && r.defiance.to > 0.45 ? 'unbroken' : null)); ses.cared(r.id);
   if (other) { fade(); stage.scene.remove(other.group); bay.group.visible = true; ses.back(); drawCams(); refresh(); }
   // (aftercare clears resentment: half of what they carry)
   const v = cfg.rel[r.id]; if (v) { v.resentment = Math.round(v.resentment * 50) / 100; save(); window.drawRel(); }
@@ -425,7 +562,7 @@ async function aftercareAll(results) {
   results = ses.st.results;      // (the summary: everyone, cared for now or earlier)
   $('say').style.display = 'none';
   const S = $('summary'); S.style.display = 'block';
-  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${Crew.ROSTER[r.id].short}</td><td>${{ otk: 'across the knee', wall: 'standing', table: 'over the table' }[r.position] || r.position}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${Crew.ROSTER[r.id].word}”` : 'completed'}</td><td>peak: ${r.band}</td><td>defiance ${pc(r.defiance.from)} → ${pc(r.defiance.to)}</td><td>compliance +${pc(r.compliance)}</td><td>resentment +${pc(r.resentment)}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
+  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${nameOf(r.id)}</td><td>${{ otk: 'across the knee', wall: 'standing', table: 'over the table' }[r.position] || r.position}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${wordOf(r.id)}”` : 'completed'}</td><td>peak: ${r.band}</td><td>defiance ${pc(r.defiance.from)} → ${pc(r.defiance.to)}</td><td>compliance +${pc(r.compliance)}</td><td>resentment +${pc(r.resentment)}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
 }
 
 // ── Live controls ──
@@ -450,6 +587,8 @@ addEventListener('keydown', e => {
   if (/^[1-9]$/.test(e.key) && window.__choose && window.__choose[+e.key - 1]) { window.__choose[+e.key - 1](); return; }
   if ((e.key === 'v' || e.key === 'V') && bay.setViewport) { $('vp').click(); return; }
   if (sta) { if (e.key === 'c' || e.key === 'C') { sta.camera(sta.st.cam + 1); drawCams(); } else if (e.key === 'r' || e.key === 'R') { audioOn(); callIn(); } return; }
+  if (stg) { if (e.key === 'c' || e.key === 'C') { stg.camera(stg.st.cam + 1); drawCams(); } return; }
+  if (ses && ses.correctorId === 'proctor') { if (e.key === 'w' || e.key === 'W') ses.callWord(); else if (e.key === 'c' || e.key === 'C') { ses.camera(ses.st.cam + 1); drawCams(); } return; }      // (the Proctor's correcting: only the word, and the cameras)
   if (!ses) return; const k = e.key;
   if (k === ' ') { e.preventDefault(); audioOn(); ses.run(); }
   else if (k === '[') bump('pace', -STEP); else if (k === ']') bump('pace', STEP); else if (k === '-') bump('strength', -STEP); else if (k === '=' || k === '+') bump('strength', STEP);
@@ -459,9 +598,12 @@ addEventListener('keydown', e => {
   else if (k === 'Enter') ses.endTurn(); else if (k === 'c' || k === 'C') { ses.camera(ses.st.cam + 1); drawCams(); }
   else if (/^[1-4]$/.test(k) && window.__choose && window.__choose[+k - 1]) window.__choose[+k - 1]();
 });
-function drawCams() { const el = $('cams'); el.innerHTML = ''; if (sta) { sta.cams.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = sta.st.cam === i ? 'on' : ''; b.onclick = () => { sta.camera(i); drawCams(); }; el.append(b); }); return; } if (!ses) return; const set = ses.CAMS[ses.st.phase === 'after' ? 'after' : ses.st.position]; set.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = ses.st.cam === i ? 'on' : ''; b.onclick = () => { ses.camera(i); drawCams(); }; el.append(b); }); }
+function drawCams() { const el = $('cams'); el.innerHTML = ''; const own = sta || stg; if (own) { own.cams.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = own.st.cam === i ? 'on' : ''; b.onclick = () => { own.camera(i); drawCams(); }; el.append(b); }); return; } if (!ses) return; const set = ses.CAMS[ses.st.phase === 'after' ? 'after' : ses.st.position]; set.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.className = ses.st.cam === i ? 'on' : ''; b.onclick = () => { ses.camera(i); drawCams(); }; el.append(b); }); }
 function refresh() {
   document.body.classList.toggle('stations', !!sta); document.body.classList.toggle('bridge', cfg.room === 'bridge' && bay.group.visible);
+  document.body.classList.toggle('checkin', !!stg); document.body.classList.toggle('reversed', !!(ses && ses.correctorId === 'proctor'));
+  if (cfg.captainWord) $('myWord').textContent = `“${cfg.captainWord}”`;
+  if (stg) { $('whoNm').textContent = 'Evening check-in'; $('whoSub').textContent = `The Proctor · ${{ voice: 'a voice', projected: 'projected', hardlight: 'hard light' }[cfg.proctor.presence]} · ${cfg.proctor.lean}`; $('whoWord').textContent = ''; return; }
   if (bay.setViewport) $('vp').textContent = bay.viewport ? 'Shut' : 'Open';
   if (sta) { $('whoNm').textContent = 'The bridge'; $('whoSub').textContent = 'At stations'; $('whoWord').textContent = ''; return; }
   if (!ses) return; const st = ses.st, c = ses.current;
@@ -478,7 +620,7 @@ function refresh() {
     $('info').innerHTML = c ? `<b>${d.toFixed(2)}</b> · ${ses.band()} · <b>${c.hits}</b> smacks${ses.st.running ? ' · running' : ''}${ses.st.soothe ? ' · soothing' : ''}${c.def0 > 0.05 ? ` · defiance <b>${Math.round(ses.defiance() * 100)}%</b>` : ''}${ses.fight() < 0.3 ? ' · spent' : ''}${ses.st.ending ? ' · finishing' : ses.st.act || ses.st.actQ.length ? ' · dressing' : ''}` : ses.st.phase === 'over' ? 'Aftercare' : ''; }; }
 
 // ── Run ──
-const each = dt => { if (ses) ses.update(dt); if (sta) sta.update(dt); bay.tick(dt); window.__meter(); };
+const each = dt => { if (ses) ses.update(dt); if (sta) sta.update(dt); if (stg) stg.update(dt); if (drv) drv.update(dt); bay.tick(dt); window.__meter(); };
 // (on a phone the camera's picture is centred in what the controls leave visible, above them or beside them; on a desktop it stays centred)
 const small = matchMedia('(max-width: 760px), (max-height: 520px)');
 const insets = () => { const r = $('bar').getBoundingClientRect(); stage.setInsets(!small.matches ? {} : r.left > innerWidth * 0.3 ? { right: Math.max(0, innerWidth - r.left) } : { bottom: Math.max(0, innerHeight - r.top) }); };

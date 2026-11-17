@@ -109,7 +109,7 @@ const CAPTAIN = { id: 'captain', name: 'Captain', role: 'Captain (Player)', dept
 // proctor (a dark gown, white bands at the throat): near-black, the seam along the closure and the flash and cuffs white, no department, no rank.
 const PROCTOR = { id: 'proctor', name: 'The Proctor', role: 'Ship’s AI', onlyDisciplinesPlayer: true,
   look: { skin: '#d2b6a2', hair: '#23252b', hairStyle: { m: 'crop', f: 'bun', n: 'crop' }, eyes: '#5fc8d4' }, h: { m: 1.85, f: 1.74, n: 1.79 },
-  dept: '#e6ecee', wear: { tunic: '#1d222b', trousers: '#191c22', edge: '#e6ecee', belt: '#121418', under: '#2a2e36' } };
+  dept: '#e6ecee', wear: { tunic: '#1d222b', trousers: '#191c22', edge: '#e6ecee', belt: '#121418', under: '#2a2e36' }, word: 'Adjourn' };      // (its own agreed word, drafted, for when it stands in)
 
 const PRONOUNS = { m: { they: 'he', them: 'him', their: 'his', They: 'He' }, f: { they: 'she', them: 'her', their: 'her', They: 'She' }, n: { they: 'it', them: 'it', their: 'its', They: 'It' } };
 const pronouns = sex => PRONOUNS[sex] || PRONOUNS.f;
@@ -131,10 +131,21 @@ function proctorSpec(p) {
   return { sex, height: PROCTOR.h[sex] || PROCTOR.h.n, mass: 0.5, fat: 0.3, skin: L.skin, hair: L.hair, hairStyle: L.hairStyle[sex] || 'crop', eyes: L.eyes,
     beard: false, outfit: 'uniform', dept: PROCTOR.dept, wear: PROCTOR.wear, bust: sex === 'f' ? 0.4 : 0, age: 40 };
 }
+// The Captain and the Proctor as the one corrected (the evening check-in: docs/proctor.md), each given what a crew member's roster entry gives
+// a correction: how they take pain, their agreed word, their build. The Captain's word is the player's own, set when the Proctor is cleared.
+function captainProfile(c, word) {
+  c = c || {}; const [mass, fat] = CAPTAIN.options.build[c.build] || CAPTAIN.options.build.average;
+  return { id: 'captain', name: 'Captain', short: 'Captain', role: 'Captain', word: word || '—', pain: { tolerance: 0.6, resilience: 0.6 }, meters: { wilfulness: 0.3 },
+    dynamic: { bond: 0 }, body: { fat, mass, response: 0.6 }, base: 'calm' };
+}
+function proctorProfile() {
+  return { id: 'proctor', name: PROCTOR.name, short: 'Proctor', role: PROCTOR.role, word: PROCTOR.word, pain: { tolerance: 0.72, resilience: 0.7 }, meters: { wilfulness: 0 },
+    dynamic: { bond: 0 }, body: { fat: 0.3, mass: 0.5, response: 0 }, base: 'calm' };
+}
 // Voice pitch for the babble and cries, by sex (Hz).
 const pitch = (id, sex) => (sex === 'm' ? 128 : sex === 'n' ? 168 : 208) + ({ scientist: 4, engineer: -14, pilot: 10, lifesupport: 8, comms: 0, medic: -6, proctor: -10 }[id] || 0);
 
-const api = { METERS, ROSTER, IDS, CAPTAIN, PROCTOR, pronouns, figureSpec, captainSpec, proctorSpec, pitch, wriggle };
+const api = { METERS, ROSTER, IDS, CAPTAIN, PROCTOR, pronouns, figureSpec, captainSpec, proctorSpec, captainProfile, proctorProfile, pitch, wriggle };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.Crew = api;
 })(typeof window !== 'undefined' ? window : globalThis);

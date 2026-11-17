@@ -31,8 +31,10 @@ resets and demerits. Physical accountability waits for hard light.
 The player chooses:
 - **The Captain's gender** (male or female), and their look.
 - **Who the Captain is drawn to** (women, men or both). This sets the crew's genders by default: all six the gender the Captain is drawn
-  to, or an even split for both. A slider then sets how many of the six are women, and any crew member can still be changed on their own.
-  (The even split for "both" is a working assumption.)
+  to, or an even split for both, with Kit, Morgan and Rowan women and Noor, Sam and Sefa men. A slider then sets how many of the six are
+  women, and any crew member can still be changed on their own:
+  - **More women than the split:** Noor turns female first, then Sam, then Sefa.
+  - **Fewer women than the split:** Rowan turns male first, then Morgan, then Kit.
 - **The Proctor's gender:** male, female or non-gendered. Non-gendered, it has no male or female characteristics in either form.
 
 **Clothing and anatomy:**
@@ -75,6 +77,37 @@ The player chooses:
   It flickers now and then and casts no shadow. It hovers a finger's breadth off the deck, and only where there's a projector.
 - **Hard light:** solid, in its own colours, with a faint blue light at its edges. It casts a shadow.
 
+## The evening check-in
+
+The Captain reports to the Proctor in the Ready Room at the end of the day (GDD §3.5), standing in front of the desk as anyone called in
+does. Where the Proctor stands depends on its leaning: authoritative, behind the desk in the Captain's own place; balanced, at the desk's
+corner; deferential, to one side and a step back. As a voice, the Captain is alone in the room. It then goes through the day.
+
+- **What it goes through:** the day's report. Did the Captain let an infraction slide, take a correction too far, skip an aftercare, or miss
+  a protocol of their own? Until the day's loop fills these in, they're switches in the set-up, with the crew member they concern.
+- **Clearance:** in hard light and not yet cleared, it first asks to be cleared, by its leaning, with its terms. The Captain clears it (on
+  those terms, or never in their quarters) or says not yet. Cleared, the player types the Captain's agreed word, kept for every check-in
+  after, and the Proctor's image stutters into solid.
+- **A clean day:** it says so, and that's all.
+- **Before hard light, or not cleared:** an order, a reset or a demerit, put as its leaning puts things.
+- **Hard light and cleared, authoritative:** it holds the Captain to account, with the roles reversed:
+  - **How much:** what's owed decides the position (a little: hands on the desk; more: over the desk; most: across its knee on the couch).
+    It also decides how long it goes on and how firmly, whether the trousers come down (and the briefs, if most is owed), and the thighs at
+    the end.
+  - **The Proctor runs it:** runs of a few, soothing in the pauses. It stops at what's owed, and always short of the edge.
+  - **What the player decides:** only how the Captain takes it, twice as it goes. Taking it shortens what's left and softens it. Pushing back
+    lengthens it, firms it, and puts some fight in the Captain. Silence, and it checks in and carries on.
+  - **The Captain's word:** the one control the player has besides those choices. It stops everything at once.
+  - **After:** it gives the Captain aftercare on the couch, the player choosing the Captain's words, and an instruction for tomorrow from the
+    day's report.
+- **Hard light and cleared, deferential:** it goes through where the Captain might have done better. For a correction that was missed or
+  mishandled, it offers to take it in the place of the crew member it was owed to: "Give it to me as it should have gone." For an aftercare
+  that was skipped, it offers to be given that care. The Captain accepts, and gives the correction as any other, the Proctor in hard light
+  with its own agreed word (drafted: *Adjourn*), then gives it aftercare. Or the Captain declines, and it's noted and carried forward. It
+  has nothing to stand in for the Captain's own missed protocol; that only gets noted.
+- **Hard light and cleared, balanced:** it lays out what's owed and lets the Captain choose: take it from the Proctor, have it stand in, or
+  not tonight.
+
 ## In the build so far
 
 - **The bodies:**
@@ -84,5 +117,9 @@ The player chooses:
 - **The two presences:** `Figure.presence(F, 'projected' | 'hardlight' | 'solid')` gives a figure the projected or hard-light look.
 - **Where it's seen:** on the bridge at stations, at the plot table's port end under Sefa's projector (`js/stations.js`), and in the
   line-up (`figures.html?who=proctor&sex=n&pres=hardlight`).
-- **The set-up's choices:** who the Captain is drawn to and the crew balance, and the Proctor's form and presence.
-- **Next:** the evening check-in in the Ready Room, with its leaning, the clearance scene, and the Proctor in the late-stage loop.
+- **The set-up's choices:** who the Captain is drawn to and the crew balance; the Proctor's form, presence and leaning; whether it's been
+  cleared (with a way to withdraw it); and the day's report.
+- **The evening check-in:** in the Ready Room, the position *Evening check-in* (`js/checkin.js`: the verdict, the staging, and the Proctor
+  at work when it's correcting the Captain). The session takes any corrector and anyone corrected (`opts.corrector`, `p.spec` and
+  `p.profile`), with their own lines (`opts.voice`).
+- **Next:** the Proctor in the late-stage loop, and its leaning tracked from the Captain's history with it rather than set.

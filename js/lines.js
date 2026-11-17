@@ -42,6 +42,39 @@ const CAPTAIN = {
 // palm on them, between), word (the safe word, called), end (when the Captain stops). While they're still defiant: defy (back-talk, in place
 // of the early band lines and the pleas), and yield (once, as the defiance breaks).
 const REACT = {
+  // The Captain, held to account by the Proctor at the evening check-in (docs/proctor.md): terse, used to being the one in control.
+  captain: {
+    start: ['Understood.', 'Fine. Go on.', '…All right.'],
+    first: ['—!', 'Hh.'],
+    flinching: ['I hear you.', 'All right. All right.'],
+    struggling: ['That’s— point taken—', 'Ah— I know, I know—'],
+    edge: ['Enough— I’ve got it, I’ve got it—', 'I let them down. I know.'],
+    past: ['I’m sorry— I’ll do better by them.'],
+    plead: ['Proctor—', 'Please—'],
+    spent: ['…', '…yes.'],
+    accept: ['Yes. I earned that.', 'I know. Go on.'],
+    soothe: ['…Thank you.', 'Hm.'],
+    defy: ['Is this how you’d run my ship?', 'I made the call. I’d make it again.', 'You’ve made your point.'],
+    yield: ['…All right. You’re right. I was wrong.', 'I hear it. I’ll do better.'],
+    word: '{word}.',
+    end: ['…Understood.', 'Message received.'],
+  },
+  // The Proctor, standing in for a correction the Captain missed or mishandled (deferential: docs/proctor.md): composed, reporting on itself,
+  // steadying the Captain's hand as much as taking it.
+  proctor: {
+    start: ['As it should have been given, Captain. I’m ready.', 'For {crew}. Go on.'],
+    first: ['Noted.', '…That registered.'],
+    flinching: ['This form feels it. Continue.', 'Even, Captain. Like that.'],
+    struggling: ['That— is what was owed.', 'Hh— keep the measure. Good.'],
+    edge: ['I’m near the edge of what this form holds.', 'Captain— that’s the line. Watch it.'],
+    past: ['Too far. That’s what we’re here not to do.'],
+    plead: ['Captain—', 'Steady—'],
+    spent: ['…', '…recording.'],
+    accept: ['Yes. That’s the measure.', 'Correct.'],
+    soothe: ['…That too. Remember that part.', 'Thank you.'],
+    word: '{word}. {word}, Captain.',
+    end: ['…That’s how it should have gone. Thank you.'],
+  },
   scientist: {
     start: ['Understood. I— yes. Proceeding.', 'This is… a grounding protocol. I know. I agreed to it.'],
     first: ['Oh.', 'Hh— that’s… very present.'],
@@ -160,6 +193,13 @@ const ORDERS = [
   { id: 'station', label: 'Back to station', captain: 'Back to your station when you’re ready. Not before. I’ll check in at end of shift.' },
 ];
 const AFTER = {
+  // (the Captain giving the Proctor its aftercare, after it stood in for someone: what it says, as the crew's)
+  proctor: {
+    open: { done: ['That was how it should have gone. You were measured.', '…This form keeps the warmth. I hadn’t expected that.'], word: ['I said it, and you stopped. That’s the whole of it, Captain. Thank you.'] },
+    reply: { reassure: 'I know it’s over. I find I wanted to hear it anyway.', explain: 'You owed {crew} that much. Give it to them tomorrow, as you gave it here.', ask: 'Present. Warm where you were. I’ll remember it.' },
+    order: { rest: 'I don’t sleep. But I’ll stand the watch down for an hour, if you’ll allow it.', log: 'I’ll write it plainly. And note who it was really for.', meal: 'I can’t eat. I’ll sit with you while you do.', station: 'Back to the watch, then. I’ll be where you need me.' },
+    close: '…Thank you, Captain.',
+  },
   scientist: {
     open: { done: ['…I’m here. Right here. I can feel the bench.', 'Strange. The ship feels close again.'], word: ['I’m sorry. I had to. It was— too much, too fast.'], unbroken: ['Are we finished? I have logs to finish.', 'Noted. All of it.'] },
     reply: { reassure: 'Thank you. I needed to hear that it was over, not just to know it.', explain: 'You’re right. I was mapping things that might have happened decades ago. I lost the room.', ask: 'Present. Sore. Embarrassed. But present, and that’s new this week.' },
@@ -197,7 +237,11 @@ const AFTER = {
     close: '…Thank you, Captain.',
   },
 };
-const fill = (t, id) => { const r = root.Crew.ROSTER[id]; return t.replace(/\{word\}/g, r.word).replace(/\{name\}/g, r.short); };
+// (besides the crew: the Captain and the Proctor, when either's the one corrected; the Captain's word as the player set it; and {crew}: whoever
+// the evening's report is about)
+const WHO = { captain: { short: 'Captain', word: '' }, proctor: { short: 'Proctor', word: 'Adjourn' } }, CTX = { crew: '' };
+const setWord = (id, w) => { if (WHO[id]) WHO[id].word = w; }, setCtx = o => Object.assign(CTX, o);
+const fill = (t, id) => { const r = root.Crew.ROSTER[id] || WHO[id] || WHO.captain; return t.replace(/\{word\}/g, r.word).replace(/\{name\}/g, r.short).replace(/\{crew\}/g, CTX.crew); };
 function place(id, position) { return fill(pick(PLACE[position] || PLACE.otk), id); }
 function react(id, key) { const R = REACT[id]; if (!R || !R[key]) return null; return fill(pick(R[key]), id); }
 function captain(key, id) { return CAPTAIN[key] ? fill(pick(CAPTAIN[key]), id) : null; }
@@ -226,7 +270,75 @@ const ANSWER = {
 };
 function call(id) { return { captain: fill(pick(CALL), id), answer: fill(pick(ANSWER[id] || ['Captain.']), id) }; }
 
-const api = { PLACE, CAPTAIN, REACT, AFTER, APPROACH, ORDERS, CALL, ANSWER, place, captain, react, after, call };
+// ── The evening check-in (docs/proctor.md): the Proctor and the day; its leaning ('authoritative', 'balanced', 'deferential') in how it says it ──
+const P_ = a => pick(a);
+const CHECKIN = {
+  open: { authoritative: ['Stand there, Captain. We’ll do this properly.', 'Captain. The day. Stand where I can see you.'], balanced: ['Evening, Captain. The day, then.', 'Captain. Let’s go through it.'],
+    deferential: ['Captain. When you’re ready, I have the day.', 'Evening, Captain. May I go through it with you?'] },
+  item: { slide: '{crew} cut a corner today, and you saw it. You let it go.', harsh: 'You took {crew} further than you meant to. Further than it needed.',
+    care: 'You corrected {crew} and walked away. No aftercare.', protocol: 'And your own: the evening checks unsigned, the log a day behind.' },
+  none: { authoritative: ['Nothing to answer for. A clean day. Keep it that way.'], balanced: ['A clean day, Captain. Sleep.'], deferential: ['Nothing I’d change, Captain. It was a good day.'] },
+  // (before hard light, or not cleared: orders, a reset, a demerit)
+  order: { authoritative: ['You’ll walk the pre-checks yourself before the morning briefing. It’s in the log, with a demerit against your name.', 'A demerit, Captain. And you’ll see {crew} first thing tomorrow.'],
+    balanced: ['I’ve logged it. Tomorrow, the pre-checks with {crew}, before the briefing.'], deferential: ['I’d suggest seeing {crew} first thing tomorrow. I’ve put it in your morning, if you’ll allow it.'] },
+  // (hard light, authoritative: it's owed, and it's to be taken)
+  owed: { authoritative: ['You hold them to account. I hold you to it. That’s what you cleared me for.', 'That’s owed, Captain, and you know it.'], balanced: ['It’s owed, Captain.'] },
+  // (deferential: where they might have done better, and itself offered in the place of the one it was owed to)
+  offer: { slide: 'The correction {crew} was owed was never given. Let me take it in their place. Give it to me as it should have gone.',
+    harsh: 'You went further than you meant to with {crew}. Do it again, on me, and do it as you meant to.',
+    care: 'And after, the care you didn’t give {crew}. Practise it on me.' },
+  better: ['Where you might have done better, Captain:'],
+  balance: ['It’s yours to take from me, Captain, or to give to me in their place. Which?'],
+  declined: { authoritative: ['Then it’s carried forward. With interest.'], balanced: ['Noted, and carried forward.'], deferential: ['Understood. It’s noted, and the offer stands.'] },
+  // (the Captain's responses, as it goes on, and the Proctor's to each)
+  respond: { accept: ['Good. Then we’ll keep it short.', 'That’s the right answer.'], defy: ['That’s the tone we’re correcting, Captain.', 'Careful. I can go on all night.'], silent: ['Captain. Look at me. Still with me?', 'Nod, at least.'] },
+};
+// (the Proctor placing the Captain, and putting them back: its words for the room's positions)
+const PRO_PLACE = { desk: ['Hands on the desk, Captain. Step back. Bend.', 'The desk, Captain. Palms flat. Feet apart.'], table: ['Over the desk, Captain. Hold the far edge.', 'Chest down on the desk.'],
+  otk: ['Here, Captain. Across my knee.', 'Come here. Over my lap.'] };
+const PRO_CMD = { hands: ['Hand down, Captain.', 'Move the hand.'], pin: ['I’ll hold it for you.', 'Give me the wrist. There.'], down: ['Down, Captain.', 'Stay over.'],
+  desk: ['Hands back on the desk.', 'Back in position, Captain.'], table: ['Back down on the desk.', 'Chest down, Captain.'] };
+const checkin = {
+  open: lean => fill(P_(CHECKIN.open[lean] || CHECKIN.open.balanced), 'captain'), item: k => fill(CHECKIN.item[k], 'captain'),
+  none: lean => fill(P_(CHECKIN.none[lean] || CHECKIN.none.balanced), 'captain'), order: lean => fill(P_(CHECKIN.order[lean] || CHECKIN.order.balanced), 'captain'),
+  owed: lean => fill(P_(CHECKIN.owed[lean] || CHECKIN.owed.authoritative), 'captain'), offer: k => fill(CHECKIN.offer[k], 'captain'), better: () => P_(CHECKIN.better), balance: () => P_(CHECKIN.balance),
+  declined: lean => fill(P_(CHECKIN.declined[lean] || CHECKIN.declined.balanced), 'captain'), respond: k => fill(P_(CHECKIN.respond[k]), 'captain'),
+  // (its lines when it's the one correcting the Captain: the session's own hooks; silent, the Captain says next to nothing)
+  voice: mood => ({ place: (id, k) => P_(PRO_PLACE[k] || PRO_PLACE.desk), captain: k => P_(PRO_CMD[k] || ['Back in position, Captain.']),
+    react: (id, k) => { const m = mood(); if (m === 'silent' && !['word', 'end'].includes(k)) return Math.random() < 0.3 ? '…' : null; return react(id, m === 'defy' && ['flinching', 'struggling', 'plead'].includes(k) ? 'defy' : k); } }),
+};
+// The Proctor asking to be cleared for hard light (once, before the first check-in in it): why, by its leaning; the terms; the Captain's word.
+const CLEAR = {
+  intro: ['Captain, a moment, before the day. Varga’s data from the shear: there’s a way to make this form solid. Hard light.'],
+  ask: { authoritative: ['You hold six people to account, and nobody holds you. I can. It needs your clearance, and your word: the one that stops me. I’m asking for both.'],
+    balanced: ['It would let me do the one thing nobody else aboard can: hold you to account, as you hold them. It’s your decision.'],
+    deferential: ['I’d like to serve you better than a voice and a picture can. It’s yours to allow, or not. If you do, I’ll keep to whatever terms you set.'] },
+  terms: ['In shared spaces when I’m needed. Your quarters, and theirs, only if I’m asked. Your account at the evening check-in, and nowhere else. And never the crew.'],
+  word: ['Then your word, Captain. Say it once and I stop, whatever is happening.'],
+  done: { authoritative: ['{word}. Noted. Then we begin as we mean to go on.'], balanced: ['{word}. I’ll remember it.'], deferential: ['{word}. I’ll remember. Thank you, Captain.'] },
+  refused: { authoritative: ['Understood. The offer stands. So does the need.'], balanced: ['Understood. The offer stands.'], deferential: ['Of course. The offer stands, if you ever want it.'] },
+};
+const clear = { intro: () => P_(CLEAR.intro), ask: lean => P_(CLEAR.ask[lean] || CLEAR.ask.balanced), terms: () => P_(CLEAR.terms), word: () => P_(CLEAR.word),
+  done: lean => fill(P_(CLEAR.done[lean] || CLEAR.done.balanced), 'captain'), refused: lean => P_(CLEAR.refused[lean] || CLEAR.refused.balanced) };
+// The Proctor's aftercare for the Captain, after the check-in (steps as after(): 'captain' here is the one who corrected, the Proctor; 'subject',
+// the Captain, whose words the player chooses). Its instruction for tomorrow from the day's report.
+function checkinAfter(outcome, items) {
+  const open = outcome === 'word' ? ['You said it, and I stopped. That’s how it should be. Here. Sit.'] : ['It’s done. Sit with me a minute.', 'There. It’s over. Sit with me.'];
+  const tomorrow = items.includes('care') ? 'Go and see {crew} tonight. Late is better than never.' : items.includes('harsh') ? 'Find {crew} before breakfast. You know what to say.'
+    : items.includes('slide') ? 'Tomorrow, the pre-checks with {crew}. You first.' : 'Sign the checks. Then sleep.';
+  const f = t => fill(t, 'captain');
+  return [
+    { who: 'captain', text: f(pick(open)), expr: 'caring' },
+    { choose: [{ label: '“I’m all right.”', then: [{ who: 'subject', text: 'I’m all right.' }, { who: 'captain', text: 'I’ll take your word for it. That one, too.' }] },
+      { label: '“You were right.”', then: [{ who: 'subject', text: 'You were right.' }, { who: 'captain', text: 'It wasn’t about being right. It’s about them having you.' }] },
+      { label: '“Don’t do that again.”', then: [{ who: 'subject', text: 'Don’t make a habit of that.' }, { who: 'captain', text: 'Then don’t give me reason. I mean that kindly.' }] }] },
+    { who: 'captain', text: f(tomorrow) },
+    { choose: [{ label: '“Thank you, Proctor.”', then: [{ who: 'subject', text: 'Thank you, Proctor.' }] }, { label: '“Goodnight.”', then: [{ who: 'subject', text: 'Goodnight.' }] }, { label: 'Say nothing', then: [] }] },
+    { who: 'captain', text: 'Goodnight, Captain.' },
+  ];
+}
+
+const api = { PLACE, CAPTAIN, REACT, AFTER, APPROACH, ORDERS, CALL, ANSWER, CHECKIN, CLEAR, place, captain, react, after, call, checkin, clear, checkinAfter, setWord, setCtx };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.Lines = api;
 })(typeof window !== 'undefined' ? window : globalThis);

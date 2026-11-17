@@ -37,13 +37,21 @@ function create(stage, bay, opts) {
     act: null, actQ: [], ending: null };
 
   // ── The cast ──
-  const captain = Fg.make(C.captainSpec(opts.captain)); scene.add(captain.root);
+  // (who corrects: the Captain; or, at the evening check-in, someone else in that place (opts.corrector: { id, spec, presence, response }),
+  // the Proctor, who then holds the Captain to account. Whoever it is, it's `captain` here: the one at the seat's end, at their side, with the
+  // hand. And who's corrected: a crew member, or anyone given a figure and a profile of their own (p.spec, p.profile: the Captain, the Proctor))
+  const CR = opts.corrector || null, correctorId = (CR && CR.id) || 'captain';
+  const captain = Fg.make(CR && CR.spec ? CR.spec : C.captainSpec(opts.captain)); scene.add(captain.root);
+  if (CR && CR.presence) Fg.presence(captain, CR.presence);
+  // (and what's said: the room's usual lines, or the check-in's own, voiced by whoever's in each place)
+  const V = Object.assign({ place: (id, k) => L.place(id, k), captain: (k, id) => L.captain(k, id), react: (id, k) => L.react(id, k) }, opts.voice || {});
   const people = [];
   const addPerson = (p, role) => {
-    const f = Fg.make(C.figureSpec(p.id, p.sex, p.outfit)); scene.add(f.root);
-    const r = C.ROSTER[p.id], pain = S.createPain(r.pain || {});
-    const P = { id: p.id, sex: p.sex, f, role, pain, r, done: false, outcome: null, hits: 0, peak: 0, marks: 0, said: {}, bandSeen: 0, pitch: C.pitch(p.id, p.sex), spot: null, resp: 0,
-      wrig0: C.wriggle(p.id, p.sex), rx: freshReact(), def: 0, def0: 0, gain: { compliance: 0, resentment: 0 } };
+    const f = Fg.make(p.spec || C.figureSpec(p.id, p.sex, p.outfit)); scene.add(f.root);
+    if (p.presence) Fg.presence(f, p.presence);
+    const r = p.profile || C.ROSTER[p.id], pain = S.createPain(r.pain || {});
+    const P = { id: p.id, sex: p.sex, f, role, pain, r, done: false, outcome: null, hits: 0, peak: 0, marks: 0, said: {}, bandSeen: 0, pitch: p.pitch || C.pitch(p.id, p.sex), spot: null, resp: 0,
+      wrig0: p.wriggle != null ? p.wriggle : C.wriggle(p.id, p.sex), rx: freshReact(), def: 0, def0: 0, gain: { compliance: 0, resentment: 0 } };
     setRel(P, (opts.rel || {})[p.id]);
     people.push(P); return P;
   };
@@ -87,7 +95,7 @@ function create(stage, bay, opts) {
     capResp *= fade;
     // (his guard eases as the affection's returned: their desire, or the bond between them once the story keeps it)
     const W = cur || afterWith, bond = W ? Math.max(W.r.dynamic && W.r.dynamic.bond || 0, W.rel.desire) : 0;
-    captain.setResponse(capResp * (0.3 + 0.7 * bond), { blush: Math.min(0.45, capResp * 0.7) });
+    if (!CR || CR.response !== false) captain.setResponse(capResp * (0.3 + 0.7 * bond), { blush: Math.min(0.45, capResp * 0.7) });
   }
 
   // ── Springs for the reactions: each driven toward a target and kicked by impulses as smacks land, so they snap and settle ──
@@ -160,13 +168,13 @@ function create(stage, bay, opts) {
     // a hand over the seat: told once; the second time, held
     if (R.cover) {
       const c = R.cover; c.t += dt;
-      if (!c.said && c.t > 0.5) { c.said = true; say('captain', L.captain(R.n.covers >= 2 ? 'pin' : 'hands', P.id)); }
+      if (!c.said && c.t > 0.5) { c.said = true; say('captain', V.captain(R.n.covers >= 2 ? 'pin' : 'hands', P.id)); }
       if (c.t >= c.dur) { R.cover = null; R.cool = 2.5; if (R.n.covers >= 2) R.pinOn = true; }
     }
     // up out of position, till they're put back (as they're placed, the defiant are slow to settle: up from the start)
     if (R.up) {
       const u = R.up; u.t += dt;
-      if (!u.said && u.t > (u.start ? u.dur - 0.5 : 0.45)) { u.said = true; say('captain', L.captain(otk ? 'down' : st.position === 'table' ? 'table' : sup.kind === 'rail' ? 'rail' : lineKind, P.id)); }
+      if (!u.said && u.t > (u.start ? u.dur - 0.5 : 0.45)) { u.said = true; say('captain', V.captain(otk ? 'down' : st.position === 'table' ? 'table' : sup.kind === 'rail' ? 'rail' : lineKind, P.id)); }
       if (u.t >= u.dur) { R.up = null; R.cool = 2.5; }
     }
     if (st.ending || st.phase !== 'turn') R.pinOn = false;      // (let go once it's over)
@@ -734,21 +742,21 @@ function create(stage, bay, opts) {
 
   // ── Their words: scripted by character, as the correction goes ──
   let sayCool = 0;
-  function say(who, text, P) { if (!text) return; emit('say', { who, id: P ? P.id : 'captain', text }); sayCool = 2.2; }
+  function say(who, text, P) { if (!text) return; emit('say', { who, id: P ? P.id : correctorId, text }); sayCool = 2.2; }
   function scripted() {
     const P = cur, b = bandIndex(), dfy = P.def > 0.4;
     // (the moment their defiance breaks comes before anything else)
-    if (P.said.yield === 1) { P.said.yield = 2; say('subject', L.react(P.id, 'yield'), P); return; }
-    if (P.hits === 1 && !P.said.first) { P.said.first = 1; say('subject', L.react(P.id, dfy ? 'defy' : 'first'), P); return; }
+    if (P.said.yield === 1) { P.said.yield = 2; say('subject', V.react(P.id, 'yield'), P); return; }
+    if (P.hits === 1 && !P.said.first) { P.said.first = 1; say('subject', V.react(P.id, dfy ? 'defy' : 'first'), P); return; }
     const keys = [null, 'flinching', 'struggling', 'edge', 'past'];
     // (while still defiant, back-talk in place of the early band lines)
-    if (b > P.bandSeen && b <= 4) { P.bandSeen = b; if (keys[b] && !P.said[keys[b]]) { P.said[keys[b]] = 1; say('subject', L.react(P.id, dfy && b <= 2 ? 'defy' : keys[b]), P); return; } }
-    if (dfy) { if (b >= 1 && sayCool <= 0 && Math.random() < 0.16 * P.def) say('subject', L.react(P.id, 'defy'), P); return; }
+    if (b > P.bandSeen && b <= 4) { P.bandSeen = b; if (keys[b] && !P.said[keys[b]]) { P.said[keys[b]] = 1; say('subject', V.react(P.id, dfy && b <= 2 ? 'defy' : keys[b]), P); return; } }
+    if (dfy) { if (b >= 1 && sayCool <= 0 && Math.random() < 0.16 * P.def) say('subject', V.react(P.id, 'defy'), P); return; }
     // (as the fight goes out of them they say less, and less in words: past halfway to stillness, now and then a breath or a fragment)
-    if (P.rx.ff < 0.5) { if (sayCool <= 0 && Math.random() < 0.05) say('subject', L.react(P.id, 'spent'), P); return; }
+    if (P.rx.ff < 0.5) { if (sayCool <= 0 && Math.random() < 0.05) say('subject', V.react(P.id, 'spent'), P); return; }
     const rl = P.rel, often = 0.12 * (0.4 + 0.6 * P.rx.ff) * (1 + rl.comfort);
-    if (!P.said.flushed && rl.desire > 0.3 && P.resp > 0.25 && sayCool <= 0) { P.said.flushed = 1; const ln = L.react(P.id, 'flushed'); if (ln) { say('subject', ln, P); return; } }
-    if (b >= 2 && sayCool <= 0 && Math.random() < often) say('subject', L.react(P.id, Math.random() < 0.7 * rl.submission ? 'accept' : 'plead'), P);
+    if (!P.said.flushed && rl.desire > 0.3 && P.resp > 0.25 && sayCool <= 0) { P.said.flushed = 1; const ln = V.react(P.id, 'flushed'); if (ln) { say('subject', ln, P); return; } }
+    if (b >= 2 && sayCool <= 0 && Math.random() < often) say('subject', V.react(P.id, Math.random() < 0.7 * rl.submission ? 'accept' : 'plead'), P);
   }
 
   // ── Turns ──
@@ -762,7 +770,7 @@ function create(stage, bay, opts) {
     if (cur.def0 > 0.4) { cur.rx.up = { t: -0.2, dur: 2.6 + 1.6 * cur.def0, said: false, start: true }; cur.rx.glance = 1.6; cur.rx.n.ups++; }
     cur.f.setClothes({ top: 'down', bottoms: 'up', under: 'up' }); cur.f.setExpr(cur.r.base || 'calm');
     emit('turn', { i, id: cur.id }); emit('state');
-    setTimeout(() => { say('captain', L.place(cur.id, placeKey())); setTimeout(() => say('subject', L.react(cur.id, cur.def0 > 0.5 && !/defiant|stern/.test(cur.r.base) ? 'defy' : 'start'), cur), 1600); }, 300);      // (their own way in, unless they're far more defiant than they usually are)
+    setTimeout(() => { say('captain', V.place(cur.id, placeKey())); setTimeout(() => say('subject', V.react(cur.id, cur.def0 > 0.5 && !/defiant|stern/.test(cur.r.base) ? 'defy' : 'start'), cur), 1600); }, 300);      // (their own way in, unless they're far more defiant than they usually are)
   }
   // ── The end of a turn: the player's (the Captain soothes them a little, then dresses them, then on), or their safe word (straight to their
   // aftercare). They stay where they are until the cut. ──
@@ -780,7 +788,7 @@ function create(stage, bay, opts) {
   function finishTurn(outcome) {
     const P = cur; st.running = false; st.soothe = false; st.act = null; st.actQ = [];
     P.outcome = outcome || 'done'; P.done = true;
-    if (P.outcome === 'done') say('subject', L.react(P.id, 'end'), P);
+    if (P.outcome === 'done') say('subject', V.react(P.id, 'end'), P);
     const r2 = x => Math.round(x * 100) / 100;
     const res = { id: P.id, outcome: P.outcome, hits: P.hits, peak: P.peak, band: BANDS[Math.min(5, P.peak < 0.3 ? 0 : P.peak < 0.6 ? 1 : P.peak < 0.9 ? 2 : P.peak < 1 ? 3 : P.peak < S.PAIN.TOO_HARSH ? 4 : 5)], position: st.position,
       defiance: { from: r2(P.def0), to: r2(P.def) }, compliance: r2(P.gain.compliance), resentment: r2(Math.min(1, P.gain.resentment)) };
@@ -831,7 +839,7 @@ function create(stage, bay, opts) {
     if (!cur || st.word) return;
     st.word = true; st.running = false; st.soothe = false; emit('word', { id: cur.id, word: cur.r.word });
     cur.gain.resentment += 0.12;      // (taken past what they could bear: over-correction is resented)
-    say('subject', L.react(cur.id, 'word'), cur); cur.f.setExpr('crying');
+    say('subject', V.react(cur.id, 'word'), cur); cur.f.setExpr('crying');
     setTimeout(() => endTurn('word'), 900);
   }
 
@@ -936,7 +944,7 @@ function create(stage, bay, opts) {
         if (cur.rx.broke > 0) e = 'crying';
         cur.f.setExpr(e);
       }
-      if (st.soothe && !st.swing && !cur.said.soothe && sayCool <= 0) { cur.said.soothe = 1; say('subject', L.react(cur.id, 'soothe'), cur); }
+      if (st.soothe && !st.swing && !cur.said.soothe && sayCool <= 0) { cur.said.soothe = 1; say('subject', V.react(cur.id, 'soothe'), cur); }
     }
     if (table && table.setTop) table.setTop(cur && st.position === 'table' && st.phase !== 'after' ? topFor(cur.f) : table.top);      // (the exam table up or down to them, eased by the room)
     if (cur && st.phase !== 'after' && st.phase !== 'over') { if (st.position === 'otk') { poseCaptain(dt); poseSubject(dt); } else { poseSubject(dt); poseCaptain(dt); } poseCaptainHands(dt); captain.setExpr(st.position === 'otk' || st.phase === 'turn' ? 'stern' : 'calm'); }
@@ -1057,7 +1065,7 @@ function create(stage, bay, opts) {
   }
 
   const api = { limbRadii: F => limbRadii(F),
-    st, captain, people, queue, get fittings() { return fittings; }, witnesses, BANDS, AREAS, CAMS, bench, RESP, get captainResponse() { return capResp; },
+    st, captain, correctorId, people, queue, get fittings() { return fittings; }, witnesses, BANDS, AREAS, CAMS, bench, RESP, get captainResponse() { return capResp; },
     setRel(id, v) { const P = people.find(p => p.id === id); if (P) setRel(P, v); },
     get current() { return cur; },
     on: fn => listeners.push(fn),
@@ -1069,7 +1077,7 @@ function create(stage, bay, opts) {
     position(p) { const q = posOf(p); if ((st.position === q.position && st.seat === q.seat) || (q.position === 'table' && !table)) return;
       st.position = q.position; st.seat = q.seat; st.swing = null; st.running = false;
       if (bench !== benchOf(st.seat)) { bench = benchOf(st.seat); seatOTK(); after = afterOf(); makeCams(); }
-      if (cur) { say('captain', L.place(cur.id, placeKey())); } camera(0); emit('state'); },
+      if (cur) { say('captain', V.place(cur.id, placeKey())); } camera(0); emit('state'); },
     positions: ['otk', 'wall'].concat(table ? ['table'] : [], Object.keys(bay.spots.seats || {}).map(k => 'otk:' + k)), support: sup.kind,
     dress(o) { if (cur && st.phase === 'turn' && !st.ending) dressTo(o); },
     endTurn: () => endTurn('done'), callWord, camera, aftercare, update, back() { if (!away) return; away = null; awayFit = null; after = afterOf(); makeCams(); },
