@@ -104,8 +104,12 @@ const REPEATERS = [['REACTOR', ['CORE  STABLE', 'COOLANT  NOMINAL', 'DRIVE  STAN
   ['MED BAY', ['BAY  READY', 'CREW VITALS  6/6', 'DOSIMETRY  LOW', '!STATION  RUEL']], ['SUIT BAY', ['SUITS  6', 'AIRLOCK  SEALED', 'EVA  NONE', 'COLLAR  SECURE']]];
 const repTex = REPEATERS.map(([t, rows]) => panel(t, rows));
 const sysTex = panel('SHIP  ·  SYSTEMS', ['HULL  INTEGRITY 100%', 'SHIELD  WATER 96%', 'RADIATORS  DEPLOYED', 'POWER  71%', 'ARRAY  LOST (SHEAR)', '!PROCTOR  ON WATCH']);
+// (before the shear (the ordinary day, docs/day.md): the long-range array still up, the link home live, the watch kept by the crew)
+const sysTexBefore = panel('SHIP  ·  SYSTEMS', ['HULL  INTEGRITY 100%', 'SHIELD  WATER 97%', 'RADIATORS  DEPLOYED', 'POWER  62%', 'ARRAY  LINKED  ·  EARTH', '!WATCH  CREW']);
 
-function build(scene) {
+// opts.before: the bridge as it was before the shear
+function build(scene, opts) {
+  const before = !!(opts && opts.before);
   const G = new THREE.Group(); scene.add(G);
   const detail = [];
   const std = (o) => F.paint(new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.7, metalness: 0.2 }, o)), { grain: 0.05, scale: 8 });
@@ -149,7 +153,7 @@ function build(scene) {
     wallRun(len, cx, cz, ry, fabric);
     const d = 0.03, nx = -sx * Math.sin(Math.PI / 4), nz = Math.cos(Math.PI / 4);
     box(1.4, 0.75, 0.04, steelDark, cx + nx * d, 1.55, cz + nz * d, { ry });
-    plane(1.3, 0.66, basic(sx < 0 ? sysTex : graph('COMMS  ·  LINK', 'trace')), cx + nx * (d + 0.022), 1.55, cz + nz * (d + 0.022), 0, ry);
+    plane(1.3, 0.66, basic(sx < 0 ? (before ? sysTexBefore : sysTex) : graph('COMMS  ·  LINK', 'trace')), cx + nx * (d + 0.022), 1.55, cz + nz * (d + 0.022), 0, ry);
   }
   for (const [len, x, z, ry] of [[X1 - X0, 0, ZA - 0.012, 0], [ZA - ZF - CH, X0 + 0.012, (ZF + CH + ZA) / 2, Math.PI / 2], [ZA - ZF - CH, X1 - 0.012, (ZF + CH + ZA) / 2, Math.PI / 2]]) box(len, 0.03, 0.025, steel, x, 0.9, z, { ry, noCast: true });
   for (const [x, z] of [[X0, ZA], [X1, ZA], [X0, ZF + CH], [X1, ZF + CH], [X0 + CH, ZF], [X1 - CH, ZF]]) box(0.14, HT, 0.14, steelDark, x, HT / 2, z);
@@ -184,7 +188,7 @@ function build(scene) {
   const chairs = {};
   chairs.helm = station(HELM, Math.PI, [graph('ATTITUDE', 'attitude'), graph('HELM  ·  THRUST', 'trace'), panel('NAV', ['HEADING  000.0', 'COURSE  ON PLOT', 'DEVIATION  0.4°', '!BURN  T−41:12'])], true);
   chairs.sensors = station(SENS, Math.PI - SIDE_YAW, [graph('SENSORS  ·  SWEEP', 'sweep'), panel('CONTACTS', ['DUST  LIGHT', 'RADIATION  NOMINAL', 'CONTACTS  0', 'COMMS  RELAY  IDLE'])]);
-  chairs.survey = station(SURV, Math.PI + SIDE_YAW, [graph('SURVEY  ·  SPECTRUM', 'spectrum'), panel('SURVEY', ['ARRAY  LOST', 'OPTICAL  ONLINE', 'TARGETS  QUEUED 3', 'LOG  DAY 1,231'])]);
+  chairs.survey = station(SURV, Math.PI + SIDE_YAW, [graph('SURVEY  ·  SPECTRUM', 'spectrum'), panel('SURVEY', [before ? 'ARRAY  LINKED' : 'ARRAY  LOST', 'OPTICAL  ONLINE', 'TARGETS  QUEUED 3', 'LOG  DAY 1,231'])]);
 
   // ── The plot table: a pedestal, a broad top that's all display, a blue edge; the Captain's place at its aft edge. Its fold-down seat, for
   // burns, folded up flat against the pedestal's aft face under the top. Its own piece: it never hides while someone's at it. ──

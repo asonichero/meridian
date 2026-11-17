@@ -5,7 +5,7 @@ A deep-space sci-fi psychological action-adventure and management sim, built on 
 ## Run it
 
 ```
-npm run serve        # http://localhost:8123/ opens the correction test (session.html); /figures.html shows one figure at a time (any crew member or the Captain, posed); /model.html the bodies and clothes
+npm run serve        # http://localhost:8123/ opens the ship's day (day.html); /session.html is the correction test; /figures.html shows one figure at a time (any crew member or the Captain, posed); /model.html the bodies and clothes
 npm test             # the pain model, the scripted correction, the crew and their lines, the figures' rig (built in code and from the models)
 ```
 
@@ -17,6 +17,19 @@ blender -b --python tools/blender/build_figures.py -- f m       # → models/mer
 ```
 
 `model.html` shows them as a turnaround sheet: `?sex=f|m`, `?wear=uniform|offduty|down|under` (or a list of garments), `?key=muscle:1`, `?wire=1`, `?bones=1`, and `?overlay=<image>` to lay the reference over them.
+
+## The ship's day (`day.html`)
+
+The game from its beginning: an ordinary day aboard, before the shear (docs/day.md). The player chooses the Captain, who they're drawn to and the
+Proctor's form, then lives a day of the ship's routine, from waking at 06:30 to lights down at 22:00:
+- **The deck plan** (the ship's general arrangement, in a tablet's frame) comes up as each scene ends. It shows the clock, who's where, the
+  day's routine and the Proctor's suggestion of what's next. Choosing a room goes there.
+- **Each room is a short scene.** Breakfast, the morning briefing on the bridge, rounds of the working compartments, meals, the desk, the
+  evening report, the night watch taking over. Anywhere else is an ordinary visit to whoever's there.
+- **Choices** in each scene, warm, formal or brisk, move the crew's comfort and desire with the Captain. The Proctor keeps the Captain's
+  manner.
+- **The night watch** goes round the bridge crew (Ashdown, Lindqvist, Varga). The clock moves with what the Captain does, and a step left too
+  long is missed.
 
 ## The correction test (`session.html`)
 
@@ -127,6 +140,10 @@ For every figure:
 | `docs/proctor.md` | The Proctor: its presence through the acts, onboarding, its persona and look (drafts) |
 | `js/stations.js` | The bridge at stations: the crew at their posts, the Captain at the plot table, calling someone into the Ready Room |
 | `js/checkin.js` | The evening check-in: the day's verdict, the two of them in the Ready Room, and the Proctor at work when it corrects the Captain |
+| `day.html` | The ship's day: the beginning, the deck plan, each room's scene, the day's end |
+| `js/day.js`, `js/daylines.js` | The ship's day: the clock, the routine, the watch and who's where; what's said in each scene, the Proctor's suggestions, the evening report |
+| `js/deckplan.js`, `js/visit.js` | The deck plan between scenes; a visit's staging (who's where in the room, the Captain with them, the cameras) |
+| `docs/day.md` | The ship's day: how it plays, the routine, the night watch, who's where |
 | `session.html` | The correction test |
 | `figures.html` | A crew member and the Captain together in a plain, well-lit space: any crew member in either translation and outfit, their clothes raised or lowered, the Captain in either translation and outfit (always fully dressed), and where the crew member is with the Captain (defiance, submission, desire, comfort; desire greyed out for Lindqvist: across the knee and at the rail, defiance shows in how they take it; in the aftercare, what's left of it). Situations: at rest (side by side), attention (the Captain at parade rest a stride away; the crew member at attention: feet together, back straight, chin up), at ease (the Captain at rest; the crew member at parade rest), dressing down (the Captain's arms folded; the crew member at parade rest, hands clasped if submissive, arms folded if defiant), inspection (the crew member's hands on their head), and across the knee, at the rail and the aftercare (posed by the correction's own code, with a bench and a rail). Expressions, the body's response, four views and a turntable (`?who=&sex=&outfit=&clothes=&csex=&coutfit=&pose=&def=&sub=&des=&com=&expr=&resp=&view=&spin=1`) |
 | `vendor/` | three.js r128, OrbitControls, r128's post-processing passes, GLTFLoader and SkeletonUtils |

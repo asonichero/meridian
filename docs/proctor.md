@@ -8,7 +8,7 @@ hard light in Act III.
 
 | Act | Presence | How it comes about |
 |---|---|---|
-| I | **A voice** in the Captain's earpiece and over the ship's speakers. It monitors telemetry, surfaces historical protocols, points out infractions, and mirrors the Captain's language and leniency as it learns them. | It's simply there. |
+| I | **A voice** in the Captain's earpiece and over the ship's speakers. Before the shear it keeps the ship's records and routine, and suggests the Captain's next step through an ordinary day (docs/day.md). After it, it monitors telemetry, surfaces historical protocols, points out infractions, and mirrors the Captain's language and leniency as it learns them. | It's simply there. |
 | II | **Projected**: an image in light. It can be seen, but it can't touch anything. | **A crew member builds it: Sefa Lindqvist.** Sefa has been chasing dead signals through what's left of the long-range array lost in the shear, and turns the array's optics into projectors that give the Proctor a face. It's a turn in Sefa's arc, from looking back toward Earth to looking at who's aboard. It's also the crew's choice: wanting to see the voice in the Captain's ear is a sign they're settling into the new order. The Proctor didn't ask for it. How it chooses to look is the first visible sign of the leaning it has learned from the Captain. |
 | III | **Hard light**: solid. It can touch, and so it can hold the Captain physically accountable. | **The Proctor finds it, and the Captain clears it.** Rowan Varga's anomaly data from the shear holds the physics. The Proctor works out the use, because it's what it needs for the one role nobody else aboard can fill. It brings the idea to the Captain as a proposal with terms, and doesn't switch it on itself. The Captain clears it, refuses, or sets conditions. Sam Okafor fits the emitters through the compartments, so the decision shows up as ship work. |
 
@@ -47,8 +47,9 @@ The player chooses:
 
 ## Persona (draft, for review)
 
-- **Name:** the Proctor, the archive's word for the officer of an old university who kept discipline and oversaw examinations. It took the
-  name with the protocols it surfaced for the Captain, and has no other.
+- **Name:** the Proctor, the archive's word for the officer of an old university who kept discipline and oversaw examinations. It has gone by
+  it since the ship was commissioned, as the keeper of the ship's records and routine, and has no other. Before the shear it's the ship's
+  steady voice through an ordinary day (docs/day.md); after it, the protocols it surfaces give the name its older meaning.
 - **Voice:**
   - Measured, unhurried and precise. It never raises its voice, and uses silence on purpose.
   - It speaks in whole sentences, gives exact numbers, and cites the archive.

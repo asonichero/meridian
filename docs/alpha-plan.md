@@ -134,8 +134,10 @@ That suits the GDD's §4 description well: "brushed steel, exposed conduit … b
 21. How does inspection work (scan a console, a minigame, read a log)?
 
 ### H. Patrol
-22. Camera: third-person like redlessons, or first-person?
-23. Is the shift clock real time, or does it advance per action? How long is a shift?
+22. Camera: third-person like redlessons, or first-person? *(Decided: neither. It's a systems game with playable scenes: the Captain moves
+    between rooms on the deck plan, and each room is a scene: docs/day.md.)*
+23. Is the shift clock real time, or does it advance per action? How long is a shift? *(Decided: per action. A step of the routine takes its
+    own time, a visit 40 minutes. The Captain's day runs 06:30 to 22:00; the bridge crew stand the night watch in turn: docs/day.md.)*
 
 ### I. Evening check-in
 24. What does the Proctor evaluate, and what counts as "performance slipping"? *(For now, the day's report in the set-up: an infraction let slide, a correction too harsh, an aftercare skipped, a protocol of the Captain's own missed. The day's loop will fill it in: docs/proctor.md.)*
