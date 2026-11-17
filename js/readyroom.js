@@ -173,8 +173,9 @@ function build(scene) {
 
   // ── Where things happen ──
   const spots = {
-    // (across the knee on the couch, square to it, near its fore end: they lie along it in front, the head aft, the near arm on its seat)
-    bench: { at: new V3(ccx - 0.35, 0, CZ - 0.16), yaw: 0, turn: 0, seatY: CY, rest: { y: CY, edge: 0.16 } },
+    // (across the knee on the couch, square to it, whoever's correcting in the middle of it: they lie along it in front, the head aft, the
+    // near arm on its seat)
+    bench: { at: new V3(ccx, 0, CZ - 0.16), yaw: 0, turn: 0, seatY: CY, rest: { y: CY, edge: 0.16 } },
     // (standing at the desk's front, palms flat on its edge, bent well forward, between the two chairs; the Captain at their left)
     wall: { at: new V3(DX0 - 0.85, 0, dz), yaw: Math.PI / 2, support: { kind: 'edge', y: DY + 0.01, d: 0.85, bend: 0.95, lines: 'desk' } },
     // (over the desk: chest down on it, hands holding its far edge)

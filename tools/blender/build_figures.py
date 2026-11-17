@@ -1027,6 +1027,7 @@ def dress_from(ob, body, BD, label, allowed, rig, split=None):
             kb = ob.shape_key_add(name=k, from_mix=False); kb.data.foreach_set('co', (bco + D[k]).ravel())
     m = ob.modifiers.new('Rig', 'ARMATURE'); m.object = rig; ob.parent = rig
 
+POUCH = False
 def garments(sex, torso, leg, arm, body, label, rig):
     L = landmarks(sex, torso); BD = body_data(body); out = []
     L['seatPeak'], L['seatFold'], L['seatTop'] = seat_marks(body_field(torso, leg, arm, sex), L['hipX'] * 0.8)
@@ -1045,10 +1046,10 @@ def garments(sex, torso, leg, arm, body, label, rig):
     Tb = Cloth(torso, lambda y: 0.0045, slope=1.2, below=CROTCH_Y + 0.12)
     Lb = [Cloth(leg, lambda y: 0.0045, sx) for sx in (1, -1)]
     briefs_f = lerp_crotch(Tb, legs_(Lb))
-    # (his held in a pouch, close against him: a rounded form in front of the crotch, not the shape of what's in it; its size follows his by
-    # the garments' own shape keys)
+    # (his: no pouch. Nothing of him shows through briefs or trousers that are up: the crotch as smooth as the rest, his own form hidden under
+    # them. A pouch hung between his legs as he bent over, his shape in the cloth. POUCH = True brings it back)
     pouch = None
-    if sex == 'm':
+    if sex == 'm' and POUCH:
         zp = front_z(Surface(torso), CROTCH_Y + 0.025); PC = np.array([0.0, CROTCH_Y + 0.014, zp - 0.022]); PR = np.array([0.042, 0.056, 0.03])
         pouch = lambda P: (1 - np.linalg.norm((P - PC) / PR, axis=1)) * PR.min()
         briefs_f = (lambda b: lambda P: smax(b(P), pouch(P), 0.03))(briefs_f)

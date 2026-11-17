@@ -1409,6 +1409,21 @@ function prepare(sx, gltf, M) {
       }
       g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
     }
+    // (trousers and briefs, up: their crotch shared between the pelvis and the thighs rather than going with the pelvis alone. Bent well
+    // forward, the pelvis turns and the thighs don't: on the pelvis alone the crotch swings out behind between the legs, the cloth drawn out
+    // into creases round it. Shared, it stays between the legs, closer to smooth.)
+    if ((name === 'Trousers' || name === 'Briefs') && BIx.hips != null && BIx.thighL != null && BIx.thighR != null && L.crotch != null) {
+      const hp = BIx.hips, tL = BIx.thighL, tR = BIx.thighR, c = L.crotch, sm = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+      for (let i = 0; i < n; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i), ax = Math.abs(x);
+        if (ax > 0.1 || y > c + 0.08 || y < c - 0.15 || z < -0.1) continue;
+        const f = 0.9 * sm(0.1, 0.045, ax) * sm(c + 0.08, c + 0.025, y) * sm(-0.1, -0.05, z); if (f <= 0.01) continue;
+        let kH = -1; for (let k = 0; k < 4; k++) if (idx[i * 4 + k] === hp) kH = k; if (kH < 0) continue;
+        const want = x >= 0 ? tL : tR; let kT = -1; for (let k = 0; k < 4; k++) if (idx[i * 4 + k] === want) kT = k;
+        if (kT < 0) { let m = -1; for (let k = 0; k < 4; k++) if (k !== kH && (m < 0 || wt[i * 4 + k] < wt[i * 4 + m])) m = k; kT = m; idx[i * 4 + kT] = want; wt[i * 4 + kT] = 0; }
+        const mv = wt[i * 4 + kH] * f; wt[i * 4 + kH] -= mv; wt[i * 4 + kT] += mv;
+      }
+    }
     // (a garment's crotch, between the legs: shared between the thighs across a hand's width of the middle, rather than going over from one to
     // the other at the midline itself; as built, the lowered briefs and trousers split there, and the gusset tore open as the legs parted)
     if (name !== 'Body' && BIx.thighL != null && BIx.thighR != null) {
