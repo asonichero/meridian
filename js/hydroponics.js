@@ -15,8 +15,9 @@ const THREE = root.THREE, F = root.Figure, srgb = F.srgb, V3 = THREE.Vector3;
 const K = root.SuitBay.kit, Q = root.Quarters.kit, rnd = K.rnd, speckle = K.speckle;
 const X0 = -4, X1 = 4, ZS = -3, ZH = 3, HT = 2.6;      // fore and aft walls, the spine side, the hull, height
 const NX = 2.0;      // (where the nook begins, aft of the racks)
-// the garden bench against the aft wall (from GZ0 to GZ1), its seat; the potting bench along the spine side of the nook (from PX0 to PX1), its top
-const GZ0 = -0.4, GZ1 = 1.2, GY = 0.45, GD = 0.5, PX0 = 2.2, PX1 = 3.85, PD = 0.62, PY = 0.9;
+// the garden bench against the aft wall (from GZ0 to GZ1), its seat; the potting table on the spine side of the nook (from PX0 to PX1, standing
+// PG off the wall: free, so it can be worked from either side), its top
+const GZ0 = -0.4, GZ1 = 1.2, GY = 0.45, GD = 0.5, PX0 = 2.2, PX1 = 3.85, PD = 0.62, PY = 0.9, PG = 0.75;
 
 // ── Painted textures ──
 const leafTex = K.canvasTex(256, 128, (c, w, h) => {
@@ -120,14 +121,15 @@ function build(scene) {
     for (const dz of [-0.12, 0.12]) box(0.02, 0.62, 0.05, std({ color: srgb('#c8902a'), roughness: 0.8 }), sx + 0.18, 0.95, CZ + dz, { detail: true });      // (the harness's straps)
     box(0.03, 0.06, 0.08, steel, sx + 0.17, 0.66, CZ, { detail: true }); }
 
-  // ── The nook: the potting bench along the spine side (soil bin, pots, trays, a trowel; the pegboard over it; clear where hands go), the
+  // ── The nook: the potting table on the spine side, out from the wall (soil bin, pots, trays, a trowel, all toward its aft end, its fore
+  // end clear where hands go; the pegboard on the wall behind it), the
   // garden bench against the aft wall (slatted, a back), big planters, a little tree; amber lights strung overhead ──
-  const pz = ZS + PD / 2;
+  const pz = ZS + PG + PD / 2;
   box(PX1 - PX0, 0.05, PD, oak, (PX0 + PX1) / 2, PY - 0.025, pz);
-  for (const x of [PX0 + 0.05, PX1 - 0.05]) for (const z of [ZS + 0.05, ZS + PD - 0.05]) box(0.05, PY - 0.05, 0.05, wood, x, (PY - 0.05) / 2, z);
+  for (const x of [PX0 + 0.05, PX1 - 0.05]) for (const z of [pz - PD / 2 + 0.05, pz + PD / 2 - 0.05]) box(0.05, PY - 0.05, 0.05, wood, x, (PY - 0.05) / 2, z);
   box(PX1 - PX0 - 0.1, 0.03, PD - 0.1, wood, (PX0 + PX1) / 2, 0.25, pz);
-  box(0.5, 0.25, 0.4, potD, PX0 + 0.35, PY + 0.125, pz - 0.05);      // (the soil bin)
-  for (const [x, s] of [[PX1 - 0.25, 0.09], [PX1 - 0.42, 0.07], [PX0 + 0.75, 0.06]]) cyl(s, s * 0.75, s * 1.5, potM, x, PY + s * 0.75, pz - 0.12, null, 12, { detail: true });
+  box(0.5, 0.25, 0.4, potD, PX1 - 0.35, PY + 0.125, pz - 0.05);      // (the soil bin)
+  for (const [x, s] of [[PX1 - 0.75, 0.09], [PX1 - 0.92, 0.07], [PX1 - 0.15, 0.06]]) cyl(s, s * 0.75, s * 1.5, potM, x, PY + s * 0.75, pz - 0.12, null, 12, { detail: true });
   for (const x of [PX0 + 0.2, PX0 + 0.5]) box(0.24, 0.05, 0.3, std({ color: srgb('#2a2a2a'), roughness: 0.8 }), x, 0.3, pz, { detail: true });
   box(0.04, 0.02, 0.18, steel, PX1 - 0.6, PY + 0.01, pz + 0.12, { detail: true });
   box(1.4, 0.8, 0.02, std({ color: srgb('#c8b08a'), roughness: 0.9 }), (PX0 + PX1) / 2, 1.7, ZS + 0.012);
@@ -175,8 +177,8 @@ function build(scene) {
     // (across the knee on the garden bench, square to it, facing up the room: they lie along it in front, the head toward the hull, the near
     // arm on its slats)
     bench: { at: new V3(X1 - GD + 0.13, 0, gz - 0.25), yaw: -Math.PI / 2, turn: 0, seatY: GY, rest: { y: GY, edge: 0.13 } },
-    // (standing at the potting bench, palms flat on its edge, bent forward; the Captain at their left, aft)
-    wall: { at: new V3((PX0 + PX1) / 2 + 0.15, 0, ZS + PD + 0.85), yaw: Math.PI, support: { kind: 'edge', y: PY + 0.01, d: 0.85, bend: 0.95, lines: 'potting' } },
+    // (standing at the potting table's fore end, palms flat on its edge, bent forward; the Captain at their left, toward the racks)
+    wall: { at: new V3(PX0 + 0.35, 0, ZS + PG + PD + 0.85), yaw: Math.PI, support: { kind: 'edge', y: PY + 0.01, d: 0.85, bend: 0.95, lines: 'potting' } },
     after: { at: new V3(X1 - GD + 0.2, 0, gz - 0.35), yaw: -Math.PI / 2, seatY: GY, beside: new V3(X1 - GD + 0.2, 0, gz + 0.27) },
     // (watching from the aisles at the racks' ends, and by the tanks)
     watch: [{ at: new V3(NX - 0.15, 0, -1.75), yaw: 0 }, { at: new V3(NX - 0.25, 0, 0.2), yaw: 0 }, { at: new V3(NX - 0.15, 0, 1.95), yaw: 0 }, { at: new V3(1.0, 0, -1.6), yaw: 0 },
@@ -203,10 +205,9 @@ function build(scene) {
   apply();
   const { sideOf, sidesAt } = K.roomSides(G, { minX: X0, maxX: X1, minZ: ZS, maxZ: ZH, ht: HT }, [floor, deck, gb]);
   let t = 0;
-  // (at the potting bench the aft wall is close on their right: the side view from behind and to the right, high; their face from low at
-  // the bench's aft end)
-  const cams = { wall: [['Side', [-0.675, 1.45, -0.53], [0.05, 0.95, 0.35]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
-    ['Their face', [-0.68, 0.95, 0.72], [0.05, 1.05, 0.5]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [1.05, 1.9, -2.95], [-0.15, 0.8, -0.15]]] };
+  // (at the potting table, their face from behind it, low, between it and the wall)
+  const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
+    ['Their face', [0.05, 0.95, 1.82], [0.0, 1.05, 0.75]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [1.05, 1.9, -2.95], [-0.15, 0.8, -0.15]]] };
   return { group: G, spots, key, cams, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Hydroponics',
     bounds: { minX: X0 + 0.2, maxX: X1 - 0.2, minZ: ZS + 0.2, maxZ: ZH - 0.2 }, get low() { return low; },
     tick(dt) { t += dt; for (const m of mist) { m.position.x += m.userData.v * dt; if (m.position.x > NX - 0.3) m.position.x = X0 + 0.6; m.material.opacity = 0.05 + 0.03 * Math.sin(t * 0.4 + m.position.z); } } };
