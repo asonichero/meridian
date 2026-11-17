@@ -927,7 +927,7 @@ function create(stage, bay, opts) {
   // (each with its box, the wall it's on, and whether it's one of the big planes, the room's shell, which nothing can be behind)
   const fittings = bay.group.children.filter(o => !o.isLight).map(o => { const box = new THREE.Box3().setFromObject(o); return { o, box, side: bay.sideOf ? bay.sideOf.get(o) : null,
     inWay: box.max.y > 0.62 && [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z].filter(d => d > 2.5).length < 2 }; })
-    .filter(f => !f.box.isEmpty() && (f.side || f.inWay));
+    .filter(f => !f.box.isEmpty() && !f.o.userData.keep && (f.side || f.inWay));      // (and never what they sit on: a couch with a back as high as a shoulder, that the room marks to keep)
   const hiddenNow = new Map();
   function setHidden(o, h) {
     if (hiddenNow.get(o) === h) return; hiddenNow.set(o, h);

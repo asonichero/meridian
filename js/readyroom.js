@@ -21,8 +21,8 @@ const DX0 = 0.15, DX1 = 1.0, DZ0 = -0.2, DZ1 = 1.4, DY = 0.76, CX0 = -1.35, CX1 
 
 // ── Painted textures ──
 const deckTex = K.canvasTex(256, 256, (c, w, h) => {
-  c.fillStyle = '#3c4248'; c.fillRect(0, 0, w, h);
-  speckle(c, w, h, 1800, '#59616a', 0.2, 1.4); speckle(c, w, h, 1200, '#1e2226', 0.25, 1.4);
+  c.fillStyle = '#4c535a'; c.fillRect(0, 0, w, h);
+  speckle(c, w, h, 1800, '#6a727a', 0.2, 1.4); speckle(c, w, h, 1200, '#1e2226', 0.25, 1.4);
   for (let i = 0; i < 30; i++) { c.strokeStyle = 'rgba(255,255,255,0.025)'; c.lineWidth = 8 + rnd() * 20; c.beginPath(); const x = rnd() * w; c.moveTo(x, 0); c.lineTo(x + (rnd() - 0.5) * 40, h); c.stroke(); }
   c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(0, 0, w, 2); c.fillRect(0, 0, 2, h);
 }, [3, 5]);
@@ -68,7 +68,7 @@ function build(scene) {
 
   // (cool and orderly: pale grey panels over dark steel ones, a dark composite deck, brass only on what's ceremonial)
   const paintM = std({ map: Q.wallTex, color: srgb('#bcc6cc'), roughness: 0.75, metalness: 0.08 });
-  const lowM = std({ map: K.panelTex('#3a4248', [1, 1]), roughness: 0.55, metalness: 0.45 });
+  const lowM = std({ map: K.panelTex('#4e575e', [1, 1]), roughness: 0.55, metalness: 0.4 });
   const steelDark = std({ map: K.panelTex('#2a3034', [1, 1]), roughness: 0.6, metalness: 0.4 });
   const steel = std({ color: srgb('#9aa0a2'), roughness: 0.45, metalness: 0.6 });
   const brass = std({ color: srgb('#b08a3e'), roughness: 0.35, metalness: 0.75 });
@@ -129,8 +129,9 @@ function build(scene) {
     box(0.04, 0.46, 0.42, steelDark, -0.2, 0.72, 0, { to: g }); box(0.03, 0.3, 0.38, leather, -0.18, 0.76, 0, { to: g });
   }
 
-  // ── The couch along the spine side: firm, dark leather, buttoned, square arms. Its own group, so it never hides with the wall behind it ──
-  const couch = new THREE.Group(); G.add(couch);
+  // ── The couch along the spine side: firm, dark leather, buttoned, square arms. Its own group, kept: it never hides, with the wall behind it
+  // or for standing between the camera and the two on it ──
+  const couch = new THREE.Group(); couch.userData.keep = true; G.add(couch);
   const cl = CX1 - CX0, ccx = (CX0 + CX1) / 2, cd = CZ - ZS;
   box(cl, 0.3, cd, leather, ccx, 0.15, ZS + cd / 2, { to: couch });
   box(cl - 0.3, CY - 0.3, cd - 0.22, leather, ccx, (0.3 + CY) / 2, ZS + 0.22 + (cd - 0.22) / 2, { to: couch });
@@ -162,11 +163,12 @@ function build(scene) {
 
   // ── Light, as the bridge's: cool and even, brighter than anywhere aft; the display's glow; at night (the ship's night: the room in use is
   // still a working one) a little lower ──
-  const hemi = new THREE.HemisphereLight(srgb('#e8eef6'), srgb('#24282e'), 1.1); G.add(hemi);
-  const amb = new THREE.AmbientLight(srgb('#30343a'), 0.6); G.add(amb);
-  const key = new THREE.SpotLight(srgb('#eef4ff'), 7.5, 7, 1.15, 0.8, 2); key.position.set(0.0, HT - 0.06, 0.2); key.target.position.set(-0.2, 0, -0.2);
+  const hemi = new THREE.HemisphereLight(srgb('#eef3fa'), srgb('#2e3238'), 1.5); G.add(hemi);
+  const amb = new THREE.AmbientLight(srgb('#3a3e44'), 0.8); G.add(amb);
+  const key = new THREE.SpotLight(srgb('#eef4ff'), 10, 7, 1.15, 0.8, 2); key.position.set(0.0, HT - 0.06, 0.2); key.target.position.set(-0.2, 0, -0.2);
   key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; key.shadow.radius = 4; key.shadow.camera.near = 0.2; key.shadow.camera.far = 6; G.add(key); G.add(key.target);
-  const fill = new THREE.PointLight(srgb('#e8f0ff'), 2.0, 7, 2); fill.position.set(0, HT - 0.3, -1.6); G.add(fill);
+  const fill = new THREE.PointLight(srgb('#e8f0ff'), 3.0, 7, 2); fill.position.set(0, HT - 0.3, -1.6); G.add(fill);
+  const fill2 = new THREE.PointLight(srgb('#e8f0ff'), 2.4, 7, 2); fill2.position.set(0, HT - 0.3, 1.6); G.add(fill2);
   const plotL = new THREE.PointLight(srgb('#5ad8e0'), 0.6, 2.5, 2); plotL.position.set(X0 + 0.6, 1.5, PZ); G.add(plotL);
 
   // ── Where things happen ──
@@ -191,8 +193,8 @@ function build(scene) {
     for (const m of meshes) m.castShadow = low ? false : cast0.get(m);
     for (const d of detail) d.visible = !low;
     plotL.visible = !low;
-    key.intensity = day ? 7.5 : 5.5; glowW.emissiveIntensity = day ? 4 : 3; fill.intensity = day ? 2.0 : 1.3;
-    hemi.intensity = (day ? 1.1 : 0.85) + (low ? 0.3 : 0); amb.intensity = day ? 0.6 : 0.5;
+    key.intensity = day ? 10 : 7.5; glowW.emissiveIntensity = day ? 4 : 3.2; fill.intensity = day ? 3.0 : 2.1; fill2.intensity = day ? 2.4 : 1.7;
+    hemi.intensity = (day ? 1.5 : 1.15) + (low ? 0.3 : 0); amb.intensity = day ? 0.8 : 0.65;
     const sz = low ? 1024 : 2048;
     if (key.shadow.mapSize.x !== sz) { key.shadow.mapSize.set(sz, sz); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
   }
