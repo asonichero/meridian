@@ -202,7 +202,9 @@ function build(scene) {
   apply();
   const { sideOf, sidesAt } = K.roomSides(G, { minX: X0, maxX: X1, minZ: ZS, maxZ: ZH, ht: HT }, [floor, couch]);
   // (over the desk, their face from behind it, beside the Captain's chair on the hull side, clear of the terminal)
-  const cams = { table: [['Side', [-1.8, 1.35, 0.35], [0, 0.85, 0.3]], ['Behind', [-0.3, 1.3, -1.4], [0, 0.85, 0.2]], ['Seat', [-0.45, 1.35, -0.7], [0, 0.9, 0.05]],
+  // (standing at the desk, their face from behind it too, low over its top, looking up under their head)
+  const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
+    ['Their face', [-0.5, 0.92, 1.9], [0.0, 1.02, 0.5]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [1.05, 1.9, -2.95], [-0.15, 0.8, -0.15]]], table: [['Side', [-1.8, 1.35, 0.35], [0, 0.85, 0.3]], ['Behind', [-0.3, 1.3, -1.4], [0, 0.85, 0.2]], ['Seat', [-0.45, 1.35, -0.7], [0, 0.9, 0.05]],
     ['Their face', [-0.75, 1.1, 1.75], [0, 0.9, 0.7]], ['Captain', [-0.6, 1.45, 0.2], [0.5, 1.5, 0]], ['Room', [1.6, 1.9, -2.2], [0, 0.8, 0.3]]] };
   return { group: G, spots, key, cams, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Ready Room', private: true,
     bounds: { minX: X0 + 0.15, maxX: X1 - 0.15, minZ: ZS + 0.15, maxZ: ZH - 0.15 }, get low() { return low; }, tick() {} };
