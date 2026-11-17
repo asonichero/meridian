@@ -156,7 +156,10 @@ function build(scene) {
   apply();
   const { sideOf, sidesAt } = K.roomSides(G, { minX: X0, maxX: X1, minZ: Z0, maxZ: Z1, ht: HT }, [floor, crate]);
   let t = 0;
-  return { group: G, spots, key, cams: null, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Reactor',
+  // (at the guard rail: their face from just inside the rail, low, looking back up at them; the room from high in the corner behind them)
+  const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
+    ['Their face', [0.3, 0.92, 1.15], [0.0, 1.05, 0.55]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [2.6, 2.6, -0.9], [0.0, 0.9, 0.1]]] };
+  return { group: G, spots, key, cams, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Reactor',
     bounds: { minX: X0 + 0.2, maxX: X1 - 0.2, minZ: Z0 + 0.2, maxZ: Z1 - 0.2 }, get low() { return low; },
     // (the core's glow breathes, slow, and flickers a little)
     tick(dt) { t += dt; const p = 0.85 + 0.15 * Math.sin(t * 0.9) + 0.04 * Math.sin(t * 7.3); glowO.emissiveIntensity = 5 * p; for (const l of coreL) l.intensity = (low ? 4.5 : 3.0) * p; } };
