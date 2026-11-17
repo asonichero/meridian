@@ -131,7 +131,7 @@ function build(scene) {
     // its lid)
     bench: { at: new V3(kx + 0.05, 0, KZ + 0.13), yaw: Math.PI, turn: 0, seatY: KY, rest: { y: KY, edge: 0.13 } },
     // (standing at the guard rail on the spine-side walkway, facing the core, hands on the top rail, bent to it)
-    wall: { at: new V3(0, 0, -(RR + 0.83)), yaw: 0, support: { kind: 'rail', y: RY, d: 0.83, bend: 0.72 } },
+    wall: { at: new V3(0, 0, -(RR + 0.83)), yaw: 0, support: { kind: 'rail', y: RY, d: 0.83, bend: 0.72, r: 0.025 } },
     after: null,
     watch: [{ at: new V3(-2.2, 0, -3.7), yaw: 0 }, { at: new V3(2.3, 0, -3.5), yaw: 0 }, { at: new V3(3.4, 0, -1.9), yaw: 0 }, { at: new V3(3.2, 0, 2.3), yaw: 0 },
       { at: new V3(0.4, 0, 3.6), yaw: 0 }, { at: new V3(-3.6, 0, -1.6), yaw: 0 }],

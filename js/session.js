@@ -224,6 +224,21 @@ function create(stage, bay, opts) {
   // (the posing helpers, js/poses.js; seated, on the bench)
   const { sc, H, ankleY, setRoot, local, toWorldDir, W_, reach, legTo, footFlat, stand, arms } = root.Poses;
   const seat = (F, at, yaw, o) => root.Poses.seat(F, at, yaw, Object.assign({ seatY: bench.seatY }, o));
+  // A gripping hand pinned to what it holds: placed, then its palm's face (midway between the wrist and the knuckles, out by half the hand's
+  // thickness the way the palm faces) brought onto the surface's plane (n · p = d) and placed again, so it rests on it rather than hovering.
+  // (and laid flat on it: the hand tipped until the wrist and the knuckles lie the same height off the surface, whatever the model's hand does
+  // with the palm's own axis)
+  function pinHand(F, side, Wt, pole, palm, fdir, n, d) {
+    const s = sc(F); palm = palm.clone();
+    for (let k = 0; k < 6; k++) {
+      reach(F, side, Wt, pole, palm, fdir);
+      const a = W_(F, 'hand' + side), b = F.bone['middle1' + side] ? W_(F, 'middle1' + side) : a.clone();
+      const v = b.clone().sub(a).normalize(), tilt = n.dot(v), fl = v.clone().addScaledVector(n, -tilt).normalize();
+      const err = n.dot(a.add(b).multiplyScalar(0.5).addScaledVector(palm, 0.014 * s)) - d;
+      if (Math.abs(err) < 0.002 && Math.abs(tilt) < 0.03) break;
+      Wt.addScaledVector(n, -err); palm.addScaledVector(fl, -tilt).normalize();
+    }
+  }
 
   // ── Placing the subject ──
   // The pelvis over the Captain's right thigh toward the knee, the belly over the left, the chest bending down past it and the hands braced on the
@@ -429,20 +444,20 @@ function create(stage, bay, opts) {
         const low = footLow(F, side); if (low < 0) { at_.y -= low; legTo(F, side, at_, pole_); footFlat(F, side, toWorldDir(F, sx * 0.12, 0, 1).normalize(), heel); }
         flexKnee(F, side, Math.min(1.5, 1.4 * Math.max(0, lk[side])));
       }
-      // the hands: a table's sides, the palm on the top by the edge and the fingers curled round it; a desk's far edge, the fingers over it
+      // the hands: a table's sides, the palm on the top by the edge and the fingers curled down round it; a desk's far edge, the fingers over
+      // it. Pinned there: a smack tightens the grip, it never lifts them off (pushing up, defiant, they push up on them).
       const U = toWorldDir(F, 0, 0, 1), X = toWorldDir(F, 1, 0, 0);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
-        const off = clamp(armUp[side], 0, 1) * (1 - uK);
         let Wt, palm, fdir;
         if (table.grip === 'far') {
-          fdir = U.clone().addScaledVector(UP, -0.6).normalize(); palm = UP.clone().negate().addScaledVector(U, 0.3).normalize();
-          Wt = inFrame(table.at, table.yaw, sx * 0.2 * s, tTop + 0.012, table.d + table.len - 0.02).addScaledVector(U, -0.07 * s).addScaledVector(UP, 0.02 + 0.05 * off);
+          fdir = U.clone().addScaledVector(UP, -0.6).normalize(); palm = UP.clone().negate().addScaledVector(U, 0.15).normalize();
+          Wt = inFrame(table.at, table.yaw, sx * 0.2 * s, tTop + 0.03, table.d + table.len - 0.02).addScaledVector(U, -0.07 * s);
         } else {
-          fdir = X.clone().multiplyScalar(sx).addScaledVector(U, 0.35).addScaledVector(UP, -0.25).normalize(); palm = UP.clone().negate();
-          Wt = inFrame(table.at, table.yaw, sx * (table.w / 2 - 0.035), tTop + 0.014, table.d + 0.5 * s).addScaledVector(fdir, -0.06 * s).addScaledVector(UP, 0.02 + 0.06 * off);
+          fdir = X.clone().multiplyScalar(sx).addScaledVector(U, 0.3).addScaledVector(UP, -0.35).normalize(); palm = UP.clone().negate();
+          Wt = inFrame(table.at, table.yaw, sx * (table.w / 2 - 0.035), tTop + 0.03, table.d + 0.5 * s).addScaledVector(fdir, -0.06 * s);
         }
-        reach(F, side, Wt, X.clone().multiplyScalar(sx).addScaledVector(UP, 0.5).normalize(), palm, fdir);
-        F.grip(side, clamp(0.45 + 0.35 * g - 0.4 * off, 0.1, 0.9), 0.05, 0.6);
+        pinHand(F, side, Wt, X.clone().multiplyScalar(sx).addScaledVector(UP, 0.5).normalize(), palm, fdir, UP, tTop);
+        F.grip(side, clamp(0.62 + 0.3 * g, 0.4, 0.95), 0.05, 0.6);
         F.bone['clav' + side].rotation.z += sx * 0.1 * Math.max(0, shr);
       }
     } else {
@@ -459,6 +474,16 @@ function create(stage, bay, opts) {
       F.bone.neck.rotation.set(0.25 + 0.25 * sub - 0.3 * dfy - 0.7 * hd - 0.15 * ar - 0.4 * rise - 0.2 * gK - 0.2 * uK, 0.06 * Math.sin(t * 1.3 + ph[0]) * dd * R.ff + 0.75 * gK, 0.12 * gK);
       F.bone.hips.rotation.x -= 0.25 * rise;
       F.root.updateMatrixWorld(true);
+      // (a step in, if their arms won't reach what they're to hold from where they stand: the short and the long-bodied alike keep their
+      // hands on it)
+      let stepIn = 0;
+      { const tw = toWorldDir(F, 0, 0, 1), arm = (F.bone.foreArmL.position.length() + F.bone.handL.position.length()) * s * 0.92;
+        for (const [side, sx] of [['L', 1], ['R', -1]]) {
+          const sh = W_(F, 'upperArm' + side), T = local(F, sx * 0.24 * s, sup.y, sup.d - (sup.kind === 'wall' ? 0.06 : 0.07)), dv = T.y - sh.y;
+          const dh = T.clone().sub(sh).dot(tw), dl = T.clone().sub(sh).addScaledVector(tw, -dh).setY(0).length(), want = Math.sqrt(Math.max(0, arm * arm - dv * dv - dl * dl));
+          stepIn = Math.max(stepIn, dh - want);
+        }
+        stepIn = clamp(stepIn, 0, 0.4); if (stepIn > 0) { F.root.position.addScaledVector(tw, stepIn); F.root.updateMatrixWorld(true); } }
       const stamp = sp.stamp.to(0, dt);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
         const st_ = side === J.side ? Math.max(0, stamp) : 0, pd = side === 'L' ? Math.max(0, pedal) : Math.max(0, -pedal);
@@ -470,23 +495,24 @@ function create(stage, bay, opts) {
       }
       // the hands on what they hold: over a rail, palms down on it, the fingers wrapped over its far side, the wrists a hand's length back toward
       // them; on a counter, palms flat on its top just past the edge, the fingers forward; on a wall, palms flat on it at shoulder height, the
-      // fingers up. A hand coming off it lifts clear.
+      // fingers up. Pinned there: a smack tightens the grip, it doesn't lift them off.
       const toWall = toWorldDir(F, 0, 0, 1), hk = sc(F);
       for (const [side, sx] of [['L', 1], ['R', -1]]) {
-        const off = clamp(armUp[side], 0, 1);
-        let Wt, palm, fdir, hold = null;
+        let Wt, palm, fdir, hold = null, n = UP, d = sup.y;
         if (sup.kind === 'edge') {
           fdir = toWall.clone(); palm = UP.clone().negate(); hold = 0.18;
-          Wt = local(F, sx * 0.22 * s, sup.y, sup.d + 0.07).addScaledVector(fdir, -0.07 * hk - 0.03 * off).addScaledVector(UP, 0.028 + 0.05 * off);
+          Wt = local(F, sx * 0.22 * s, sup.y, sup.d - stepIn + 0.07).addScaledVector(fdir, -0.07 * hk).addScaledVector(UP, 0.028);
         } else if (sup.kind === 'wall') {
           fdir = UP.clone().addScaledVector(toWall, -0.1).normalize(); palm = toWall.clone(); hold = 0.12;
-          Wt = local(F, sx * 0.24 * s, sup.y, sup.d - 0.015).addScaledVector(fdir, -0.07 * hk).addScaledVector(toWall, -0.04 * off);
+          Wt = local(F, sx * 0.24 * s, sup.y, sup.d - stepIn - 0.015).addScaledVector(fdir, -0.07 * hk);
+          n = toWall.clone().negate(); d = n.dot(local(F, 0, sup.y, sup.d - stepIn));
         } else {
           fdir = toWall.clone().addScaledVector(UP, -0.25).normalize(); palm = UP.clone().negate().addScaledVector(toWall, 0.25).normalize();
-          Wt = local(F, sx * 0.25 * s, sup.y, sup.d).addScaledVector(fdir, -0.07 * hk - 0.03 * off).addScaledVector(UP, 0.036 + 0.05 * off);
+          Wt = local(F, sx * 0.25 * s, sup.y, sup.d - stepIn).addScaledVector(fdir, -0.07 * hk).addScaledVector(UP, 0.036);
+          d = sup.y + (sup.r || 0.018);      // (the rail's top)
         }
-        reach(F, side, Wt, toWorldDir(F, sx * 1, -0.6, -0.2).normalize(), palm, fdir);
-        F.grip(side, hold == null ? clamp((0.72 + 0.2 * g) * (1 - 0.3 * P.rel.comfort) - 0.7 * off, 0.1, 1) : clamp(hold + 0.25 * g - 0.1 * off, 0.05, 0.6), 0.05, 0.7);      // (the more at ease, the looser)
+        pinHand(F, side, Wt, toWorldDir(F, sx * 1, -0.6, -0.2).normalize(), palm, fdir, n, d);
+        F.grip(side, hold == null ? clamp((0.72 + 0.2 * g) * (1 - 0.3 * P.rel.comfort), 0.3, 1) : clamp(hold + 0.25 * g, 0.05, 0.6), 0.05, 0.7);      // (the more at ease, the looser)
         F.bone['clav' + side].rotation.z += sx * 0.12 * Math.max(0, shr);
       }
     }

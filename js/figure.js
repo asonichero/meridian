@@ -1275,7 +1275,7 @@ function tickFace(F, dt) {
   // (his scrotum: with gravity alone, from hanging toward forward; face down across a lap it swings forward, out of the way between the thighs)
   if (F.bone.sexS) {
     const R = F.resp, b = F.bone.sexS; b.parent.getWorldQuaternion(_sq); _sv.set(0, -1, 0).applyQuaternion(_sq.invert());
-    const want = Math.max(clamp(Math.atan2(_sv.z, -_sv.y), 0, 1.3), F.tuck ? 2.1 : 0);
+    const want = Math.max(clamp(Math.atan2(_sv.z, -_sv.y), 0, 2.0), F.tuck ? 2.1 : 0);      // (bent over a table, past a right angle: it still hangs straight down)
     R.angS = (R.angS || 0) + (want - (R.angS || 0)) * (1 - Math.exp(-dt * 2.5)); b.rotation.x = -R.angS;
     // (and tucked, drawn up into the crotch and forward, swung up in front: from behind, between the thighs, at most a sliver of it deep in the
     // gap, nothing hanging back where a stroke could land)
@@ -1397,14 +1397,39 @@ function prepare(sx, gltf, M) {
       }
       g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
     }
+    // (a garment's crotch, between the legs: shared between the thighs across a hand's width of the middle, rather than going over from one to
+    // the other at the midline itself; as built, the lowered briefs and trousers split there, and the gusset tore open as the legs parted)
+    if (name !== 'Body' && BIx.thighL != null && BIx.thighR != null) {
+      const tL = BIx.thighL, tR = BIx.thighR; let changed = false;
+      for (let i = 0; i < n; i++) {
+        const x = p.getX(i); if (Math.abs(x) > 0.065) continue;
+        let kL = -1, kR = -1, wL = 0, wR = 0;
+        for (let k = 0; k < 4; k++) { if (idx[i * 4 + k] === tL) { kL = k; wL = wt[i * 4 + k]; } else if (idx[i * 4 + k] === tR) { kR = k; wR = wt[i * 4 + k]; } }
+        const tot = wL + wR; if (tot < 0.3) continue;
+        const u = clamp((x + 0.06) / 0.12, 0, 1), t = u * u * (3 - 2 * u);
+        const slot = () => { let m = -1; for (let k = 0; k < 4; k++) if (k !== kL && k !== kR && (m < 0 || wt[i * 4 + k] < wt[i * 4 + m])) m = k; return m; };      // (the lightest other)
+        if (kL < 0) { kL = slot(); idx[i * 4 + kL] = tL; }
+        if (kR < 0) { kR = slot(); idx[i * 4 + kR] = tR; }
+        wt[i * 4 + kL] = tot * t; wt[i * 4 + kR] = tot * (1 - t);
+        const sum = wt[i * 4] + wt[i * 4 + 1] + wt[i * 4 + 2] + wt[i * 4 + 3]; if (sum > 0) for (let k = 0; k < 4; k++) wt[i * 4 + k] /= sum;
+        changed = true;
+      }
+      if (changed) { g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4)); }
+    }
     if (name === 'Body' && sx === 'm' && part && g.attributes._ink) {
-      const ink_ = g.attributes._ink, S_ = [], B_ = [], sb = BIx.sex;
-      // (and finest of all where it bends as it lifts, the blend at its root, and close round it: there the shell folds out through the skin)
-      const wsex = i => { let w = 0; for (let k = 0; k < 4; k++) if (idx[i * 4 + k] === sb) w += wt[i * 4 + k]; return w; };
-      for (let i = 0; i < n; i++) { if (part.getX(i) > 0.5) S_.push(i); if (sb != null) { const w = wsex(i); if (w > 0.02 && w < 0.98) B_.push(i); } }
+      const ink_ = g.attributes._ink, S_ = [], B_ = [], sb = BIx.sex, ssb = BIx.sexS, inS = new Uint8Array(n);
+      // (and finest of all where it bends as it lifts, the blend at its root, and close round it: there the shell folds out through the skin;
+      // the scrotum the same, on its own bone though not marked as the sex, and finest where it blends into the body as it swings)
+      const wOn = (i, b) => { let w = 0; for (let k = 0; k < 4; k++) if (idx[i * 4 + k] === b) w += wt[i * 4 + k]; return w; };
+      for (let i = 0; i < n; i++) {
+        const ws_ = ssb != null ? wOn(i, ssb) : 0;
+        if (part.getX(i) > 0.5 || ws_ > 0.3) { S_.push(i); inS[i] = 1; }
+        if (sb != null) { const w = wOn(i, sb); if (w > 0.02 && w < 0.98) B_.push(i); }
+        if (ws_ > 0.02 && ws_ < 0.9) B_.push(i);
+      }
       for (let i = 0; i < n; i++) {
         let f = 0.4;
-        if (part.getX(i) <= 0.5) {
+        if (!inS[i]) {
           const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
           if (Math.abs(x) > 0.13 || y < L.crotch - 0.2 || y > L.crotch + 0.12) continue;
           let d = 1; for (const j of S_) { const dx = p.getX(j) - x, dy = p.getY(j) - y, dz = p.getZ(j) - z, dd = dx * dx + dy * dy + dz * dz; if (dd < d) d = dd; }
