@@ -59,37 +59,42 @@ function staging(stage, bay, o) {
 }
 
 // The Proctor at work, correcting the Captain: as a player would run it. The position by how much is owed (a little: hands on the desk;
-// more: over the desk; most: across its knee on the couch); runs of a few with a short pause between, soothing in the pauses only once
-// they're close to the edge, and never for pushing back; trousers down once it's begun if more's owed, briefs too if most is; the thighs as
-// well toward the end when most is owed. It stops at what's owed, or at the edge, whichever comes first: it watches the edge as the Captain does. Twice it pauses for the Captain's
-// response (ask(i)): taking it shortens what's left and softens it; pushing back lengthens it and firms it; silence, it checks in and goes on.
+// more: over the desk; most: across its knee on the couch); what's owed is how far it takes them (a little, to flinching; more, to
+// struggling; most, close to the edge; never past it), the pace and strength firmer the more it is; runs with a short pause between,
+// soothing in the pauses only once they're close to the edge, and never for pushing back; trousers down once it's begun if more's owed,
+// briefs too from halfway; the thighs as well toward the end when most is owed. Twice it pauses for the Captain's response (ask(i)):
+// taking it brings the goal in; pushing back takes it further (never past the edge) and firmer; silence, it checks in and goes on.
 const positionFor = v => (v.severity < 0.34 ? 'wall' : v.severity < 0.67 ? 'table' : 'otk');
 function driver(ses, v, o) {
-  const st = { mood: 'accept', target: Math.round(12 + 30 * v.severity), asked: 0, waiting: false, dressed: 0, pause: 1.6, runStart: 0, runLen: 6, done: false };
+  // (what's owed, as how far it takes them: a little, to flinching; more, to struggling; most, close to the edge; never past it. The pace and
+  // strength firmer the more is owed.)
+  const st = { mood: 'accept', goal: clamp(0.4 + 0.6 * v.severity, 0.35, 0.98), cap: 160, asked: 0, waiting: false, dressed: 0, pause: 1.6, runStart: 0, runLen: 8, done: false };
   const position = positionFor(v);
-  ses.set({ pace: 1, strength: clamp(0.85 + 0.35 * v.severity, 0.75, 1.25), area: 'sitspot', side: 'alt', soothe: false });
+  ses.set({ pace: clamp(1.0 + 0.5 * v.severity, 1, 1.5), strength: clamp(1.0 + 0.5 * v.severity, 1, 1.5), area: 'sitspot', side: 'alt', soothe: false });
   function update(dt) {
     const c = ses.current; if (st.done || !c || ses.st.phase !== 'turn' || ses.st.word || ses.st.ending) return;
     if (ses.busy || st.waiting) return;
-    const hits = c.hits, D = ses.distress();
-    if (st.asked < 2 && hits >= Math.max(2, st.target * [0.15, 0.6][st.asked])) { st.waiting = true; ses.run(false); ses.set({ soothe: false }); const i = st.asked++; if (o.ask) o.ask(i); return; }
+    const hits = c.hits, D = ses.distress(), k = D / st.goal;
+    // (twice it waits on the Captain: once it's begun, and again partway there)
+    if (st.asked < 2 && (st.asked === 0 ? hits >= 4 : k >= 0.55)) { st.waiting = true; ses.run(false); ses.set({ soothe: false }); const i = st.asked++; if (o.ask) o.ask(i); return; }
     if (st.dressed === 0 && hits >= 3 && v.severity >= 0.3) { st.dressed = 1; ses.run(false); ses.dress({ bottoms: 'down' }); return; }
-    if (st.dressed === 1 && hits >= st.target * 0.4 && v.severity >= 0.65) { st.dressed = 2; ses.run(false); ses.dress({ under: 'down' }); return; }
-    if (v.severity >= 0.65 && hits >= st.target * 0.75 && ses.st.area !== 'thighs') ses.set({ area: 'thighs' });
-    if (hits >= st.target || D > 1.0) { st.done = true; ses.run(false); ses.set({ soothe: true }); setTimeout(() => ses.endTurn(), 2400); return; }
-    // (a short pause between runs, and the hand only resting there; soothing only once it's close to the edge, and not for pushing back)
+    if (st.dressed === 1 && k >= 0.3 && v.severity >= 0.5) { st.dressed = 2; ses.run(false); ses.dress({ under: 'down' }); return; }
+    if (v.severity >= 0.65 && k >= 0.75 && ses.st.area !== 'thighs') ses.set({ area: 'thighs' });
+    if (D >= st.goal || hits >= st.cap) { st.done = true; ses.run(false); ses.set({ soothe: true }); setTimeout(() => ses.endTurn(), 2400); return; }
+    // (a short pause between runs, the hand only resting there; soothing only once it's close to the edge, and not for pushing back)
     if (ses.st.running) {
-      if (hits - st.runStart >= st.runLen) { ses.run(false); st.pause = st.mood === 'defy' ? 0.9 : 1.4 + 0.6 * Math.random(); if (st.mood !== 'defy' && D > 0.75) ses.set({ soothe: true }); }
+      if (hits - st.runStart >= st.runLen) { ses.run(false); st.pause = st.mood === 'defy' ? 0.8 : 1.2 + 0.5 * Math.random(); if (st.mood !== 'defy' && D > 0.8) ses.set({ soothe: true }); }
     } else {
       st.pause -= dt;
-      if (st.pause <= 0) { ses.set({ soothe: false }); st.runStart = hits; st.runLen = 5 + Math.floor(Math.random() * 4); ses.run(true); }
+      if (st.pause <= 0) { ses.set({ soothe: false }); st.runStart = hits; st.runLen = 7 + Math.floor(Math.random() * 5); ses.run(true); }
     }
   }
+  // (taking it: a little less; pushing back: further, and firmer, though never past the edge; silence: as it was)
   function respond(kind) {
-    st.mood = kind; st.waiting = false; st.pause = 1.4;
-    const c = ses.current, left = st.target - (c ? c.hits : 0);
-    if (kind === 'accept') st.target -= Math.round(left * 0.2);
-    if (kind === 'defy') { st.target += Math.round(left * 0.3); ses.set({ strength: clamp(ses.st.strength + 0.15, 0.75, 1.4) }); if (c) c.def = Math.max(c.def, 0.6); }
+    st.mood = kind; st.waiting = false; st.pause = 1.2;
+    const c = ses.current;
+    if (kind === 'accept') st.goal = Math.max(0.3, st.goal - 0.1);
+    if (kind === 'defy') { st.goal = Math.min(0.98, st.goal + 0.15); ses.set({ strength: clamp(ses.st.strength + 0.15, 1, 1.6) }); if (c) c.def = Math.max(c.def, 0.6); }
   }
   return { update, respond, position, get mood() { return st.mood; }, get done() { return st.done; } };
 }

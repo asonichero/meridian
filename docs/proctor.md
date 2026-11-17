@@ -92,12 +92,13 @@ corner; deferential, to one side and a step back. As a voice, the Captain is alo
 - **Before hard light, or not cleared:** an order, a reset or a demerit, put as its leaning puts things.
 - **Hard light and cleared, authoritative:** it holds the Captain to account, with the roles reversed:
   - **How much:** what's owed decides the position (a little: hands on the desk; more: over the desk; most: across its knee on the couch).
-    It also decides how long it goes on and how firmly, whether the trousers come down (and the briefs, if most is owed), and the thighs at
-    the end.
-  - **The Proctor runs it:** runs of a few with short pauses between, soothing only once the Captain is close to the edge. It stops at
-    what's owed or at the edge, whichever comes first.
-  - **What the player decides:** only how the Captain takes it, twice as it goes. Taking it shortens what's left and softens it. Pushing back
-    lengthens it, firms it, and puts some fight in the Captain. Silence, and it checks in and carries on.
+    It also decides how far it takes the Captain: a little, to flinching; more, to struggling; most, close to the edge, never past it. The
+    more that's owed, the firmer the pace and strength. More owed brings the trousers down; from halfway, the briefs; and most owed brings
+    the thighs in at the end.
+  - **The Proctor runs it:** runs with short pauses between, soothing only once the Captain is close to the edge. It stops when it's taken
+    them as far as what's owed.
+  - **What the player decides:** only how the Captain takes it, twice as it goes. Taking it brings the goal in. Pushing back takes it
+    further, though never past the edge, firms it, and puts some fight in the Captain. Silence, and it checks in and carries on.
   - **The Captain's word:** the one control the player has besides those choices. It stops everything at once.
   - **After:** it gives the Captain aftercare on the couch, the player choosing the Captain's words, and an instruction for tomorrow from the
     day's report.
