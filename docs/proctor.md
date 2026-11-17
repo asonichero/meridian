@@ -94,7 +94,8 @@ corner; deferential, to one side and a step back. As a voice, the Captain is alo
   - **How much:** what's owed decides the position (a little: hands on the desk; more: over the desk; most: across its knee on the couch).
     It also decides how long it goes on and how firmly, whether the trousers come down (and the briefs, if most is owed), and the thighs at
     the end.
-  - **The Proctor runs it:** runs of a few, soothing in the pauses. It stops at what's owed, and always short of the edge.
+  - **The Proctor runs it:** runs of a few with short pauses between, soothing only once the Captain is close to the edge. It stops at
+    what's owed or at the edge, whichever comes first.
   - **What the player decides:** only how the Captain takes it, twice as it goes. Taking it shortens what's left and softens it. Pushing back
     lengthens it, firms it, and puts some fight in the Captain. Silence, and it checks in and carries on.
   - **The Captain's word:** the one control the player has besides those choices. It stops everything at once.
