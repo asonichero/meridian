@@ -1275,7 +1275,7 @@ function tickFace(F, dt) {
   // (his scrotum: with gravity alone, from hanging toward forward; face down across a lap it swings forward, out of the way between the thighs)
   if (F.bone.sexS) {
     const R = F.resp, b = F.bone.sexS; b.parent.getWorldQuaternion(_sq); _sv.set(0, -1, 0).applyQuaternion(_sq.invert());
-    const want = Math.max(clamp(Math.atan2(_sv.z, -_sv.y), 0, 2.0), F.tuck ? 2.1 : 0);      // (bent over a table, past a right angle: it still hangs straight down)
+    const want = Math.max(clamp(Math.atan2(_sv.z, -_sv.y), 0, 1.1), F.tuck ? 2.1 : 0);      // (bent over a table, it hangs back of the shaft, which it can't swing through)
     R.angS = (R.angS || 0) + (want - (R.angS || 0)) * (1 - Math.exp(-dt * 2.5)); b.rotation.x = -R.angS;
     // (and tucked, drawn up into the crotch and forward, swung up in front: from behind, between the thighs, at most a sliver of it deep in the
     // gap, nothing hanging back where a stroke could land)
