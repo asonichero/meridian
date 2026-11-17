@@ -1,10 +1,11 @@
 // Project Meridian — the Captain's quarters (docs/ship.md: port, forward, beside the Ready Room, a connecting door between them so the
 // Captain reaches the bridge in seconds without crossing the spine). 5.5 m along the ship by 6 m from the spine to the hull. Made, like the
 // crew's cabins, for someone who'll live in it for decades (the ship's steel bones, warm surfaces, light kept to the ship's day), and for the
-// one person aboard who is never off duty: a bridge repeater over the bed, a command terminal on a desk facing the room, a locked cabinet for
-// what only the Captain can release, and a sitting area (a settee, a low table, an armless chair) for talking to someone in private.
-//   Fore wall: the connecting door to the Ready Room, toward the spine; the desk free-standing in front of the wall, the Captain's chair
-//   behind it, facing the room. Hull side: the bed, a double, its head on the fore wall, the repeater over it; aft of it, the head and shower
+// one person aboard who is never off duty: a bridge repeater over the bed, a locked cabinet for what only the Captain can release, and a
+// sitting area (a settee, a low table, an armless chair) for talking to someone in private. Personal, not formal: command itself, and the
+// formal business of duty, are the Ready Room's (docs/ship.md); here the desk is a writing desk.
+//   Fore wall: the connecting door to the Ready Room, toward the spine; a writing desk free-standing in front of the wall, its chair behind
+//   it, facing the room. Hull side: the bed, a double, its head on the fore wall, the repeater over it; aft of it, the head and shower
 //   behind one door. Spine side: the door onto the spine, forward; built-in storage; the command locker in the aft corner. Aft: the sitting
 //   area, under a view panel.
 // Private, as the crew's cabins: nobody watches a correction here.
@@ -20,7 +21,7 @@ const K = root.SuitBay.kit, Q = root.Quarters.kit, rnd = K.rnd, speckle = K.spec
 const X0 = -2.75, X1 = 2.75, ZS = -3, ZH = 3, HT = 2.45;      // fore and aft walls, the spine side, the hull, height
 // the bed (a double: from the fore wall to BX1, from BZ to the hull), its mattress's top; the desk (its front edge at DX1, from DZ0 to DZ1),
 // its top; the wet room's partition (from WX0 aft, at WZ); the settee against the aft wall (from SZ0 to SZ1)
-const BX1 = X0 + 2.1, BZ = ZH - 1.5, MT = 0.5, DX0 = X0 + 0.75, DX1 = X0 + 1.45, DZ0 = -0.85, DZ1 = 0.65, DY = 0.76, WX0 = -0.25, WZ = 1.35, SZ0 = -1.95, SZ1 = -0.35;
+const BX1 = X0 + 2.1, BZ = ZH - 1.5, MT = 0.5, DX0 = X0 + 0.85, DX1 = X0 + 1.45, DZ0 = -0.65, DZ1 = 0.45, DY = 0.76, WX0 = -0.25, WZ = 1.35, SZ0 = -1.95, SZ1 = -0.35;
 
 // ── Painted textures (the rest from the crew's cabins) ──
 const carpetNavy = K.canvasTex(256, 256, (c, w, h) => {
@@ -39,11 +40,11 @@ const repeaterTex = K.canvasTex(256, 192, (c, w, h) => {
   c.strokeStyle = 'rgba(90,216,224,0.5)'; c.beginPath(); c.arc(w - 46, h - 46, 30, 0, 7); c.stroke(); c.beginPath(); c.moveTo(w - 46, h - 46); c.lineTo(w - 46 + 22, h - 46 - 20); c.stroke();
   c.fillStyle = 'rgba(90,216,224,0.07)'; for (let y = 0; y < h; y += 4) c.fillRect(0, y, w, 1);
 });
-const commandTex = K.canvasTex(320, 200, (c, w, h) => {
-  c.fillStyle = '#0a1214'; c.fillRect(0, 0, w, h); c.strokeStyle = '#3a3420'; c.lineWidth = 4; c.strokeRect(4, 4, w - 8, h - 8);
-  c.fillStyle = '#e8b04a'; c.font = '600 16px monospace'; c.fillText('COMMAND · CAPTAIN', 16, 30);
+const slateTex = K.canvasTex(256, 176, (c, w, h) => {
+  c.fillStyle = '#0c1416'; c.fillRect(0, 0, w, h); c.strokeStyle = '#3a3420'; c.lineWidth = 4; c.strokeRect(4, 4, w - 8, h - 8);
+  c.fillStyle = '#e8b04a'; c.font = '600 14px monospace'; c.fillText('PERSONAL', 14, 26);
   c.fillStyle = 'rgba(90,216,224,0.75)'; c.font = '13px monospace';
-  for (const [i, s] of ['SHIP\'S LOG          DAY 1,231', 'STANDING ORDERS      12', 'CREW                 6 ABOARD', '  ASHDOWN · VARGA · LINDQVIST', '  RUEL · HADDAD · OKAFOR', 'CORRECTIONS LOG      —'].entries()) c.fillText(s, 16, 58 + i * 21);
+  for (const [i, s] of ['SHIP\'S LOG     READ', 'NOTES          3', 'READING        p.212', 'SHIP DAY       1,231'].entries()) c.fillText(s, 14, 54 + i * 22);
   c.fillStyle = 'rgba(90,216,224,0.07)'; for (let y = 0; y < h; y += 4) c.fillRect(0, y, w, 1);
 });
 
@@ -137,21 +138,26 @@ function build(scene) {
   box(0.12, 0.16, 0.02, std({ color: srgb('#1a1e20'), roughness: 0.4 }), LX + 0.2, 1.25, ZS + 0.57, { detail: true }); box(0.04, 0.012, 0.01, glowG, LX + 0.2, 1.31, ZS + 0.58, { noCast: true });
   box(0.03, 0.22, 0.03, brass, LX + 0.28, 1.0, ZS + 0.58, { detail: true });
 
-  // ── The desk: free-standing in front of the fore wall, facing the room, its front edge where they stand; the Captain's chair behind it; the
-  // command terminal on it, a brass lamp, the log ──
-  const dz = (DZ0 + DZ1) / 2, dl = DZ1 - DZ0, dd = DX1 - DX0;
-  box(dd, 0.05, dl, deskWood, (DX0 + DX1) / 2, DY - 0.025, dz);
-  for (const z of [DZ0 + 0.05, DZ1 - 0.05]) box(dd - 0.06, DY - 0.05, 0.05, deskWood, (DX0 + DX1) / 2, (DY - 0.05) / 2, z);
-  box(0.03, 0.42, dl - 0.1, deskWood, DX1 - 0.12, DY - 0.26, dz);      // (its modesty panel, set back from the front)
-  box(0.02, 0.012, dl, brass, DX1 + 0.002, DY - 0.035, dz, { noCast: true, detail: true });
-  box(0.04, 0.3, 0.04, steelDark, DX0 + 0.18, DY + 0.15, dz - 0.15); box(0.03, 0.3, 0.48, steelDark, DX0 + 0.2, DY + 0.38, dz - 0.15);
-  plane(0.44, 0.27, new THREE.MeshBasicMaterial({ map: commandTex }), DX0 + 0.218, DY + 0.38, dz - 0.15, 0, Math.PI / 2);
-  cyl(0.07, 0.08, 0.025, brass, DX0 + 0.2, DY + 0.012, DZ1 - 0.2, null, 16, { detail: true }); cyl(0.008, 0.008, 0.32, brass, DX0 + 0.2, DY + 0.17, DZ1 - 0.2, null, 8, { detail: true });
-  const dShade = cyl(0.05, 0.1, 0.1, std({ color: srgb('#2e4a3e'), roughness: 0.4, metalness: 0.2, side: THREE.DoubleSide }), DX0 + 0.26, DY + 0.33, DZ1 - 0.2, [0, 0, -0.5], 16, { detail: true }); dShade.castShadow = false;
-  box(0.22, 0.03, 0.3, std({ color: srgb('#5a2a1e'), roughness: 0.7 }), DX0 + 0.42, DY + 0.015, dz + 0.25, { detail: true });      // (the log)
-  // (the Captain's chair behind it)
-  box(0.5, 0.08, 0.5, leather, X0 + 0.42, 0.48, dz); box(0.08, 0.55, 0.46, leather, X0 + 0.17, 0.8, dz);
-  cyl(0.03, 0.03, 0.42, steel, X0 + 0.42, 0.22, dz, null, 10); cyl(0.24, 0.26, 0.02, steelDark, X0 + 0.42, 0.01, dz, null, 20);
+  // ── A personal writing desk, free-standing in front of the fore wall, facing the room, its front edge where they stand: a slim top on four
+  // tapered legs, a shallow drawer; the Captain's slate on it (the log read after hours; command itself is the Ready Room's), a brass lamp,
+  // the log, a pen; a writing chair behind it ──
+  const dz = (DZ0 + DZ1) / 2, dl = DZ1 - DZ0, dd = DX1 - DX0, dx = (DX0 + DX1) / 2;
+  box(dd, 0.035, dl, deskWood, dx, DY - 0.018, dz);
+  box(dd - 0.08, 0.1, dl - 0.08, deskWood, dx, DY - 0.085, dz);
+  box(0.012, 0.06, 0.4, deskWood, DX1 - 0.035, DY - 0.085, dz, { noCast: true }); box(0.02, 0.012, 0.1, brass, DX1 - 0.025, DY - 0.085, dz, { detail: true });
+  for (const [x, z] of [[DX0 + 0.05, DZ0 + 0.05], [DX0 + 0.05, DZ1 - 0.05], [DX1 - 0.05, DZ0 + 0.05], [DX1 - 0.05, DZ1 - 0.05]]) cyl(0.022, 0.014, DY - 0.13, deskWood, x, (DY - 0.13) / 2, z, null, 8);
+  box(0.02, 0.01, dl, brass, DX1 + 0.002, DY - 0.03, dz, { noCast: true, detail: true });
+  box(0.1, 0.02, 0.2, steelDark, DX0 + 0.14, DY + 0.01, dz - 0.22); box(0.02, 0.18, 0.28, steelDark, DX0 + 0.12, DY + 0.1, dz - 0.22, { ry: 0 });
+  plane(0.25, 0.17, new THREE.MeshBasicMaterial({ map: slateTex }), DX0 + 0.132, DY + 0.1, dz - 0.22, 0, Math.PI / 2);
+  cyl(0.06, 0.07, 0.022, brass, DX0 + 0.14, DY + 0.011, DZ1 - 0.15, null, 16, { detail: true }); cyl(0.007, 0.007, 0.3, brass, DX0 + 0.14, DY + 0.16, DZ1 - 0.15, null, 8, { detail: true });
+  const dShade = cyl(0.045, 0.09, 0.09, std({ color: srgb('#2e4a3e'), roughness: 0.4, metalness: 0.2, side: THREE.DoubleSide }), DX0 + 0.19, DY + 0.31, DZ1 - 0.15, [0, 0, -0.5], 16, { detail: true }); dShade.castShadow = false;
+  box(0.2, 0.03, 0.28, std({ color: srgb('#5a2a1e'), roughness: 0.7 }), dx + 0.06, DY + 0.015, dz + 0.12, { detail: true });      // (the log)
+  cyl(0.005, 0.005, 0.14, std({ color: srgb('#1a1a1a'), roughness: 0.3, metalness: 0.5 }), dx + 0.06, DY + 0.035, dz - 0.08, [0, 0.6, Math.PI / 2], 6, { detail: true });
+  // (the writing chair behind it: wood, a leather seat, a low back)
+  const WCX = X0 + 0.48;
+  box(0.44, 0.05, 0.44, leather, WCX, 0.46, dz); box(0.44, 0.03, 0.44, deskWood, WCX, 0.42, dz);
+  for (const [ox, oz] of [[-0.19, -0.19], [-0.19, 0.19], [0.19, -0.19], [0.19, 0.19]]) box(0.035, 0.42, 0.035, deskWood, WCX + ox, 0.21, dz + oz);
+  box(0.035, 0.42, 0.4, deskWood, WCX - 0.2, 0.68, dz); box(0.03, 0.1, 0.4, leather, WCX - 0.18, 0.78, dz);
 
   // ── The sitting area aft: a settee against the aft wall under the view panel, a low table, the armless chair facing it; a rug, a floor lamp,
   // a plant ──
@@ -187,13 +193,13 @@ function build(scene) {
   key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; key.shadow.radius = 4; key.shadow.camera.near = 0.2; key.shadow.camera.far = 6; G.add(key); G.add(key.target);
   const fill = new THREE.PointLight(srgb('#f6eee2'), 1.6, 7, 2); fill.position.set(1.4, HT - 0.3, -0.8); G.add(fill);
   const bedL = new THREE.PointLight(srgb('#ffbc78'), 1.2, 3, 2); bedL.position.set(X0 + 0.35, 1.3, bcz); G.add(bedL);
-  const deskL = new THREE.PointLight(srgb('#ffc890'), 1.0, 2.5, 2); deskL.position.set(DX0 + 0.35, DY + 0.3, DZ1 - 0.25); G.add(deskL);
+  const deskL = new THREE.PointLight(srgb('#ffc890'), 1.0, 2.5, 2); deskL.position.set(DX0 + 0.28, DY + 0.28, DZ1 - 0.18); G.add(deskL);
   const lampL = new THREE.PointLight(srgb('#ffb070'), 1.0, 3.5, 2); lampL.position.set(X1 - 0.3, 1.45, SZ1 + 0.3); G.add(lampL);
   const coveS = new THREE.PointLight(srgb('#ffd8a8'), 1.0, 3.5, 2); coveS.position.set(sx, HT - 0.12, ZS + 0.4); G.add(coveS);
   const viewL = new THREE.PointLight(srgb('#cfe0f0'), 0.8, 3, 2); viewL.position.set(X1 - 0.5, VY, sz); G.add(viewL);
   const doorL = new THREE.PointLight(srgb('#5ad8e0'), 0.4, 1.6, 2); doorL.position.set(MX, 2.0, ZS + 0.3); G.add(doorL);
 
-  // ── Where things happen; their cameras where the room needs its own (the low table, the desk, its lamp and terminal in the way) ──
+  // ── Where things happen; their cameras where the room needs its own (the low table, the desk and its lamp in the way) ──
   const otkCams = face => [['Side', [0.05, 1.2, 2.4], [0.05, 0.76, 0.3]], ['Behind', [-1.4, 1.3, 0.67], [-0.05, 0.72, 0.3]], ['Seat', [-0.46, 1.5, 1.07], [-0.1, 0.82, 0.35]],
     ['Their face', ...face], ['Captain', [0.3, 0.92, 0.95], [0.0, 1.18, 0.1]], ['Room', [1.5, 1.9, 1.5], [0.0, 0.7, 0.25]]];
   const spots = {
@@ -241,7 +247,7 @@ function build(scene) {
   const setLow = on => { low = !!on; apply(); }, setTime = t => { time = t === 'night' ? 'night' : 'day'; apply(); };
   apply();
   const { sideOf, sidesAt } = K.roomSides(G, { minX: X0, maxX: X1, minZ: ZS, maxZ: ZH, ht: HT }, [floor, bed]);
-  // (at the desk, their face from across it, low over its top, looking up under their head; the Captain's side of it, clear of the terminal and the lamp)
+  // (at the desk, their face from across it, low over its top, looking up under their head; beside the writing chair, clear of the slate and the lamp)
   const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.2, -1.25], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.25, -0.75], [0, 0.88, 0]],
     ['Their face', [0.5, 0.92, 1.9], [0.0, 1.02, 0.5]], ['Captain', [-0.4, 1.42, -0.25], [0.43, 1.5, -0.07]], ['Room', [1.05, 1.9, -2.95], [-0.15, 0.8, -0.15]]] };
   return { group: G, spots, key, cams, setLow, setTime, get time() { return time; }, sideOf, sidesAt, name: 'Captain’s quarters', private: true,
