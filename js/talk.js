@@ -9,7 +9,8 @@
 //   left is taken by itself; several, the player chooses how it ends). An option's `after` is its label once something has been explored
 //   ("Just looking in." becomes "I'll let you get on.").
 //
-//   await Talk.play(steps, { line(step, hold) → Promise, choose(options, prompt) → Promise<option>, took(option) })
+//   await Talk.play(steps, { line(step, hold) → Promise, choose(options, prompt) → Promise<option>, took(option), act(step) → Promise })
+//   ({ act: 'leave' | 'seat', id }: something done in the scene between lines)
 //   hold: 'click' (wait for the player) or 'choices' (the choices come up under it). prompt: what the box says over a choice that comes
 //   first, with nothing said before it.
 (function (root) {
@@ -19,6 +20,7 @@ const hasChoice = s => !!(s && s.choose && s.choose.length);
 async function play(steps, io, tail) {
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i], last = i === steps.length - 1, after = last ? tail : hasChoice(steps[i + 1]) ? 'choices' : 'click';
+    if (s.act) { if (io.act) await io.act(s); continue; }      // (something done in the scene, between lines: someone leaving, someone taking their station)
     if (s.choose) {
       if (!s.choose.length) continue;
       if (s.explore) await explore(s, io, after, i === 0);

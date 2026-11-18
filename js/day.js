@@ -2,7 +2,8 @@
 // watch (the bridge crew in turn), and what the Captain has done so far today. Logic only: the page (day.html) draws it on the deck plan
 // (js/deckplan.js) and plays each visit (js/visit.js, js/daylines.js).
 //
-// The clock moves with what the Captain does, never in real time: a step of the routine takes its own time, any other visit forty minutes.
+// The clock moves with what the Captain does, never in real time: a step of the routine takes its own time; otherwise arriving somewhere takes
+// a few minutes, and what the Captain does there its own (talking to someone, watching them at work, looking something over).
 // The Proctor suggests what's next; where the Captain goes is the player's choice. A step not begun by the end of its window is missed (on an
 // ordinary day nothing follows from that but the Proctor noting it at the evening report).
 //
@@ -78,7 +79,9 @@ const STEPS = [
   { id: 'lights', at: T.lights, until: 24 * 60 + 60, room: 'captain', dur: 0, name: 'Lights down' },
 ];
 const STEP = Object.fromEntries(STEPS.map(s => [s.id, s]));
-const LEAD = 30, VISIT = 40, LATE = 23 * 60 + 30;      // (how early a step can be gone to; an ordinary visit; when the Proctor sends the Captain to bed)
+const LEAD = 30, LATE = 23 * 60 + 30;      // (how early a step can be gone to; when the Proctor sends the Captain to bed)
+// (minutes: arriving somewhere off the routine; talking to someone; watching them at it; looking something over)
+const VISIT = 5, TALK = 10, OBSERVE = 5, LOOK = 2;
 
 function fresh(day) {
   return { v: 1, day: day || 1, t: T.wake, done: {}, missed: {}, rounds: {}, seen: {}, visits: {}, style: { warm: 0, formal: 0, brisk: 0 }, log: [], over: false };
@@ -115,8 +118,9 @@ function settle(s) {
     if (st.rooms && st.rooms.some(x => s.rounds[x])) s.done[st.id] = 'part'; else s.missed[st.id] = true;
   }
 }
-// Pass the time (in the Captain's quarters or at the desk, waiting on the next thing): the clock on to `to`.
+// Pass the time (in the Captain's quarters or at the desk, waiting on the next thing): the clock on to `to`. Spend: the clock on by `m`.
 function wait(s, to) { s.t = Math.max(s.t, to); settle(s); }
+function spend(s, m) { s.t += m; settle(s); }
 // What the Proctor suggests next: the next step still open (the rounds, the first of their rooms not yet seen), or, between steps, the
 // Captain's own time until the next one (and, late, bed).
 function next(s) {
@@ -135,7 +139,7 @@ const light = t => (t >= T.wake && t < T.report ? 'day' : 'night');
 // Who the Captain hasn't seen yet today, among those awake and about (for the Proctor to suggest, in the Captain's own time).
 const unseen = s => IDS().filter(id => !s.seen[id] && !whereIs(id, s.t, s.day).room.startsWith('cabin:'));
 
-const api = { ROOMS, CABIN, WATCH, STATION, EVENING, T, STEPS, STEP, LEAD, VISIT, LATE, watchFor, whereIs, present, fresh, resolve, start, finish, settle, wait, next, late, light, unseen, clock, spoken };
+const api = { ROOMS, CABIN, WATCH, STATION, EVENING, T, STEPS, STEP, LEAD, VISIT, TALK, OBSERVE, LOOK, LATE, spend, watchFor, whereIs, present, fresh, resolve, start, finish, settle, wait, next, late, light, unseen, clock, spoken };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.Day = api;
 })(typeof window !== 'undefined' ? window : globalThis);

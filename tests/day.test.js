@@ -41,10 +41,10 @@ test('following the Proctor’s suggestions takes the day through to lights down
   assert.deepEqual(Object.keys(s.missed), []);
 });
 
-test('a step left past its window is missed; a visit takes forty minutes', () => {
+test('a step left past its window is missed; arriving somewhere off the routine takes a few minutes', () => {
   const s = Day.fresh(1); s.t = Day.T.breakfast;
   const r = Day.resolve(s, 'reactor'); assert.equal(r.kind, 'visit');
-  Day.start(s, r); Day.finish(s, r, 'reactor'); assert.equal(s.t, Day.T.breakfast + 40);
+  Day.start(s, r); Day.finish(s, r, 'reactor'); assert.equal(s.t, Day.T.breakfast + Day.VISIT);
   Day.wait(s, Day.T.briefing + 1); assert.ok(s.missed.breakfast);
   assert.equal(Day.resolve(s, 'mess').kind, 'visit');
 });
@@ -71,6 +71,7 @@ test('every scene has its lines filled in and its choices whole, for every watch
           // (lines of inquiry always offer a way to end the conversation, and something to ask besides)
           if (st.explore) { assert.ok(st.choose.some(c => c.end), `${id}: no way to end it, day ${day}`); assert.ok(st.choose.some(c => !c.end), `${id}: nothing to ask, day ${day}`); }
           for (const c of st.choose) { assert.ok(c.label && !/[{}]/.test(c.label), c.label); check(c.then); } continue; }
+        if (st.act) { assert.ok(x.here.includes(st.id), `${id}: ${st.act} ${st.id}, who isn't there (day ${day})`); continue; }
         assert.ok(st.text && !/[{}]|undefined/.test(st.text), `${id}: ${st.text}`);
         assert.ok(st.who === 'proctor' || st.who === 'captain' || x.here.includes(st.who) || st.radio, `${id}: ${st.who} speaks but isn't there (day ${day})`);
       } };
@@ -79,13 +80,38 @@ test('every scene has its lines filled in and its choices whole, for every watch
   }
 });
 
-test('an ordinary visit has something for everyone there, at any hour', () => {
-  for (const room of Object.keys(Day.ROOMS)) for (let t = Day.T.wake; t < Day.T.lights; t += 30) {
-    const x = { day: 1, t, w0: 'pilot', w1: 'comms', here: Day.present(room, t, 1).filter(i => !Day.whereIs(i, t, 1).asleep), seen: {}, state: Day.fresh(1) };
-    const steps = DayLines.visit(room, x); assert.ok(steps.length, `${room} ${Day.clock(t)}`);
-    const check = list => { for (const st of list) {
-      if (st.choose) { if (st.explore) assert.ok(st.choose.some(c => c.end), `${room} ${Day.clock(t)}: no way to end it`); for (const c of st.choose) check(c.then || []); continue; }
-      assert.ok(st.text && !/[{}]|undefined/.test(st.text), `${room} ${Day.clock(t)}: ${st.text}`); } };
-    check(steps);
+test('anyone in a room can be talked to and watched, at any hour; an empty working room says where its owner is', () => {
+  const lines = (list, where) => { for (const st of list) {
+    if (st.choose) { if (st.explore) assert.ok(st.choose.some(c => c.end), `${where}: no way to end it`); for (const c of st.choose) lines(c.then || [], where); continue; }
+    assert.ok(st.text && !/[{}]|undefined/.test(st.text), `${where}: ${st.text}`); } };
+  for (const day of [1, 2, 3]) for (const room of Object.keys(Day.ROOMS)) for (let t = Day.T.wake; t < 24 * 60; t += 15) {
+    const x = { day, t, w0: Day.watchFor(day), w1: Day.watchFor(day + 1), here: Day.present(room, t, day).filter(i => !Day.whereIs(i, t, day).asleep), seen: {}, state: Day.fresh(day) };
+    const where = `${room} ${Day.clock(t)} day ${day}`;
+    lines(DayLines.arrive(room, x), where);
+    if (!x.here.length && ['reactor', 'hydro', 'medbay'].includes(room)) assert.ok(DayLines.arrive(room, x).length, `${where}: nothing said in an empty room`);
+    for (const id of x.here) { lines(DayLines.talk(id, x), where + ' talk ' + id); const o = DayLines.observe(id, x); assert.equal(o.length, 1); lines(o, where + ' watch ' + id); }
+  }
+});
+
+test('every room has things to look at, each with something to see, placed inside the room', () => {
+  for (const room of Object.keys(Day.ROOMS)) {
+    const obs = DayLines.objects(room); assert.ok(obs.length, room);
+    for (const o of obs) {
+      assert.ok(o.label && o.look, `${room} ${o.id}`); assert.equal(o.at.length, 3);
+      const x = { t: 600, viewport: false }; assert.ok((typeof o.look === 'function' ? o.look(x) : o.look).length > 10);
+      if (o.use) assert.ok((typeof o.use.text === 'function' ? o.use.text(x) : o.use.text).length > 5, `${room} ${o.id} use`);
+    }
+  }
+});
+
+test('the morning briefing: the night watch hands over, leaves, and only then do the stations report', () => {
+  for (const day of [1, 2, 3]) {
+    const x = { day, t: Day.T.briefing, w0: Day.watchFor(day), w1: Day.watchFor(day + 1), here: Day.present('bridge', Day.T.briefing, day), seen: {}, state: Day.fresh(day) };
+    const steps = DayLines.scene('briefing', x), left = steps.findIndex(s => s.act === 'leave');
+    assert.ok(left > 0 && steps[left].id === x.w0);
+    assert.ok(steps.slice(0, left).some(s => s.who === x.w0), 'the watch reports before leaving');
+    assert.ok(!steps.slice(left).some(s => s.who === x.w0), 'and says nothing after');
+    assert.ok(steps.slice(left).filter(s => s.radio).length === 3, 'the compartments report after');
+    assert.ok(/deck plan/.test(steps[steps.length - 1].text), 'the Proctor leaves the rounds to the Captain');
   }
 });

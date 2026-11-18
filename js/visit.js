@@ -13,6 +13,8 @@ const THREE = root.THREE, V3 = THREE.Vector3, UP = new V3(0, 1, 0);
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const fwdOf = yaw => new V3(Math.sin(yaw), 0, Math.cos(yaw)), leftOf = yaw => new V3(Math.cos(yaw), 0, -Math.sin(yaw));
 const face = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
+// (two hands on a surface at e, either side of it from where they face: the left hand to their left)
+const handsAt = (e, yaw, w) => [e.clone().addScaledVector(leftOf(yaw), w), e.clone().addScaledVector(leftOf(yaw), -w)];
 
 // Where everyone is, room by room. here: the crew in the room; kind: 'meal' | 'off' | 'work' | 'wake' | 'desk' | 'room'.
 function layout(room, bay, here, o) {
@@ -40,15 +42,19 @@ function layout(room, bay, here, o) {
     // off duty: the couple on the sofa, side by side; whoever else at the table
     const sofa = S.after, onSofa = here.filter(id => id === 'pilot' || id === 'engineer'), rest = here.filter(id => !onSofa.includes(id));
     onSofa.forEach((id, i) => out.people.push({ id, at: i ? sofa.beside.clone() : sofa.at.clone(), yaw: sofa.yaw, how: 'seat', seatY: sofa.seatY, lean: -0.05 }));
-    rest.forEach((id, i) => { const at = new V3(1.4 + i * 0.8, 0, -0.5), e = at.clone().add(new V3(0, 0.755, 0.47)); out.people.push({ id, at, yaw: 0, how: 'seat', seatY: 0.45, hands: [e.clone().add(new V3(0.17, 0, 0)), e.clone().add(new V3(-0.17, 0, 0))], lean: 0.12 }); });
+    rest.forEach((id, i) => { const at = new V3(1.4 + i * 0.8, 0, -0.44), e = at.clone().add(new V3(0, 0.755, 0.37)); out.people.push({ id, at, yaw: 0, how: 'seat', seatY: 0.45, hands: handsAt(e, 0, 0.19), lean: 0.1 }); });
     out.cap = onSofa.length ? { at: new V3(2.6, 0, -0.95), yaw: Math.PI, how: 'stand' } : { at: new V3(1.8, 0, 0.0), yaw: face(new V3(1.8, 0, 0), out.people[0].at), how: 'stand' };
     return out;
   }
   if (room === 'medbay' && here.length) {
     // (Ruel at their desk against the fore wall, the baselines terminal in front of them; the Captain standing beside it, turned to them)
     const at = new V3(-1.62, 0, -1.75), e = new V3(-2.02, 0.765, -1.75);
-    here.forEach((id, i) => out.people.push(i ? { id, at: new V3(-1.0, 0, -2.3), yaw: -Math.PI / 4, how: 'stand' } : { id, at, yaw: -Math.PI / 2, how: 'seat', seatY: 0.49, hands: [e.clone().add(new V3(0, 0, 0.18)), e.clone().add(new V3(0, 0, -0.18))], lean: 0.08 }));
-    const c = new V3(-1.45, 0, -0.85); out.cap = { at: c, yaw: face(c, at), how: 'stand' }; out.camFrom = 'front';
+    here.forEach((id, i) => out.people.push(i ? { id, at: new V3(-1.0, 0, -2.3), yaw: -Math.PI / 4, how: 'stand' } : { id, at, yaw: -Math.PI / 2, how: 'seat', seatY: 0.49, hands: handsAt(e, -Math.PI / 2, 0.18), lean: 0.08 }));
+    const c = new V3(-1.45, 0, -0.85); out.cap = { at: c, yaw: face(c, at), how: 'stand' };
+    // (the cameras inside the room (from beyond the desk they'd come through the fore wall, and the desk and terminal with it would go): over
+    // the Captain's shoulder, Ruel turned to them from the terminal; the desk from its end)
+    out.cams = [['Two-shot', new V3(-0.3, 1.68, -0.95), new V3(-1.9, 1.08, -1.8)], ['Ruel', new V3(-1.15, 1.5, -0.95), new V3(-1.66, 1.2, -1.75)], ['Desk', new V3(-2.25, 1.62, -2.85), new V3(-1.55, 1.3, -1.35)],
+      ['You', new V3(-1.95, 1.5, -1.55), new V3(-1.45, 1.55, -0.85)], ['Room', new V3(1.7, 2.1, 0.9), new V3(-1.6, 0.9, -1.5)]];
     return out;
   }
   if (room === 'reactor' || room === 'hydro' || room === 'medbay') {
@@ -64,14 +70,14 @@ function layout(room, bay, here, o) {
   if (room === 'ready') {
     // (the desk: the Captain in the chair behind it, hands on its top)
     const at = new V3(1.36, 0, 0.6), e = new V3(0.94, 0.765, 0.6);
-    out.cap = { at, yaw: -Math.PI / 2, how: 'seat', seatY: 0.545, hands: [e.clone().add(new V3(0, 0, -0.17)), e.clone().add(new V3(0, 0, 0.17))], lean: 0.1 };
+    out.cap = { at, yaw: -Math.PI / 2, how: 'seat', seatY: 0.545, hands: handsAt(e, -Math.PI / 2, 0.17), lean: 0.1 };
     return out;
   }
   if (room === 'captain') {
     // (waking and turning in, on the edge of the bed; otherwise at the writing desk)
     if (o.kind === 'wake') { const b = S.seats.bed; out.cap = { at: b.at.clone(), yaw: b.yaw, how: 'seat', seatY: b.seatY, lean: 0.12 }; return out; }
     const at = new V3(-2.25, 0, -0.1), e = new V3(-1.84, 0.765, -0.1);
-    out.cap = { at, yaw: Math.PI / 2, how: 'seat', seatY: 0.485, hands: [e.clone().add(new V3(0, 0, 0.17)), e.clone().add(new V3(0, 0, -0.17))], lean: 0.1 };
+    out.cap = { at, yaw: Math.PI / 2, how: 'seat', seatY: 0.485, hands: handsAt(e, Math.PI / 2, 0.17), lean: 0.1 };
     return out;
   }
   // (anywhere else (the suit bay): the Captain in front of the suit alcoves, looking them over; anyone there at the watch spots)

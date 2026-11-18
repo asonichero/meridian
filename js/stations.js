@@ -9,6 +9,8 @@
 //
 //   const s = Stations.create(stage, bridge, { captain, crew: [{ id, sex, outfit }], proctor: { sex, presence } })
 //   s.update(dt) · s.camera(i, ms) → its name · s.cams · s.st.cam · s.people [{ id, f, station }] · s.captain · s.proctor · s.dispose()
+//   crew: { across: true } stands across the plot table from the Captain (handing over the watch); s.leave(id) · s.seat(id) (to their own
+//   station) · s.focus(id) (the Captain's eyes on whoever's speaking) · s.expr(id, e)
 (function (root) {
 'use strict';
 const THREE = root.THREE, V3 = THREE.Vector3, UP = new V3(0, 1, 0);
@@ -21,11 +23,13 @@ function create(stage, bay, opts) {
   // (each officer at their own station; anyone else in a jump seat, in turn)
   const OWN = { pilot: S.helm, comms: S.sensors, scientist: S.survey };
   let j = 0;
+  // (or, handing over the watch, standing across the plot table from the Captain: p.across)
   const people = (opts.crew || []).map(p => {
     const f = Fg.make(C.figureSpec(p.id, p.sex, p.outfit)); scene.add(f.root); f.setExpr('calm');
-    const own = OWN[p.id];
-    return { id: p.id, f, station: !!own, spot: own || S.jump[j++ % S.jump.length], ph: Math.random() * 20, glance: 0, glanceAt: null, next: 3 + Math.random() * 6 };
+    const own = OWN[p.id], across = !!(p.across && S.plot.across);
+    return { id: p.id, f, across, station: !across && !!own, spot: across ? S.plot.across : own || S.jump[j++ % S.jump.length], ph: Math.random() * 20, glance: 0, glanceAt: null, next: 3 + Math.random() * 6 };
   });
+  const acrossOf = () => people.find(Q => Q.across);
   captain.setExpr('calm');
   const st = { t: 0, cam: 0 };
   const pro = opts.proctor && opts.proctor.presence && opts.proctor.presence !== 'voice' && S.proctor ? opts.proctor : null;
@@ -41,6 +45,14 @@ function create(stage, bay, opts) {
     st.t += dt;
     for (const Q of people) {
       const F = Q.f, sp = Q.spot, s = sc(F);
+      // (across the plot table, handing over: standing square to it, hands on its edge, eyes on the Captain)
+      if (Q.across) {
+        const c = W_(captain, 'head'), h = W_(F, 'head'), d = Math.atan2(c.x - sp.at.x, c.z - sp.at.z) - sp.yaw, a = Math.atan2(Math.sin(d), Math.cos(d));
+        P.stand(F, sp.at, sp.yaw, { weight: 0.35 + 0.1 * Math.sin(st.t * 0.2 + Q.ph), wide: 0.13, lean: 0.08, look: clamp(Math.atan2(h.y - c.y, Math.hypot(c.x - h.x, c.z - h.z)) * 0.8, -0.3, 0.4), headYaw: clamp(a, -1, 1) * 0.7, arms: null });
+        const lf = toWorldDir(F, 1, 0, 0), fw = toWorldDir(F, 0, 0, 1), ed = sp.edge.slice().sort((p1, p2) => p2.dot(lf) - p1.dot(lf));
+        for (const [side, sx, at] of [['L', 1, ed[0]], ['R', -1, ed[1]]]) flat(F, side, at.clone().addScaledVector(fw, 0.02 * s), fw.clone().addScaledVector(lf, -sx * 0.2).normalize(), toWorldDir(F, sx * 0.8, -0.5, -0.5).normalize());
+        F.root.updateMatrixWorld(true); continue;
+      }
       // (now and then a glance: officers up at the viewscreen or back toward the Captain; the jump seats round the room)
       Q.next -= dt; if (Q.next <= 0) { Q.glance = 1.4 + Math.random() * 1.6; Q.glanceAt = Math.random() < 0.55 ? 'screen' : 'captain'; Q.next = 5 + Math.random() * 9; }
       Q.glance = Math.max(0, Q.glance - dt); const g = Q.glance > 0 ? Math.min(1, Q.glance * 2, (3.2 - Q.glance) * 2) : 0;
@@ -65,8 +77,12 @@ function create(stage, bay, opts) {
     }
     // the Captain at the plot table: standing square to it, weight on one leg, leaning a little over it, a hand either side on its edge;
     // looking down at the plot, and now and then up over the stations to the screen
-    const cs = sc(captain), up = 0.5 + 0.5 * Math.sin(st.t * 0.17);
-    P.stand(captain, S.plot.at, S.plot.yaw, { weight: 0.45, wide: 0.15, lean: 0.12, look: 0.5 - 0.42 * up * up, headYaw: 0.08 * Math.sin(st.t * 0.21), arms: null });
+    // (with someone across the table, or someone speaking, the eyes on them)
+    const cs = sc(captain), up = 0.5 + 0.5 * Math.sin(st.t * 0.17), them = people.find(Q => Q.id === st.focus) || acrossOf();
+    let cLook = 0.5 - 0.42 * up * up, cYaw = 0.08 * Math.sin(st.t * 0.21);
+    if (them && st.t > 0) { const t = W_(them.f, 'head'), h = W_(captain, 'head'), d = Math.atan2(t.x - S.plot.at.x, t.z - S.plot.at.z) - S.plot.yaw, a = Math.atan2(Math.sin(d), Math.cos(d));
+      cYaw = clamp(a, -1.2, 1.2) * 0.75; cLook = clamp(Math.atan2(h.y - t.y, Math.hypot(t.x - h.x, t.z - h.z)) * 0.8 + 0.1, -0.2, 0.5); }
+    P.stand(captain, S.plot.at, S.plot.yaw, { weight: 0.45, wide: 0.15, lean: 0.12, look: cLook, headYaw: cYaw, arms: null });
     const left = toWorldDir(captain, 1, 0, 0), fwd = toWorldDir(captain, 0, 0, 1), edge = S.plot.edge.slice().sort((a, b) => b.dot(left) - a.dot(left));
     for (const [side, sx, at] of [['L', 1, edge[0]], ['R', -1, edge[1]]]) flat(captain, side, at.clone().addScaledVector(fwd, 0.02 * cs), fwd.clone().addScaledVector(left, -sx * 0.2).normalize(), toWorldDir(captain, sx * 0.8, -0.5, -0.5).normalize());
     captain.root.updateMatrixWorld(true);
@@ -79,12 +95,26 @@ function create(stage, bay, opts) {
     }
   }
 
-  const cams = bay.stationCams.concat(proctor ? [['Proctor', [S.proctor.at.x - 1.75, 1.55, S.proctor.at.z - 0.9], [S.proctor.at.x, 1.45, S.proctor.at.z]]] : []);
+  // (the cameras; with someone across the plot table, the two of them first: from the side, over the Captain's shoulder, over theirs)
+  const cams = [];
+  function makeCams() {
+    const ac = acrossOf(), A = S.plot.across, c = S.plot.at;
+    cams.length = 0;
+    if (ac) { const mz = (A.at.z + c.z) / 2; cams.push(['Across', [2.4, 1.6, mz + 0.35], [0, 1.35, mz]], [C.ROSTER[ac.id].short, [0.42, 1.68, c.z + 0.45], [0, 1.5, A.at.z]], ['You', [-0.42, 1.65, A.at.z - 0.45], [0, 1.55, c.z]]); }
+    cams.push(...bay.stationCams);
+    if (proctor) cams.push(['Proctor', [S.proctor.at.x - 1.75, 1.55, S.proctor.at.z - 0.9], [S.proctor.at.x, 1.45, S.proctor.at.z]]);
+  }
+  makeCams();
+  // (whoever was across the table going: off the bridge, or to their own station)
+  function leave(id) { const i = people.findIndex(Q => Q.id === id); if (i < 0) return; scene.remove(people[i].f.root); people.splice(i, 1); makeCams(); st.cam = 0; }
+  function seat(id) { const Q = people.find(q => q.id === id); if (!Q) return; Q.across = false; Q.station = !!OWN[id]; Q.spot = OWN[id] || S.jump[j++ % S.jump.length]; makeCams(); st.cam = 0; }
+  const focus = id => { st.focus = id; };
+  const expr = (id, e) => { const Q = people.find(q => q.id === id); if (Q && e) Q.f.setExpr(e); else if (id === 'captain' && e) captain.setExpr(e); };
   function camera(i, ms) { st.cam = ((i % cams.length) + cams.length) % cams.length; const [, p, l] = cams[st.cam]; stage.go(new V3(...p), new V3(...l), ms == null ? 900 : ms); return cams[st.cam][0]; }
   function update(dt) { pose(dt); captain.tick(dt); for (const Q of people) Q.f.tick(dt); if (proctor) proctor.tick(dt); }
   function dispose() { scene.remove(captain.root); for (const Q of people) scene.remove(Q.f.root); if (proctor) scene.remove(proctor.root); }
   pose(0);
-  return { st, captain, people, proctor, cams, camera, update, dispose };
+  return { st, captain, people, proctor, cams, camera, update, dispose, leave, seat, focus, expr };
 }
 
 root.Stations = { create };

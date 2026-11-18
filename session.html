@@ -490,7 +490,7 @@ let sayTimer = null, sayQueue = Promise.resolve();
 // for a click on the box, or Space or Enter; a click while it's typing finishes it first), or 'choices' (it stays up, the choices under it).
 let advance = null;
 // (who's who, by id: a crew member, the Captain, or the Proctor)
-const nameOf = id => (id === 'captain' ? 'Captain' : id === 'proctor' ? 'The Proctor' : Crew.ROSTER[id].short);
+const nameOf = id => (id === 'captain' ? 'Captain' : id === 'proctor' ? 'The Proctor' : Crew.ROSTER[id].name);
 const pitchOf = id => (id === 'captain' ? (cfg.captain.sex === 'm' ? 140 : 200) : id === 'proctor' ? Crew.pitch('proctor', cfg.proctor.sex) : Crew.pitch(id, cfg.sex[id]));
 const wordOf = id => (id === 'captain' ? cfg.captainWord : id === 'proctor' ? Crew.PROCTOR.word : Crew.ROSTER[id].word);
 function showLine(who, id, text, hold) {
@@ -580,7 +580,14 @@ const flip = k => { const c = ses.current; if (!c) return; const s = c.f.state; 
 $('cTop').onclick = () => ses && ses.dress({ top: ses.current.f.state.top === 'up' ? 'down' : 'up' });
 $('cBot').onclick = () => ses && ses.dress({ bottoms: ses.current.f.state.bottoms === 'up' ? 'down' : 'up' });
 $('cUnd').onclick = () => ses && ses.dress({ under: ses.current.f.state.under === 'up' ? 'down' : 'up' });
-$('say').addEventListener('click', e => { if (advance && !e.target.closest('button')) advance(); });
+// (a click anywhere moves a line along: the box, the view (not the end of a drag turning it), anything that isn't a control)
+let downAt = null;
+addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; }, true);
+addEventListener('click', e => {
+  if (!advance || e.target.closest('button, input, select, a, #setup, #summary')) return;
+  if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  advance();
+});
 addEventListener('keydown', e => {
   if (advance && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); advance(); return; }      // (the aftercare's lines: on)
   if (e.target.tagName === 'INPUT') return;

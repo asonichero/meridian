@@ -22,8 +22,11 @@ blender -b --python tools/blender/build_figures.py -- f m       # → models/mer
 
 The game from its beginning: an ordinary day aboard, before the shear (docs/day.md). The player chooses the Captain, who they're drawn to and the
 Proctor's form, then lives a day of the ship's routine, from waking at 06:30 to lights down at 22:00:
-- **The deck plan** (the ship's general arrangement, in a tablet's frame) comes up as each scene ends. It shows the clock, who's where, the
-  day's routine and the Proctor's suggestion of what's next. Choosing a room goes there.
+- **The deck plan** (the ship's general arrangement, in a tablet's frame) shows the clock, who's where, the day's routine and the Proctor's
+  suggestion of what's next. Choosing a room goes there. Before the morning briefing it comes up as each scene ends; after it, the Captain
+  stays in the room until the player moves on, from its button.
+- **In a room:** name tags over the crew (talk to them, or watch what they're doing) and markers on things to look at or use (the
+  viewport opens; the bed turns in, once it's time). Each takes a few minutes of the clock.
 - **Each room is a short scene.** Breakfast, the morning briefing on the bridge, rounds of the working compartments, meals, the desk, the
   evening report, the night watch taking over. Anywhere else is an ordinary visit to whoever's there.
 - **Choices** in each scene, warm, formal or brisk, move the crew's comfort and desire with the Captain. The Proctor keeps the Captain's

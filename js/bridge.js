@@ -274,7 +274,9 @@ function build(scene, opts) {
     // (the bridge crew stay at their posts, each officer at their own, swivelled to it; anyone else in the jump seats)
     watch: [helmS, sensS, survS].map(s => ({ at: s.at, yaw: s.yaw, seatY: s.seatY, swivel: true, for: s.for, chair: s.chair })).concat(jumpS),
     corner: { at: new V3(X0 + 0.45, 0, 2.3), yaw: -Math.PI / 2, next: { base: new V3(0, 0, 0), step: new V3(0, 0, -0.85), yaw: -Math.PI / 2 } },
-    stations: { helm: helmS, sensors: sensS, survey: survS, jump: jumpS, proctor: { at: new V3(PRX, 0, PRZ), yaw: -Math.PI / 2 }, plot: { at: capAt, yaw: Math.PI, edge: [[-0.32, PY + 0.012, PZ + PD / 2 - 0.05], [0.32, PY + 0.012, PZ + PD / 2 - 0.05]].map(a => new V3(...a)) } },
+    stations: { helm: helmS, sensors: sensS, survey: survS, jump: jumpS, proctor: { at: new V3(PRX, 0, PRZ), yaw: -Math.PI / 2 }, plot: { at: capAt, yaw: Math.PI, edge: [[-0.32, PY + 0.012, PZ + PD / 2 - 0.05], [0.32, PY + 0.012, PZ + PD / 2 - 0.05]].map(a => new V3(...a)),
+      // (across it from the Captain, at its fore edge: where the watch hands over, face to face)
+      across: { at: new V3(0, 0, PZ - PD / 2 - 0.42), yaw: 0, edge: [[-0.32, PY + 0.012, PZ - PD / 2 + 0.05], [0.32, PY + 0.012, PZ - PD / 2 + 0.05]].map(a => new V3(...a)) } } },
   };
   // (its cameras: at the plot table, from across the bridge and over the stations; the stations scene's own, as world points)
   const cams = { wall: [['Side', [-1.9, 1.4, -0.05], [0.1, 1.0, 0.1]], ['Behind', [-0.35, 1.25, -1.15], [0, 0.85, 0.15]], ['Seat', [-0.55, 1.3, -0.7], [0, 0.88, 0]],

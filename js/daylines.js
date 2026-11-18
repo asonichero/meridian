@@ -10,8 +10,9 @@
 // ids that have to be there for a line or choice (whoever stood last night's watch is asleep half the day, and the bridge crew take it in turn).
 // {w0}: last night's watch (relieved at the briefing); {w1}: tonight's; {time}: the time, as the Proctor says it.
 //
-//   DayLines.scene(stepId | 'rounds:' + room, ctx) → steps · DayLines.visit(room, ctx) → steps · DayLines.hint(next, ctx) → the Proctor's
-//   suggestion · DayLines.report(ctx) → the evening report · DayLines.close(ctx) → the day's last line
+//   DayLines.scene(stepId | 'rounds:' + room, ctx) → steps · DayLines.arrive(room, ctx) · DayLines.talk(id, ctx) · DayLines.observe(id, ctx)
+//   → steps · DayLines.objects(room) → what's there to look at or use · DayLines.hint(next, ctx) → the Proctor's suggestion ·
+//   DayLines.report(ctx) → the evening report
 (function (root) {
 'use strict';
 const pick = a => (Array.isArray(a) ? a[Math.floor(Math.random() * a.length)] : a);
@@ -20,6 +21,9 @@ const sur = id => (C().ROSTER[id] ? C().ROSTER[id].short : id);
 const fill = (t, x) => t.replace(/\{w0\}/g, sur(x.w0)).replace(/\{w1\}/g, sur(x.w1)).replace(/\{time\}/g, D().spoken(x.t));
 // (a line in each of the bridge crew's voices, for whichever of them it is)
 const per = (o, id) => o[id] || o.any;
+
+const STATION_REPORT = { pilot: 'Helm. Course on plot, deviation point-four degrees. Next burn in forty-one hours.', comms: 'Sensors. No contacts. Dust light. The long-range link is up.',
+  scientist: 'Survey. Baseline calibrated. Three targets queued for the field.' };
 
 // ── The routine ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const SCENES = {
@@ -59,18 +63,15 @@ const SCENES = {
     { who: 'scientist', need: ['scientist'], unless: ['comms'], text: 'Lindqvist sorted the packet on watch. Mail’s in everyone’s queue, yours included.' },
   ],
 
-  // 08:00, the bridge: the morning briefing at the plot table, last night's watch handing over; the others report in from their compartments
-  // (how the Captain relieves the watch: one answer, not a line of inquiry)
+  // 08:00, the bridge: the morning briefing. Last night's watch hands over across the plot table, face to face with the Captain (how the
+  // Captain relieves them: one answer, not a line of inquiry), and goes off to sleep; then the stations report, the bridge crew from their
+  // posts and the compartments over comms; and the Proctor leaves the Captain to begin the rounds when they're ready.
   briefing: x => [
-    { who: 'proctor', text: 'Oh-eight-hundred, Captain. All stations reporting.' },
+    { who: 'proctor', text: 'Oh-eight-hundred, Captain. {w0} has the watch report.' },
     { who: x.w0, text: per({
       pilot: 'Morning, Captain. Quiet night. Two micrometeoroid dings on the shield, both logged, both boring. Helm’s yours.',
       comms: 'Captain. Watch report: nothing on the long-range band but the packet. The array is aligned. I have nothing to add.',
       scientist: 'Captain. An uneventful watch, which I spent recalibrating the survey baseline. Don’t tell Ashdown. The ship is yours.' }, x.w0) },
-    { who: 'engineer', text: 'Reactor, Captain. Sixty-two percent. Thermal loops nominal.', radio: true },
-    { who: 'lifesupport', text: 'Life support’s green. Scrubbers at ninety-four. The wheat says hello.', radio: true },
-    { who: 'medic', text: 'Med bay. Nothing to report, except that everyone’s due their monthly baseline this week. Everyone, Captain.', radio: true },
-    { who: 'proctor', text: 'Course holds. Eleven days to the edge of the Parallax field.' },
     { choose: [
       { label: '“Good watch, {w0}. Get some sleep.”', style: 'warm', fx: { w0: { comfort: 0.04 } }, then: [{ who: x.w0, text: per({
         pilot: 'Bunk. Then lunch. Then I’m flying the boring bits again.', comms: 'Acknowledged. Eight hours, near enough.', scientist: 'If I can stop thinking about the baseline. Yes.' }, x.w0), expr: 'smile' }] },
@@ -79,6 +80,15 @@ const SCENES = {
         pilot: 'Nope. I mean— no, Captain.', comms: 'Nothing that isn’t in the log. I’m thorough.', scientist: 'Only my opinions. They’re in a separate log.' }, x.w0) }] },
     ] },
     { who: 'proctor', text: 'Logged: {w0} relieved at oh-eight-oh-two. The Captain has the ship.' },
+    { act: 'leave', id: x.w0 },
+    { who: 'proctor', text: 'All stations, report.' },
+    // (the bridge crew still here, from their posts: everyone but the watch just gone)
+    ...['pilot', 'comms', 'scientist'].filter(id => id !== x.w0).map(id => ({ who: id, need: [id], text: STATION_REPORT[id] })),
+    { who: 'engineer', text: 'Reactor, Captain. Sixty-two percent. Thermal loops nominal.', radio: true },
+    { who: 'lifesupport', text: 'Life support’s green. Scrubbers at ninety-four. The wheat says hello.', radio: true },
+    { who: 'medic', text: 'Med bay. Nothing to report, except that everyone’s due their monthly baseline this week. Everyone, Captain.', radio: true },
+    { who: 'proctor', text: 'Course holds. Eleven days to the edge of the Parallax field.' },
+    { who: 'proctor', text: 'That’s every station, Captain. Your rounds are on the deck plan, whenever you’re ready to begin them.' },
   ],
 
   // the rounds, any order through the morning: the reactor (Okafor), hydroponics (Haddad), the med bay (Ruel), the suit bay (nobody: the Proctor)
@@ -187,7 +197,7 @@ const SCENES = {
   // 20:00, the Ready Room: the evening report (built from the day: see report())
   report: x => report(x),
 
-  // 21:45, the bridge: tonight's watch takes over from the Captain
+  // 21:45, the bridge: tonight's watch reports across the plot table and takes the ship from the Captain (one answer), then their station
   handover: x => [
     { who: x.w1, text: per({ pilot: 'Ashdown, reporting for the watch, Captain. Fully caffeinated. Possibly over.', comms: 'Lindqvist, reporting for the watch.', scientist: 'Varga, reporting for the watch. Rested, more or less.' }, x.w1) },
     { choose: [
@@ -197,6 +207,8 @@ const SCENES = {
       { label: '“Quiet night.”', style: 'brisk', then: [{ who: x.w1, text: per({ pilot: 'Boring’s good. Night, Captain.', comms: 'That’s the plan. Goodnight, Captain.', scientist: 'One hopes. Goodnight, Captain.' }, x.w1) }] },
     ] },
     { who: 'proctor', text: 'Logged: {w1} has the watch at twenty-one fifty.' },
+    { act: 'seat', id: x.w1 },
+    { who: 'proctor', text: 'Your quarters, Captain, whenever you’re ready.' },
   ],
 
   // 22:00, the Captain's quarters
@@ -232,34 +244,93 @@ const ASK = [
 const WHERE = { bridge: 'on the bridge', mess: 'in the mess', reactor: 'at the reactor', hydro: 'in hydroponics', medbay: 'in the med bay', ready: 'in the Ready Room', suitbay: 'in the suit bay', captain: 'in your quarters' };
 const OWNER = { reactor: 'engineer', hydro: 'lifesupport', medbay: 'medic' };
 function whereNow(id, x) { const w = D().whereIs(id, x.t, x.day); return w.room.startsWith('cabin:') ? (w.asleep ? 'asleep in their cabin' : 'in their cabin') : WHERE[w.room]; }
-function visit(room, x) {
-  const here = x.here;
-  // (the Captain's own rooms, and the suit bay, with nobody there: time to themselves; anywhere else empty, the Proctor says where they are)
-  if (!here.length) {
-    if (room === 'captain') return [{ who: 'proctor', text: 'Your quarters, Captain.' }, { explore: true, choose: [
-      { label: 'Read the log.', style: 'formal', then: [{ who: 'proctor', text: 'The log is as you left it, Captain. Nothing amended.' }] },
-      { label: 'Rest a while.', style: 'warm', rest: 60, end: true, then: [{ who: 'proctor', text: 'An hour. I’ll keep the ship.' }] },
-      { label: 'Back out.', style: 'brisk', end: true, then: [] }] }];
-    if (room === 'ready') return [{ who: 'proctor', text: 'Your desk, Captain.' }, { explore: true, choose: [
-      { label: 'Catch up on reports.', style: 'formal', rest: 30, then: [{ who: 'proctor', text: 'Okafor’s loop figures are in. Inside spec, all three.' }] },
-      { label: 'Back out.', style: 'brisk', end: true, then: [] }] }];
-    if (room === 'suitbay') return [{ who: 'proctor', text: 'The suit bay. Seven suits, sealed and charged.' }];
-    const o = OWNER[room], name = D().ROOMS[room].name;
-    if (o) return [{ who: 'proctor', text: `${name}. Nobody here at this hour, Captain. ${sur(o)} is ${whereNow(o, x)}.` }];
-    if (room === 'bridge') return [{ who: 'proctor', text: 'The bridge, Captain. Nobody on it until the watch. I have the ship.' }];
-    return [{ who: 'proctor', text: `${name}. Nobody here at this hour, Captain.` }];
-  }
-  // (one at a time: the Captain chooses whom to talk to, if there's more than one)
-  const talk = id => {
-    const V = VISIT[id], w = D().whereIs(id, x.t, x.day), again = (x.seen[id] || 0) > 0;
-    return [{ who: id, text: again ? V.again : w.off ? V.off : V.duty, expr: id === 'pilot' ? 'cheeky' : 'calm' },
-      { explore: true, choose: ASK.map(a => ({ label: a.label, after: a.after, end: a.end, style: a.style, fx: { [id]: a.fx }, then: [{ who: id, text: V[a.k], expr: a.k === 'you' ? 'smile' : 'calm' }] })) }];
-  };
-  if (here.length === 1) return talk(here[0]);
-  const names = here.map(sur), list = names.length === 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-  // (each in turn, any of them; or leave them to it)
-  return [{ prompt: `${list} are here.`, explore: true, choose: here.map(id => ({ label: `Talk to ${sur(id)}`, style: null, then: talk(id) })).concat([{ label: 'Leave them to it.', style: 'brisk', end: true, then: [] }]) }];
+// Arriving somewhere off the routine: nothing said if anyone's there (the Captain chooses whom to talk to, or to watch: their name tags);
+// an empty room where someone works, the Proctor says where they are.
+function arrive(room, x) {
+  if (x.here.length) return [];
+  const o = OWNER[room], name = D().ROOMS[room].name;
+  if (o) return [{ who: 'proctor', text: `${name}. Nobody here at this hour, Captain. ${sur(o)} is ${whereNow(o, x)}.` }];
+  if (room === 'bridge') return [{ who: 'proctor', text: 'The bridge, Captain. Nobody on it until the watch. I have the ship.' }];
+  return [];
 }
+// Talking to someone: their greeting (at work, off duty, or again), then how the work's going, how they are, either or both, and an end.
+function talk(id, x) {
+  const V = VISIT[id], w = D().whereIs(id, x.t, x.day), again = (x.seen[id] || 0) > 0;
+  return [{ who: id, text: again ? V.again : w.off ? V.off : V.duty, expr: id === 'pilot' ? 'cheeky' : 'calm' },
+    { explore: true, choose: ASK.map(a => ({ label: a.label, after: a.after, end: a.end, style: a.style, fx: { [id]: a.fx }, then: [{ who: id, text: V[a.k], expr: a.k === 'you' ? 'smile' : 'calm' }] })) }];
+}
+
+// ── Watching someone: what they're doing, as the Captain sees it (later in the story, set against what they say) ─────────────────────────
+// (by what they're about: at their work, at a meal, off duty (with company, or without), keeping the watch)
+const OBSERVE = {
+  scientist: { duty: 'Varga works the survey console, lips moving a little as the numbers scroll, now and then a note on a slate without looking down.',
+    meal: 'Varga eats with a slate propped against a mug, reading, and has to be asked twice to pass the bread.', off: 'Varga has the day’s readings spread across the table, and a cup of tea gone cold beside them.',
+    watch: 'Varga keeps the watch and the survey both, as promised: one eye on each, and the survey getting the better of it.' },
+  engineer: { duty: 'Okafor walks the rail with a hand on it, listening to the core more than looking at it. Twice the hand stops at loop two’s housing.',
+    meal: 'Okafor eats fast, like someone with somewhere to be, and still goes back for seconds.', off: 'Okafor sits on the sofa with a cold tea, eyes closed, not quite asleep.',
+    offWith: 'Okafor has an arm round Ashdown on the sofa, and the far-away look of someone listening to a reactor three compartments away.' },
+  pilot: { duty: 'Ashdown sits loose at the helm, one boot up on the console’s edge, running a docking sim on the side screen for the fun of it.',
+    meal: 'Ashdown talks with a full mouth, hands going, and wins at least one argument a meal.', off: 'Ashdown is sprawled on the sofa, feet up, flicking through something on a slate and laughing at it.',
+    offWith: 'Ashdown is curled into Okafor’s side on the sofa, feet up, half asleep and pretending not to be.',
+    watch: 'Ashdown keeps the watch with a mug in both hands and both feet up, eyes on the screen.' },
+  lifesupport: { duty: 'Haddad works along the racks, touching leaves, murmuring to the beans. The scrubber readout gets a glance every few plants.',
+    meal: 'Haddad watches everyone else try the bread before eating any.', off: 'Haddad sits among the plants doing nothing at all, and looks happier for it.' },
+  comms: { duty: 'Lindqvist has one ear on the long-range band, eyes half closed, a hand resting on the array’s alignment controls.',
+    meal: 'Lindqvist eats in an exact order: the bread, then the rest, then the tea.', off: 'Lindqvist is reading, very still.',
+    watch: 'Lindqvist keeps the watch as if it were the day shift: upright, headphones on, the log open.' },
+  medic: { duty: 'Ruel types up the baselines with two fingers, reading each one back aloud, quietly.', meal: 'Ruel eats slowly and watches the table, the way a doctor does.',
+    off: 'Ruel is reading, glasses down the nose.' },
+};
+function observe(id, x) {
+  const w = D().whereIs(id, x.t, x.day), O = OBSERVE[id], partner = { pilot: 'engineer', engineer: 'pilot' }[id];
+  const k = w.station && w.room === 'bridge' && (x.t < D().T.relieved || x.t >= D().T.handover) ? 'watch' : w.meal ? 'meal' : w.off ? (partner && x.here.includes(partner) && O.offWith ? 'offWith' : 'off') : 'duty';
+  return [{ who: 'observe', id, text: O[k] || O.duty }];
+}
+
+// ── What's in each room to look at, or use: where its marker sits (the room's own frame), how it's named, what the Captain sees in it, and
+// what they can do with it (minutes: the time it takes; kind: what the page does besides); cam: where to look at it from, if not straight on ──────────────────────────────────────────────────
+const OBJECTS = {
+  bridge: [
+    { id: 'plot', label: 'Plot table', at: [0.55, 1.15, 1.0], look: 'The plot: the ship a bright point on its course, the range rings round it, and ahead the Parallax field, a faint grey wash eleven days out.' },
+    { id: 'screen', label: 'Viewscreen', at: [0, 2.05, -3.8], look: 'The forward view from the bow cameras. At this speed the stars crowd ahead into a ring of shifted colour, blue at its heart.' },
+    { id: 'viewport', label: 'Viewport', at: [0, 2.45, 1.0], cam: [[0.55, 1.45, 1.75], [0, 3.7, 1.0]], look: 'The armoured viewport over the plot table, the ship’s one real window, straight up through the shield along the course.',
+      use: { label: x => (x.viewport ? 'Shut the viewport' : 'Open the viewport'), kind: 'viewport', minutes: 1, text: x => (x.viewport ? 'The leaves close over the well.' : 'The armoured leaves draw back. Straight up the well, the course: black, and the faint bend of the stars.') } },
+    { id: 'repeaters', label: 'Repeaters', at: [-3.85, 2.15, 3.8], look: 'The repeaters along the back: reactor core stable, life support scrubbers two of two, the med bay ready, the suit bay sealed.' },
+  ],
+  ready: [
+    { id: 'terminal', label: 'Command terminal', at: [0.78, 1.45, 0.1], look: 'The command terminal: the ship’s log, twelve standing orders, each crew member’s file.',
+      use: { label: 'Catch up on reports', minutes: 30, text: 'Okafor’s loop figures are in. Inside spec, all three; loop two a degree warmer than the others.' } },
+    { id: 'navplot', label: 'Navigation plot', at: [-1.68, 2.1, -1.3], look: 'The navigation plot: the course an arc from home toward the target, the ship two-thirds of the way along it. Under it, the mission timeline.' },
+    { id: 'plaque', label: 'Plaque and model', at: [0, 1.9, 2.85], look: 'A model of the Meridian in brass and grey, and over it the commissioning plaque: “Steady on the line.”' },
+  ],
+  captain: [
+    { id: 'repeater', label: 'Bridge repeater', at: [-2.13, 1.62, 2.9], look: 'The bridge repeater over the bed: heading on plot, the drive coasting, reactor and life support nominal.' },
+    { id: 'desk', label: 'Writing desk', at: [-1.6, 1.15, -0.1], look: 'Your writing desk: the log, a pen, the brass lamp.', use: { label: 'Read the log', minutes: 10, text: 'The log as you left it. Nothing amended, nothing you’d write differently.' } },
+    { id: 'bed', label: 'Bed', at: [-1.7, 0.95, 2.1], look: 'Your bed, made.', use: { label: 'Rest an hour', kind: 'rest', minutes: 60, text: 'You lie down for an hour. The ship hums on without you.' } },
+  ],
+  mess: [
+    { id: 'clocks', label: 'Clocks', at: [6.9, 2.15, -0.1], look: x => `Two clocks over the shelves: the ship’s, at ${D().clock(x.t)}, and Earth’s, running on ahead of it. By Earth’s count you left months longer ago than you remember.` },
+    { id: 'galley', label: 'Galley', at: [-4.6, 1.5, -2.6], look: 'The galley: the cooktop cold between meals, and a kettle that never is.', use: { label: 'Make a cup of tea', minutes: 5, text: 'You make a tea, and drink it standing. It helps.' } },
+  ],
+  reactor: [
+    { id: 'core', label: 'The core', at: [1.1, 2.4, -1.1], look: 'The core, floor to ceiling, banded and glowing. Loud and hot: you can feel it in your teeth.' },
+    { id: 'console', label: 'Engineer’s console', at: [4.2, 1.6, 0], look: 'The Engineer’s console bank: core temperature, coolant, the three loops. Loop two runs a degree warmer than the others.' },
+  ],
+  hydro: [
+    { id: 'racks', label: 'Grow racks', at: [-0.4, 1.75, 1.0], look: 'Rows of grow racks under violet light: beans, greens, the new wheat, the tomatoes not yet turned.' },
+    { id: 'bench', label: 'Garden bench', at: [3.5, 1.0, 0.4], look: 'The bench the crew built, slatted wood among the plants.', use: { label: 'Sit a while', kind: 'rest', minutes: 20, text: 'You sit among the plants for a while. It’s warm, and it smells green.' } },
+  ],
+  medbay: [
+    { id: 'terminal', label: 'Baselines terminal', at: [-2.38, 1.45, -1.85], look: 'Dr. Ruel’s terminal. The crew’s files are the medic’s; the summary reads: all six within range.' },
+    { id: 'monitor', label: 'Vitals monitor', at: [2.15, 2.2, 1.9], look: 'The vitals monitor on its arm, quiet, waiting for someone on the cot.' },
+  ],
+  suitbay: [
+    { id: 'suits', label: 'EVA suits', at: [-1.0, 2.0, -1.95], look: 'Two suits on their frames here, the rest in the lockers. Yours checked and charged.',
+      use: { label: 'Run a seal check on yours', minutes: 5, text: 'The seals hold at full pressure.' } },
+    { id: 'hatch', label: 'Airlock hatch', at: [2.6, 1.95, 0], look: 'The airlock’s inner hatch, sealed. The docking collar beyond it, and nothing docked.' },
+  ],
+};
+const objects = room => OBJECTS[room] || [];
 
 // ── The Proctor between: what it suggests next ─────────────────────────────────────────────────────────────────────────────────────────────
 const HINT = {
@@ -321,13 +392,13 @@ function resolve(steps, x) {
     return out; };
   const go = list => list.filter(ok).map(s => s.choose
     ? { prompt: s.prompt ? fill(s.prompt, x) : null, explore: !!s.explore, choose: s.choose.filter(ok).map(c => Object.assign({}, c, { label: fill(c.label, x), after: c.after ? fill(c.after, x) : undefined, fx: fx(c.fx), then: go(c.then || []) })) }
-    : Object.assign({}, s, { text: fill(s.text, x) }));
+    : s.act ? Object.assign({}, s) : Object.assign({}, s, { text: fill(s.text, x) }));
   return go(steps);
 }
 const scene = (id, x) => resolve((SCENES[id] || (() => []))(x), x);
-const visitSteps = (room, x) => resolve(visit(room, x), x);
+const arriveSteps = (room, x) => resolve(arrive(room, x), x), talkSteps = (id, x) => resolve(talk(id, x), x), observeSteps = (id, x) => resolve(observe(id, x), x);
 
-const api = { SCENES, VISIT, HINT, scene, visit: visitSteps, hint, report, manner, resolve, fill };
+const api = { SCENES, VISIT, OBSERVE, OBJECTS, HINT, scene, arrive: arriveSteps, talk: talkSteps, observe: observeSteps, objects, hint, report, manner, resolve, fill };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 root.DayLines = api;
 })(typeof window !== 'undefined' ? window : globalThis);
