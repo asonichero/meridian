@@ -26,7 +26,7 @@ test('the safe word is said only when it is called', () => {
 test('aftercare: an opening, a choice of approach, an instruction, a last word, for either outcome', () => {
   for (const id of Crew.IDS) for (const outcome of ['done', 'word']) {
     const steps = Lines.after(id, outcome);
-    assert.equal(steps.length, 4); assert.ok(steps[0].text); assert.equal(steps[1].choose.length, 3); assert.equal(steps[2].choose.length, 4); assert.ok(steps[3].text);
+    assert.equal(steps.length, 4); assert.ok(steps[0].text); assert.ok(steps[1].explore); assert.equal(steps[1].choose.filter(c => !c.end).length, 3); assert.equal(steps[1].choose.filter(c => c.end).length, 1); assert.equal(steps[2].choose.length, 4); assert.ok(steps[3].text);
     for (const c of steps[1].choose.concat(steps[2].choose)) for (const s of c.then) assert.ok(s.text && !s.text.includes('{'), id);
   }
 });

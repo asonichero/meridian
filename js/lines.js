@@ -245,13 +245,17 @@ const fill = (t, id) => { const r = root.Crew.ROSTER[id] || WHO[id] || WHO.capta
 function place(id, position) { return fill(pick(PLACE[position] || PLACE.otk), id); }
 function react(id, key) { const R = REACT[id]; if (!R || !R[key]) return null; return fill(pick(R[key]), id); }
 function captain(key, id) { return CAPTAIN[key] ? fill(pick(CAPTAIN[key]), id) : null; }
-// The aftercare conversation, as steps for the page to play: { who: 'subject' | 'captain', text } lines, and { choose: [{ label, then: [...] }] }.
+// The aftercare conversation, as steps for the page to play (js/talk.js): { who: 'subject' | 'captain', text } lines, and { choose: [{ label,
+// then: [...] }] }: what the Captain says, explored (any or all of reassuring them, saying why it mattered, asking how they are), then the
+// instruction for the rest of the shift, one of them.
 // (mood 'unbroken': it ended with their defiance still standing; the safe word's opening comes first all the same)
 function after(id, outcome, mood) {
   const A = AFTER[id], k = outcome === 'word' ? 'word' : mood === 'unbroken' && A.open.unbroken ? 'unbroken' : 'done', open = pick(A.open[k]);
   return [
     { who: 'subject', text: fill(open, id), expr: k === 'word' ? 'sad' : k === 'unbroken' ? (id === 'lifesupport' ? 'sad' : 'defiant') : 'teary' },
-    { choose: APPROACH.map(a => ({ label: a.label, then: [{ who: 'captain', text: fill(pick(a.captain), id) }, { who: 'subject', text: fill(A.reply[a.id], id), expr: a.id === 'reassure' ? 'teary' : a.id === 'explain' ? 'concerned' : 'wistful' }] })) },
+    // (what the Captain says: any of the three, or all, in any order; then on to the instruction)
+    { explore: true, choose: APPROACH.map(a => ({ label: a.label, approach: a.id, then: [{ who: 'captain', text: fill(pick(a.captain), id) }, { who: 'subject', text: fill(A.reply[a.id], id), expr: a.id === 'reassure' ? 'teary' : a.id === 'explain' ? 'concerned' : 'wistful' }] }))
+      .concat([{ label: 'Give them an instruction for the shift', end: true, then: [] }]) },
     { choose: ORDERS.map(o => ({ label: o.label, order: o.id, then: [{ who: 'captain', text: fill(o.captain, id) }, { who: 'subject', text: fill(A.order[o.id], id), expr: 'soft' }] })) },
     { who: 'subject', text: fill(A.close, id), expr: 'soft' },
   ];

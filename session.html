@@ -193,7 +193,7 @@ body.checkin #bar, body.checkin #meter { display: none; }
 
 <script src="vendor/three.min.js"></script><script src="vendor/OrbitControls.js"></script><script src="vendor/postprocessing.js"></script><script src="vendor/GLTFLoader.js"></script>
 <script src="js/pain.js"></script><script src="js/audio.js"></script><script src="js/crew.js"></script><script src="js/lines.js"></script>
-<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/capquarters.js"></script><script src="js/readyroom.js"></script><script src="js/hydroponics.js"></script><script src="js/medbay.js"></script><script src="js/reactor.js"></script><script src="js/bridge.js"></script><script src="js/stations.js"></script><script src="js/checkin.js"></script><script src="js/session.js"></script>
+<script src="js/figure.js"></script><script src="js/poses.js"></script><script src="js/stage.js"></script><script src="js/suitbay.js"></script><script src="js/mess.js"></script><script src="js/quarters.js"></script><script src="js/capquarters.js"></script><script src="js/readyroom.js"></script><script src="js/hydroponics.js"></script><script src="js/medbay.js"></script><script src="js/reactor.js"></script><script src="js/bridge.js"></script><script src="js/stations.js"></script><script src="js/checkin.js"></script><script src="js/talk.js"></script><script src="js/session.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
@@ -543,13 +543,13 @@ async function aftercareOne(r) {
   if (other) bay.group.visible = false;
   fade(); ses.aftercare(r.id, other); ses.camera(0, 0); drawCams(); refresh();
   const P = ses.people.find(p => p.id === r.id);
-  const run = async steps => {
-    for (const s of steps) {
-      if (s.choose) { const o = await choose(s.choose); r.choice = r.choice || []; r.choice.push(o.order || o.label); await run(o.then); continue; }
-      const id = s.who === 'captain' ? (ses.correctorId || 'captain') : r.id; if (s.expr) { if (s.who === 'captain') ses.captain.setExpr(s.expr); else if (P) P.f.setExpr(s.expr); }
-      await showLine(s.who, id, s.text, steps[steps.indexOf(s) + 1] && steps[steps.indexOf(s) + 1].choose ? 'choices' : 'click');
-    }
-  };
+  // (played through js/talk.js: what the Captain says explored, any or all of it, then the instruction; each kept for the summary)
+  const run = steps => Talk.play(steps, {
+    line: (s, hold) => { const id = s.who === 'captain' ? (ses.correctorId || 'captain') : r.id; if (s.expr) { if (s.who === 'captain') ses.captain.setExpr(s.expr); else if (P) P.f.setExpr(s.expr); }
+      return showLine(s.who, id, s.text, hold); },
+    choose: options => choose(options),
+    took: o => { r.choice = r.choice || []; r.choice.push(o.label); if (o.order) r.order = o.label; },
+  });
   // (the Captain, after the Proctor's held them to account: the Proctor's aftercare, the player choosing the Captain's words)
   await run(r.id === 'captain' ? Lines.checkinAfter(r.outcome, chk ? chk.v.items : []) : Lines.after(r.id, r.outcome, r.defiance && r.defiance.to > 0.45 ? 'unbroken' : null)); ses.cared(r.id);
   if (other) { fade(); stage.scene.remove(other.group); bay.group.visible = true; ses.back(); drawCams(); refresh(); }
@@ -562,7 +562,7 @@ async function aftercareAll(results) {
   results = ses.st.results;      // (the summary: everyone, cared for now or earlier)
   $('say').style.display = 'none';
   const S = $('summary'); S.style.display = 'block';
-  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${nameOf(r.id)}</td><td>${{ otk: 'across the knee', wall: 'standing', table: 'over the table' }[r.position] || r.position}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${wordOf(r.id)}”` : 'completed'}</td><td>peak: ${r.band}</td><td>defiance ${pc(r.defiance.from)} → ${pc(r.defiance.to)}</td><td>compliance +${pc(r.compliance)}</td><td>resentment +${pc(r.resentment)}</td><td>${(r.choice || [])[1] || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
+  S.innerHTML = `<h2 style="margin:0 0 4px;font-size:16px">After</h2><table>${results.map(r => `<tr><td>${nameOf(r.id)}</td><td>${{ otk: 'across the knee', wall: 'standing', table: 'over the table' }[r.position] || r.position}</td><td>${r.hits} smacks</td><td>${r.outcome === 'word' ? `called “${wordOf(r.id)}”` : 'completed'}</td><td>peak: ${r.band}</td><td>defiance ${pc(r.defiance.from)} → ${pc(r.defiance.to)}</td><td>compliance +${pc(r.compliance)}</td><td>resentment +${pc(r.resentment)}</td><td>${r.order || ''}</td></tr>`).join('')}</table><button onclick="begin()">Again</button>`;
 }
 
 // ── Live controls ──

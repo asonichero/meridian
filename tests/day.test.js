@@ -66,7 +66,11 @@ test('every scene has its lines filled in and its choices whole, for every watch
       const x = { day, t, w0: Day.watchFor(day), w1: Day.watchFor(day + 1), here: Day.present(room, t, day).filter(i => !Day.whereIs(i, t, day).asleep), seen: {}, state: s };
       const steps = DayLines.scene(id, x); assert.ok(steps.length, `${id} day ${day}`);
       const check = list => { for (const st of list) {
-        if (st.choose) { assert.ok(st.choose.length, `${id}: an empty choice, day ${day}`); for (const c of st.choose) { assert.ok(c.label && !/[{}]/.test(c.label), c.label); check(c.then); } continue; }
+        if (st.choose) {
+          assert.ok(st.choose.length, `${id}: an empty choice, day ${day}`);
+          // (lines of inquiry always offer a way to end the conversation, and something to ask besides)
+          if (st.explore) { assert.ok(st.choose.some(c => c.end), `${id}: no way to end it, day ${day}`); assert.ok(st.choose.some(c => !c.end), `${id}: nothing to ask, day ${day}`); }
+          for (const c of st.choose) { assert.ok(c.label && !/[{}]/.test(c.label), c.label); check(c.then); } continue; }
         assert.ok(st.text && !/[{}]|undefined/.test(st.text), `${id}: ${st.text}`);
         assert.ok(st.who === 'proctor' || st.who === 'captain' || x.here.includes(st.who) || st.radio, `${id}: ${st.who} speaks but isn't there (day ${day})`);
       } };
@@ -79,6 +83,9 @@ test('an ordinary visit has something for everyone there, at any hour', () => {
   for (const room of Object.keys(Day.ROOMS)) for (let t = Day.T.wake; t < Day.T.lights; t += 30) {
     const x = { day: 1, t, w0: 'pilot', w1: 'comms', here: Day.present(room, t, 1).filter(i => !Day.whereIs(i, t, 1).asleep), seen: {}, state: Day.fresh(1) };
     const steps = DayLines.visit(room, x); assert.ok(steps.length, `${room} ${Day.clock(t)}`);
-    for (const st of steps) if (!st.choose) assert.ok(st.text && !/[{}]|undefined/.test(st.text), `${room} ${Day.clock(t)}: ${st.text}`);
+    const check = list => { for (const st of list) {
+      if (st.choose) { if (st.explore) assert.ok(st.choose.some(c => c.end), `${room} ${Day.clock(t)}: no way to end it`); for (const c of st.choose) check(c.then || []); continue; }
+      assert.ok(st.text && !/[{}]|undefined/.test(st.text), `${room} ${Day.clock(t)}: ${st.text}`); } };
+    check(steps);
   }
 });

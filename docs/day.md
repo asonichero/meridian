@@ -69,13 +69,21 @@ and after, their own clothes.
 
 Each step of the routine is a short scene in that room, and anywhere else is an ordinary visit to whoever's there. In each:
 
-- **Choices.** One or two choices in each scene, each in one of three manners: **warm**, **formal** or **brisk**.
-  - The Proctor keeps the Captain's manner (it learns the Captain's language from it: GDD §6.1).
-  - A choice can move a crew member's **comfort** with the Captain, and for the romance candidates a little **desire**. These are the same
-    values a correction reads (README, *The relationship*).
-  - A second visit to someone the same day moves them half as much.
-- **Ordinary visits.** At work or off duty, the Captain asks how the work's going (formal), how they are (warm), or is just looking in
-  (brisk). With more than one there, the Captain chooses whom to talk to.
+- **Lines of inquiry.** Most choices are things the Captain can ask or say, worked through one at a time:
+  - after each answer the menu comes back, less what's been asked;
+  - an option to end the conversation is always there ("Carry on.", "Leave the rest for tomorrow.");
+  - once everything has been asked, the conversation ends by itself;
+  - where there are several ways to end it (logging the day one way or another), the player chooses;
+  - two answers to the same thing (doing the baseline now, or Thursday) are one choice: taking one takes both away.
+- **Single decisions** stay single: how the Captain relieves the watch, whose side they take at dinner, how they hand the ship to the night
+  watch.
+- **Manner.** Each option is in one of three manners: **warm**, **formal** or **brisk**. The Proctor keeps the Captain's manner (it learns
+  the Captain's language from it: GDD §6.1).
+- **What it moves.** An option can move a crew member's **comfort** with the Captain, and for the romance candidates a little **desire**.
+  These are the same values a correction reads (README, *The relationship*). Asking more moves more; a second visit to someone the same day
+  moves them half as much.
+- **Ordinary visits.** At work or off duty, the Captain asks how the work's going (formal), how they are (warm), or both, and then lets them
+  get on (or is just looking in). With more than one there, the Captain talks to each in turn, or leaves them to it.
 - **Empty rooms.** The Proctor says where whoever works there is. The Captain's quarters and the desk offer time to rest or catch up.
 - **Who speaks.** Only someone in the room speaks, except over comms at the briefing. Whoever stood last night's watch sleeps half the
   day, and the watch goes round, so the lines are chosen by who's there.
@@ -103,6 +111,7 @@ All the lines are drafts (`js/daylines.js`), as are these choices about the worl
 
 - `js/day.js`: the clock, the routine, the watch, and who's where. Logic only, tested in `tests/day.test.js`.
 - `js/daylines.js`: the scenes, the visits, the Proctor's suggestions and the evening report.
+- `js/talk.js`: a conversation played through, lines of inquiry and all (the correction's aftercare too).
 - `js/deckplan.js`: the plan.
 - `js/visit.js`: a visit's staging.
 - `day.html`: the page.
